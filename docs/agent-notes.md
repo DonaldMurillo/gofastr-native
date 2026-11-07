@@ -1,5 +1,14 @@
 # Implementation notes
 
+## 2026-11-07 - macOS aliases and extension entry points
+- Scope: release safety, scaffolding, UIKit share inbox, build.
+- Trigger: `248d14e` introduced host-independent Windows test paths and partial symlink resolution; `66f1ec7` introduced URL-based inbox deduplication and a Share executable without an entry point.
+- Approach: use host-native scaffold fixtures; check lexical and resolved containment through missing suffixes, failing closed on resolution errors; deduplicate inbox items by filename; link Share with `_NSExtensionMain` while preserving Widget `@main`.
+- Evidence: exact five regression tests pass with `GOWORK=off`; added missing-path/alias/outward/dangling-link checks and executable Swift checks through a symlinked parent. Compiler logs and Swift assertion call-site lines now survive failures.
+- Details: [release containment](release.md), [incoming shares](share-in.md). macOS Foundation directory listings canonicalize `/var`/`/tmp` aliases; URL equality is not item identity.
+- Next time: run the executable macOS checks and full `GOWORK=off go test -count=1 ./...`; resolve both paths consistently before trusting release containment, and keep Windows backslash fixtures on Windows.
+- Status: active.
+
 ## 2026-11-06 - Keep validation local, without CI
 - Scope: build, tooling, terminal.
 - Trigger: repository policy excludes CI; the desktop Notes command also cannot link as a CGO-disabled iOS executable.

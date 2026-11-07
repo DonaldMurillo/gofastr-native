@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -86,14 +87,20 @@ func TestInitDryRunListsFilesAndWritesNothing(t *testing.T) {
 }
 
 func TestInitGoModPinsToolsAndReplace(t *testing.T) {
+	// Checkout paths belong to the host OS. On Unix, backslashes are valid
+	// filename characters rather than separators; exercise Windows on Windows.
+	nativeDir := filepath.Join(t.TempDir(), "gofastr-native")
+	if runtime.GOOS == "windows" {
+		nativeDir = `C:\src\gofastr-native`
+	}
 	s := appScaffold{Module: "example.com/hello", ImportBase: "example.com/hello", Package: "hello", ID: "dev.gofastr.hello", Name: "Hello",
-		Native: nativeSource{dir: `C:\src\gofastr-native`}, GoVersion: "1.27.3"}
+		Native: nativeSource{dir: nativeDir}, GoVersion: "1.27.3"}
 	files, err := appScaffoldFiles(s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mod := string(files["go.mod"])
-	for _, want := range []string{"module example.com/hello", "go 1.27.3", nativeModulePath + " " + placeholderVersion, "=> C:/src/gofastr-native", nativeModulePath + "/cmd/gofastr-native", "golang.org/x/mobile/cmd/gomobile", "golang.org/x/mobile/cmd/gobind"} {
+	for _, want := range []string{"module example.com/hello", "go 1.27.3", nativeModulePath + " " + placeholderVersion, "=> " + filepath.ToSlash(nativeDir), nativeModulePath + "/cmd/gofastr-native", "golang.org/x/mobile/cmd/gomobile", "golang.org/x/mobile/cmd/gobind"} {
 		if !strings.Contains(mod, want) {
 			t.Errorf("go.mod lacks %q:\n%s", want, mod)
 		}
