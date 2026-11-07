@@ -51,26 +51,25 @@ command overview, completed checks, and the remaining platform acceptance gates.
 
 ## The gofastr version
 
-`go.mod` requires gofastr v0.96.0, the first release with the seams this
-module uses. Before it, `go.mod` pinned the main commit that merged them
-(#663, `6905b8f07`) as a pseudo-version. The seams:
+`go.mod` requires gofastr v0.96.0. The public seams this module uses:
 
 | Seam | What it does here |
 |---|---|
-| `framework.App.Serve(net.Listener)` | Runs the app's full lifecycle on the in-memory listener. |
+| `framework.App.Run(ctx, framework.ServicesHost())` | Runs the service-only lifecycle without a listener, HTTP server or HTTP client. |
+| `framework.App.ServicesReady()` | Reports service readiness after all boot phases succeed. |
+| `framework.App.Serve(net.Listener)` | Runs the WebView app's full lifecycle on the in-memory listener. |
 | `window.__gofastr_transport` (core-ui runtime) | Every runtime request goes through it, so `bridge.js` can carry requests over the native message channel. |
 | `framework/localapp` | Opens the data directory: SQLite DB, session secret, the installation's owner id. Shared with the desktop and service batteries. |
 | `App.NoteAuthenticator` and the banner | The startup banner prints paths for a listener with no `host:port`, and the host quiets the "No auth is wired" warning. |
 
-Once a release ships them, replace the pseudo-version with that tag. To work
-against a local gofastr checkout, copy `go.work.example` to `go.work` and
+To work against a local gofastr checkout, copy `go.work.example` to `go.work` and
 point it at the checkout. `go.work` is gitignored.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
-| `mobilehost/` | The host. `Options(data)` turns a `localapp.Data` into app options. `New(app, cfg)` registers the `mobile` battery (single-user identity), and `Start` runs the app on an in-memory listener. `Do` and `Open` serve one request buffered or streamed. `Bridge` answers one message from `bridge.js`. |
+| `mobilehost/` | The host. `Options(data)` turns a `localapp.Data` into app options. `New(app, cfg)` registers the `mobile` battery (single-user identity). `Start` uses `ServicesHost` for service-only apps and an in-memory listener for WebView apps. `Do` and `Open` serve requests only in WebView mode; otherwise they return `ErrServiceOnly`. `Bridge` answers one message from `bridge.js`. |
 | `mobilehost/bridge.js` | The page half of the native bridge: installs `window.__gofastr_transport` and sends native POST forms over the same channel. |
 | `mobileui/` | An experimental external mobile-web presentation package: iOS/Android components, styles, behavior, and adaptive themes, using GoFastr's public registry. |
 | `examples/notes/notesapp/` | Composes an owner-scoped entity, rendering-independent Notes service, and handwritten mobile screens. No CSS or structural screen markup. |
@@ -153,9 +152,9 @@ The native prototype uses Go-authored `nativeui` screens and a reusable, bundled
 UIKit or Android renderer selected by `--renderer native`. Apps do not write platform templates
 or wire JSON. No GoFastr code or production dependencies changed.
 UIKit now composes services/installation data without mounting unused web
-screens. It still uses in-memory `App.Serve` for the complete framework lifecycle;
-listener-free startup is not claimed. Shared editor policy, durable draft storage,
-capabilities and observed effect receipts live in [mobile runtime services](docs/mobile-runtime.md).
+screens. It uses `App.Run(ctx, framework.ServicesHost())` for the complete
+listener-free lifecycle and waits on `App.ServicesReady()`. Shared editor
+policy, durable draft storage, capabilities and observed effect receipts live in [mobile runtime services](docs/mobile-runtime.md).
 See [the architecture, public APIs, validation, and limitations](docs/presentation-prototype.md)
 and [the native host contract](docs/native-presentation.md), plus
 [implementation notes](docs/agent-notes.md).
@@ -360,9 +359,10 @@ interception path and `Open`, which hands chunks over as they arrive.
   `mobileui.Theme(platform)`; a scaffold must also choose its presentation.
 - **The framework's 404 page has no styles.** On the phone it renders as bare
   HTML.
-- **Listener-free lifecycle is not extracted.** UIKit no longer mounts web
-  screens, but its complete lifecycle still runs through in-memory Serve. See
-  [Gate A versus Gate B](docs/mobile-lifecycle.md).
+- **Service-only hosts have no HTTP transport.** UIKit mounts no unused web
+  screens and uses the listener-free lifecycle. Framework HTTP routes stay
+  configured but unused. WebView hosts still use in-memory `App.Serve`. See
+  [Gate A and Gate B](docs/mobile-lifecycle.md).
 - **Some async acceptance gaps remain.** App-tagged browser history and explicit
   app departure now await Go acknowledgement. Untagged history fails closed;
   immediate termination can still outrun checkpoints. Keyed list updates,
@@ -374,7 +374,7 @@ interception path and `Open`, which hands chunks over as they arrive.
 Follow the [milestones and acceptance gates](docs/mobile-roadmap.md#build-order-and-acceptance-gates):
 
 1. Finish the remaining M2 Back/IME/accessibility gates over the shared editor/runtime.
-2. Propose a complete public listener-free lifecycle seam; do not copy framework startup.
+2. Preserve the tested listener-free lifecycle and WebView shutdown boundaries; do not copy framework startup.
 3. Run the Android gates [Android builds and acceptance](docs/android.md) leaves open; preserve WebView support.
 4. Expand task-shaped components/capabilities, then extensions, scaffolding, device
    signing, and measured optimization. Re-pin to framework releases as required

@@ -1,5 +1,14 @@
 # Implementation notes
 
+## 2026-11-07 - Service-only lifecycle without transport
+- Scope: mobilehost, native, lifecycle.
+- Trigger: gofastr v0.96.0 adds `App.Run`, `ServicesHost` and `ServicesReady`; the old listener-free Gate B status is superseded.
+- Approach: run services on `context.Background()` and let the first Host.Stop own Shutdown's deadline; do not cancel the bridge context as Run's lifetime or register OnReady.
+- Evidence: `mobilehost/lifecycle_test.go` covers no transport, stop during boot, concurrent Start/Stop, rollback once and waiting past Run completion; HTTP drain/ownership assertions use WebView hosts.
+- Details: [lifecycle contract and regression checks](mobile-lifecycle.md). Run can return nil before a pending Shutdown finishes; pre-boot refusal still needs composition cleanup.
+- Next time: read the pinned `framework/host.go` with `GOWORK=off`; preserve the Stop owner and use recorder-based handlers for unused-route checks, not service-only Do/Open.
+- Status: active.
+
 ## 2026-11-07 - macOS aliases and extension entry points
 - Scope: release safety, scaffolding, UIKit share inbox, build.
 - Trigger: `248d14e` introduced host-independent Windows test paths and partial symlink resolution; `66f1ec7` introduced URL-based inbox deduplication and a Share executable without an entry point.
@@ -237,7 +246,7 @@
 - Approach: use one mobile screen set with UIKit and WebView adapters; keep interaction/navigation renderer-owned and preserve independent whole-web-app hosting.
 - Evidence: `render/webview`, `examples/notes/notesscreens`, and `docs/shared-mobile-screens.md`; both mobile bindings consume the same definitions.
 - Next time: extend shared `behavior.Editor`/`nativeui.Runtime`; keep browser-Back, keyed collection and listener-free lifecycle gaps explicit.
-- Status: active
+- Status: lifecycle gap superseded by the 2026-11-07 service-only lifecycle entry; other gaps remain separate
 
 ## 2026-11-04 - External presentation boundary
 - Scope: presentation, mobile, terminal
@@ -269,7 +278,7 @@
 - Approach: superseded by `notesapp/application.Open` plus `mobilehost.ServiceOnly`: UIKit mounts no unused UIHost but retains in-memory Serve for the complete lifecycle.
 - Evidence: `examples/notes/notesnative/notesnative.go`, `docs/native-presentation.md`.
 - Next time: read `docs/mobile-lifecycle.md`; do not replace complete Serve with InitPlugins or claim listener-free Gate B.
-- Status: superseded by UI-independent Gate A; listener-free Gate B remains open
+- Status: superseded by the 2026-11-07 service-only lifecycle entry; the old listener-free Gate B status no longer applies
 
 ## 2026-11-04 - Presentations are typed Go continuations
 - Scope: behavior, native, webview, examples

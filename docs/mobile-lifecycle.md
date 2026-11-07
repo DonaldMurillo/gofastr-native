@@ -1,11 +1,12 @@
 # Mobile application lifecycle: M3
 
-## Gate A — UI-independent startup
+## Gate A: UI-independent startup
 
 Native Notes composes the same entity, owner-scoped repository, service and
 installation data as both web presentations, without mounting a `UIHost` or
 importing `notesweb`, `mobileui`, or `render/webview` into the native binding.
-This is **UI-independent startup, not HTTP-free or listener-free startup**.
+Gate A covers composition without a web presentation. Gate B below covers the
+listener-free service lifecycle provided by gofastr v0.96.0.
 
 - `examples/notes/notesapp/application.Open(dataDir)` constructs the shared
   `Application`: `App`, `Data`, and `Service`. It does not choose a presentation,
@@ -20,8 +21,9 @@ This is **UI-independent startup, not HTTP-free or listener-free startup**.
 - `mobilehost.New(app, mobilehost.Config{Data: shared.Data, ServiceOnly: true})`
   explicitly omits the WebView script route, script injection, and `UIHost`
   requirement. It still installs the local identity middleware, respecting a
-  foreign authenticator, and starts the real `App.Serve` on a `memory` listener
-  made of `net.Pipe` connections. It opens no TCP socket or loopback port.
+  foreign authenticator, and the owner extractor used by direct service calls.
+  It runs `App.Run(context.Background(), framework.ServicesHost())` without
+  constructing a listener, HTTP server, HTTP client or cookie jar.
 - `mobilehost.New` defaults are unchanged: without `ServiceOnly`, a mounted
   `uihost.UIHost` is required at startup and the bridge is installed normally.
   `notesapp.Build`, `BuildWithPlatform`, `BuildScreensWithPlatform`, and
@@ -34,36 +36,53 @@ This is **UI-independent startup, not HTTP-free or listener-free startup**.
 
 ### One lifecycle owner
 
-`Host.Start` delegates to the public `App.Serve` lifecycle. The current public
-pin and active workspace perform migration/entity seeding, app seed hooks,
+`Host.Start` delegates to public `App.Run` with `ServicesHost` for service-only
+apps and `App.Serve` on a memory listener for WebView apps. The v0.96.0 pin
+performs migration/entity seeding, app seed hooks,
 plugin/battery initialization, a second migration pass for schema registered
 during initialization, battery/application start hooks, readiness and handler
 composition. `App.Shutdown` owns cancellation, request/stream drain, reverse
 battery stop and stop hooks. Mobile code does not reproduce those phases.
 
 `InitPlugins` alone is not a replacement: it initializes registrations but does
-not provide migration/seeding, start hooks, serving readiness, or complete
+not provide migration/seeding, start hooks, readiness, or complete
 startup-failure handling. Nor does `RunWithSignals` initialize an application;
 it waits for signals and invokes shutdown. Mobile disables process signal
-handling because the OS host owns its lifecycle.
+handling in WebView mode because the OS host owns its lifecycle. `App.Run`
+installs no signal handler, so service-only mode does not change that setting.
+
+Service-only Start waits on `App.ServicesReady()`, not `OnReady`. `App.Run`
+refuses `OnReady` hooks because they need an HTTP listener. It also refuses
+interactive HTTP setup; headless setup remains available. Framework HTTP routes,
+`WrapServer`, TLS and server timeouts stay configured but unused.
+
+Run receives `context.Background()`, not the bridge context or the startup
+timer's context. Stop calls `App.Shutdown` with the caller's context; Shutdown
+cancels the framework lifecycle context passed to boot hooks and workers. This
+avoids a competing Run-context shutdown with a different deadline.
 
 Host completion is a closed, repeatably observable channel, not a consumed
-error receive. A failed `Serve`, including an error before GoFastr establishes
-its lifecycle context, is followed by idempotent `App.Shutdown` before Start
-reports completion. Startup timeout requests bounded shutdown. `Stop` closes
-the in-memory transport, closes idle client connections, joins Serve within
+error receive. Run rolls back admitted startup failures itself. When Run or
+Serve returns on its own, the completion path claims shutdown only if Stop has
+not claimed it. Its idempotent `App.Shutdown` also closes a composition refused
+before framework boot begins. Startup timeout requests Stop with a five-second
+context. `Stop` closes WebView transport when present, joins Run or Serve within
 the supplied context and reports deadline errors. Repeat/concurrent stops share
 their result. A Host/App is one-shot; restart constructs a fresh pair over the
 same data directory.
 
-Host shutdown has one owner: either the first `Stop`, or the Serve-return path
-if the server exits unexpectedly. Listener closure during a normal Stop does
+Host shutdown has one owner: either the first `Stop`, or the completion path
+if the run ends on its own. Run may return nil while an existing Shutdown is
+still tearing down. Stop waits for its own Shutdown call, not just the run's
+completion channel, so stop-hook failures stay with that owner. A stop during
+boot cancels the current phase and waits for teardown without publishing
+readiness. Listener closure during a normal WebView Stop does
 not start a second, shorter shutdown budget. Long requests such as live watches
 drain against the Stop caller's context rather than producing an unrelated
 five-second follower timeout. The HTTP-boundary regression is
 `TestStopDrainsLongRequestWithOneShutdownOwner` in `mobilehost/lifecycle_test.go`.
 
-The Host also owns the bridge-request context. Stop cancels outstanding
+The WebView Host also owns the bridge-request context. Stop cancels outstanding
 native-channel requests before HTTP drain, so abandoned live polls cannot
 consume the entire shutdown deadline. Cancellation does not imply that an
 already-started write failed; no action is replayed. Direct `Do`/`Open` callers
@@ -91,22 +110,39 @@ context can delay the admission drain; the 10-second host shutdown budget starts
 after that drain. Code running inside an admitted operation must not synchronously
 call `Stop`, because Stop necessarily waits for that operation itself.
 
-## Gate B — intentionally not complete
+## Gate B: listener-free startup
 
-There is no complete public listener-free equivalent of `App.Serve` in the
-currently pinned GoFastr API. Gate A therefore deliberately retains an explicit
-temporary in-memory Serve adapter, an HTTP server and its transport/client.
-Service-only mode does not remove framework HTTP routes or HTTP dependencies;
-it only removes the unused web presentation and WebView bridge. No GoFastr core
-change is made or required for Gate A.
+Gate B is complete for `Config.ServiceOnly` using the public v0.96.0 lifecycle.
+No GoFastr core change or manual boot pipeline is needed. This does not remove
+HTTP dependencies or route registration from the application. It leaves those
+routes unused and rejects `Host.Do` and `Host.Open` with the exported
+`mobilehost.ErrServiceOnly`, including before startup and after shutdown.
 
-The minimal upstream proposal is a public lifecycle operation that performs
-the same pre-serving pipeline, including schema registered by plugins, app
-lifecycle context, startup hooks, readiness and failure rollback, then pairs
-with the existing idempotent Shutdown without creating a server/listener. That
-operation must specify concurrent startup/stop and startup-failure guarantees.
-Do not substitute manual `InitPlugins`/migration calls or a worker-role setting
-for this contract. Until such a seam exists and is tested, do not claim Gate B.
+`mobilehost/lifecycle_test.go` exercises these boundaries:
+
+- `TestServiceOnlyHasNoTransport` checks construction and startup without a
+  listener, client or cookie jar, unused `WrapServer`, readiness, and transport
+  errors before Start, while running and after Stop.
+- `TestServiceOnlyStopDuringBoot` cancels seed and start hooks, joins the Start
+  caller and run goroutine, closes storage once, and never publishes readiness.
+- `TestServiceOnlyConcurrentStartStop` rejects a second Start while booting and
+  joins concurrent Stops with the same teardown error and one stop-hook call.
+- `TestServiceOnlyRejectsReadyHooksDuringBoot` exercises startup refusal and one
+  rollback when a start hook registers an HTTP-dependent `OnReady` hook.
+- `TestStartupFailureDrainsAndStopIsRepeatable` covers pre-boot refusal,
+  migration, seed, init and start failures, plus WebView HTTP preflight failure.
+- `TestServiceOnlyStopWaitsForTeardown` proves that Run completion does not
+  replace waiting for Shutdown or consume its teardown error.
+- `TestStartupTimeoutCancelsAndJoinsWorkers` checks timeout cancellation,
+  run completion and database cleanup.
+
+WebView request drain and bridge cancellation tests still run on a mounted
+`uihost.UIHost` with the in-memory transport. Notes service/HTTP interoperability
+and forged-owner assertions use that WebView mode rather than a service-only
+host. Service-only identity and unused-route checks call the configured handler
+directly without constructing a host transport. Notes keeps its missing-route
+assertions in `TestServiceOnlyLeavesWebRoutesUnused`; its native bootstrap test
+checks that HTTP access is unavailable.
 
 ## Regression checks and implementation notes
 
@@ -121,20 +157,18 @@ service/HTTP interoperability, legacy web builders and native operation drain
 with a reentrant callback. Dependency checks prevent web adapters returning to
 the native bootstrap.
 
-Next time: inspect `go.work` before auditing upstream APIs; the sibling checkout
-may not be the selected core. Check both the selected workspace and the public
-pin, and keep application construction separate from lifecycle execution.
+Next time: inspect the pinned module's `framework/host.go` with `GOWORK=off`;
+the sibling workspace checkout may expose a different contract. Keep application
+construction separate from lifecycle execution.
 Use the admission helper for new native commands so asynchronous waits cannot
 reintroduce a lifecycle lock held across business code.
 
 ```sh
-export GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL
-go test ./mobilehost ./examples/notes/...
-go test -race ./mobilehost ./examples/notes/...
-GOWORK=off go test ./mobilehost ./examples/notes/...
-GOWORK=off go test -race ./mobilehost ./examples/notes/...
-GOWORK=off go vet ./mobilehost ./examples/notes/...
+gofmt -l $(git ls-files '*.go' ':!:tui/**')
+GOWORK=off go vet ./...
+GOWORK=off go test -race ./mobilehost/... ./examples/notes/...
+GOWORK=off go test ./...
 ```
 
 These checks do not establish renderer pixel quality, capability negotiation,
-Android native support or listener-free startup. Those have separate gates.
+Android native support. Those have separate gates.

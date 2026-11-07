@@ -174,9 +174,11 @@ general scene restoration, physical-device release tooling, and a public GoFastr
 renderer-host mounting seam. No remote UI/code loading is added.
 
 **Bootstrap boundary:** startup composes `notesapp/application.Open` without a
-web presentation, then uses `mobilehost.ServiceOnly` for the complete in-memory
-Serve lifecycle. M3 Gate A is complete; listener-free Gate B is not. Neither
-GoFastr checkout is modified.
+web presentation, then uses `mobilehost.ServiceOnly` with
+`App.Run(ctx, framework.ServicesHost())` and `App.ServicesReady()` for the
+complete listener-free lifecycle. M3 Gate A and Gate B are complete for this
+mode. Framework HTTP routes stay configured but unused. WebView hosting still
+uses in-memory `App.Serve`. No GoFastr core changes are needed.
 
 ## Verification
 

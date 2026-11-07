@@ -176,10 +176,10 @@ controls or terminal widgets to core. External web packages can already own
 components and screens through public APIs.
 
 The native host now demonstrates Go-owned mobile screens/actions without HTML
-and composes its services without mounting a web UI. It still uses in-memory
-Serve for full lifecycle ownership, not a listener-free native startup. See
-[Gate A and the remaining Gate B seam](mobile-lifecycle.md). Extract only the demonstrated gaps:
-host-neutral app lifecycle, destination/action identity independent of HTTP,
+and composes its services without mounting a web UI. It uses the listener-free
+`App.Run(ctx, framework.ServicesHost())` lifecycle in gofastr v0.96.0. See
+[Gate A and Gate B](mobile-lifecycle.md). Extract only the demonstrated gaps:
+destination/action identity independent of HTTP,
 explicit host capabilities, and screen activation/disposal/navigation delivery.
 A native renderer should mount native controls, a canvas renderer should own its
 scene, and neither should implement an HTTP response or return HTML merely to

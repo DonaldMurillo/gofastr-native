@@ -265,25 +265,27 @@ collection updates. Do not label the entire M2 gate complete from this slice.
   repository supports it; unknown outcomes must remain truthful and not trigger
   an unsafe automatic retry.
 
-### M3 — Separate application startup from presentation
+### M3: separate application startup from presentation
 
-**Gate A complete; Gate B explicitly incomplete.** Shared
+**Gate A and Gate B complete for service-only startup.** Shared
 `notesapp/application.Open` and `mobilehost.ServiceOnly` remove the unused native
-web presentation while preserving full in-memory Serve lifecycle. See
+web presentation and use `App.Run(ctx, framework.ServicesHost())` with
+`App.ServicesReady()` for the full listener-free lifecycle. WebView hosts keep
+`App.Serve` on their in-memory transport. See
 [lifecycle guarantees and tests](mobile-lifecycle.md).
 
 - Split entity/service/identity/data composition from web mounting and transport.
   Native boot must stop mounting unused web screens. Reuse public lifecycle
   mechanisms; do not copy migrations, plugin startup, readiness, or shutdown.
-- Audit `App.Serve`, `InitPlugins`, readiness, and cleanup separately. Calling
+- Audit `App.Run`, `App.Serve`, `InitPlugins`, readiness, and cleanup separately. Calling
   `InitPlugins` alone is not equivalent to the complete startup pipeline.
 - Gate A: UI-independent startup with the same identity, scoped repository,
   migrations, fresh-install behavior, and failure cleanup; no unused `UIHost`.
-- Gate B: listener-free native startup only if a complete public lifecycle seam
-  supports it. If it does not, retain an explicit temporary in-memory Serve
-  adapter and propose the minimal upstream lifecycle seam separately. No
-  GoFastr core changes are authorized by this roadmap; do not label Gate A
-  HTTP-free or Gate B complete prematurely.
+- Gate B: service-only hosts construct no listener, HTTP server, client or
+  cookie jar. Tests cover concurrent Start/Stop, stop during seed/start hooks,
+  startup rollback and shutdown ownership. Framework HTTP routes stay
+  configured but unused. `Do` and `Open` return `mobilehost.ErrServiceOnly`.
+  No GoFastr core changes are needed.
 
 ### M4 — Android native against the same contract
 
