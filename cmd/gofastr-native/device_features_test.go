@@ -69,7 +69,7 @@ func TestIOSFeatureExtensionPlanKeepsExecutablesAndKeychainSeparate(t *testing.T
 	if err := buildIOSFeatureExtensions(&runner{ctx: context.Background(), dryRun: true, out: &plan}, a, directory, filepath.Join(directory, "Features.app"), "<sdk>", "arm64-apple-ios16.0-simulator"); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"-application-extension", "GofastrShareViewController.swift", "GofastrWidgetExtension.swift", "PlugIns", "--entitlements"} {
+	for _, expected := range []string{"-application-extension", "-Xlinker -e -Xlinker _NSExtensionMain", "GofastrShareViewController.swift", "GofastrWidgetExtension.swift", "PlugIns", "--entitlements"} {
 		if !strings.Contains(plan.String(), expected) {
 			t.Error("extension plan omits", expected)
 		}
@@ -124,7 +124,9 @@ func TestIOSDeviceFeatureExtensionsCompileAgainstSimulatorSDK(t *testing.T) {
 	a := nativeApp(t)
 	a.ReceiveShares, a.Widgets = true, true
 	a.AppGroup, a.URLScheme = "group.dev.gofastr.featuretest", "feature-test"
-	r := &runner{ctx: context.Background(), out: io.Discard}
+	var output bytes.Buffer
+	t.Cleanup(func() { t.Log(output.String()) })
+	r := &runner{ctx: context.Background(), out: &output}
 	sdk, err := r.output("find simulator SDK", "", "xcrun", "--sdk", "iphonesimulator", "--show-sdk-path")
 	if err != nil {
 		t.Skip(err)
