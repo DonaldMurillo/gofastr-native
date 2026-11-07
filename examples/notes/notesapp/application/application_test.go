@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	appui "github.com/DonaldMurillo/gofastr/core-ui/app"
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
 	"github.com/DonaldMurillo/gofastr/framework/owner"
+	"github.com/DonaldMurillo/gofastr/framework/uihost"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp/application"
@@ -22,6 +25,11 @@ import (
 
 func start(t *testing.T, directory string) (*application.Application, *mobilehost.Host) {
 	t.Helper()
+	return startMode(t, directory, true)
+}
+
+func startMode(t *testing.T, directory string, serviceOnly bool) (*application.Application, *mobilehost.Host) {
+	t.Helper()
 	shared, err := application.Open(directory)
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +38,10 @@ func start(t *testing.T, directory string) (*application.Application, *mobilehos
 	if len(shared.App.Mountables()) != 0 {
 		t.Fatal("host-neutral composition requires a presentation")
 	}
-	host, err := mobilehost.New(shared.App, mobilehost.Config{Data: shared.Data, ServiceOnly: true})
+	if !serviceOnly {
+		shared.App.Mount(uihost.New(appui.NewApp("authorization-test")))
+	}
+	host, err := mobilehost.New(shared.App, mobilehost.Config{Data: shared.Data, ServiceOnly: serviceOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +161,7 @@ func TestLegacySchemaMigratesWithoutReplacingIdentity(t *testing.T) {
 
 func TestServiceAndHTTPShareAuthorizationAndValidation(t *testing.T) {
 	t.Cleanup(func() { owner.SetExtractor(nil) })
-	shared, host := start(t, t.TempDir())
+	shared, host := startMode(t, t.TempDir(), false)
 	ctx := handler.SetUser(context.Background(), shared.Data.User)
 	created, err := shared.Service.Save(ctx, "", "Scoped service", "Native and HTTP share one repository.")
 	if err != nil {
@@ -197,5 +208,17 @@ func TestServiceAndHTTPShareAuthorizationAndValidation(t *testing.T) {
 	}
 	if rows, err := shared.Service.List(other, "From HTTP"); err != nil || len(rows) != 0 {
 		t.Fatalf("HTTP caller forged ownership: %+v %v", rows, err)
+	}
+}
+
+func TestServiceOnlyLeavesWebRoutesUnused(t *testing.T) {
+	t.Cleanup(func() { owner.SetExtractor(nil) })
+	shared, _ := start(t, t.TempDir())
+	for _, route := range []string{"/", "/notes", "/notes/new", "/__gofastr-mobile/bridge.js"} {
+		response := httptest.NewRecorder()
+		shared.App.Router().ServeHTTP(response, httptest.NewRequest(http.MethodGet, route, nil))
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("service-only startup installed unused web route %s: %d", route, response.Code)
+		}
 	}
 }
