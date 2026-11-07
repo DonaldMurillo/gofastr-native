@@ -467,19 +467,57 @@ func isDebugKeystore(path string) bool {
 	return errA == nil && errB == nil && os.SameFile(a, b)
 }
 
-// inside reports whether path is dir or below it.
+// inside reports whether path is dir or below it, lexically or after
+// resolving symlinks. Missing suffixes must use the same resolved ancestors
+// as existing paths (notably /var -> /private/var on macOS). Resolution errors
+// fail closed because this guards signing inputs from output cleanup.
 func inside(dir, path string) bool {
-	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
-		dir = resolved
+	within := func(dir, path string) bool {
+		rel, err := filepath.Rel(dir, path)
+		return err == nil && (rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
 	}
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		path = resolved
-	}
-	rel, err := filepath.Rel(dir, path)
+	dir, err := filepath.Abs(dir)
 	if err != nil {
-		return false
+		return true
 	}
-	return rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return true
+	}
+	if within(dir, path) {
+		return true
+	}
+	dir, err = resolveExistingPath(dir)
+	if err != nil {
+		return true
+	}
+	path, err = resolveExistingPath(path)
+	return err != nil || within(dir, path)
+}
+
+// resolveExistingPath resolves the deepest existing ancestor and preserves any
+// missing suffix. A dangling link or inaccessible ancestor is an error, rather
+// than evidence that an input is safely outside the output directory.
+func resolveExistingPath(path string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolved, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if _, statErr := os.Lstat(path); !errors.Is(statErr, os.ErrNotExist) {
+		return "", err
+	}
+	parent := filepath.Dir(path)
+	if parent == path {
+		return "", err
+	}
+	resolved, err = resolveExistingPath(parent)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(resolved, filepath.Base(path)), nil
 }
 
 func contains(list []string, s string) bool {
