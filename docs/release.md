@@ -47,9 +47,13 @@ keystores need.
 
 The CLI refuses the debug keystore, the `androiddebugkey` alias, a
 certificate whose subject is `CN=Android Debug`, an expired certificate, and a
-keystore or other signing input that lives inside `--out`. It checks the key
-with `keytool -list` before running gomobile, so a wrong password or alias
-fails in seconds instead of after the bind.
+keystore or other signing input that lives inside `--out`. Containment checks
+both the supplied paths and their resolved symlink ancestors, including when
+output directories or input suffixes do not exist yet. Inputs reached through
+an alias into output, and symlinks located inside output that point elsewhere,
+are rejected. Unresolvable paths fail closed. It checks the key with
+`keytool -list` before running gomobile, so a wrong password or alias fails in
+seconds instead of after the bind.
 
 Create the upload key yourself, once, and keep it outside the repository. For
 example (the CLI never runs this):

@@ -96,7 +96,10 @@ final class MobileIncomingShareInbox {
         try coordinated {
             let current = try entries()
             let destination = directory.appendingPathComponent(item.identifier + ".json")
-            if current.contains(destination) || FileManager.default.fileExists(atPath: directory.appendingPathComponent(item.identifier + ".ack").path) { return }
+            // Directory listings can resolve symlink aliases in the parent
+            // path. Deduplicate by the identifier filename within this inbox,
+            // not by URL spelling, so a retained share never replaces content.
+            if current.contains(where: { $0.lastPathComponent == destination.lastPathComponent }) || FileManager.default.fileExists(atPath: directory.appendingPathComponent(item.identifier + ".ack").path) { return }
             guard current.count < 16 else { throw MobileIncomingShareError.full }
             #if os(iOS)
             try data.write(to: destination, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
