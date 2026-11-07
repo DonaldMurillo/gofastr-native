@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	appui "github.com/DonaldMurillo/gofastr/core-ui/app"
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/core/schema"
 	"github.com/DonaldMurillo/gofastr/framework"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
 	"github.com/DonaldMurillo/gofastr/framework/owner"
+	"github.com/DonaldMurillo/gofastr/framework/uihost"
 )
 
 type lifecycleBattery struct {
@@ -45,6 +48,11 @@ func (battery *lifecycleBattery) OnStop(ctx context.Context) error {
 
 func lifecycleHost(t *testing.T, configure func(*framework.App), timeout time.Duration) (*framework.App, *localapp.Data, *Host) {
 	t.Helper()
+	return lifecycleHostMode(t, configure, timeout, true)
+}
+
+func lifecycleHostMode(t *testing.T, configure func(*framework.App), timeout time.Duration, serviceOnly bool) (*framework.App, *localapp.Data, *Host) {
+	t.Helper()
 	t.Cleanup(func() { owner.SetExtractor(nil) })
 	data, err := localapp.Open(t.TempDir())
 	if err != nil {
@@ -54,7 +62,10 @@ func lifecycleHost(t *testing.T, configure func(*framework.App), timeout time.Du
 	app := framework.NewApp(Options(data)...)
 	app.OnStop(data.Close)
 	configure(app)
-	host, err := New(app, Config{Data: data, ServiceOnly: true, StartTimeout: timeout})
+	if !serviceOnly {
+		app.Mount(uihost.New(appui.NewApp("lifecycle-test")))
+	}
+	host, err := New(app, Config{Data: data, ServiceOnly: serviceOnly, StartTimeout: timeout})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,17 +117,16 @@ func TestServiceOnlyRunsCompleteLifecycleWithoutUI(t *testing.T) {
 	if len(app.Mountables()) != 0 {
 		t.Fatal("service-only startup mounted a presentation")
 	}
-	if host.ln.Addr().Network() != "memory" || host.ln.Addr().String() != "memory" {
-		t.Fatalf("service-only transport is not explicitly in-memory: %v", host.ln.Addr())
-	}
-	response, err := host.Do(context.Background(), &Request{URL: DefaultOrigin + "/identity"})
-	if err != nil || response.Status != http.StatusOK || string(response.Body) != data.User.GetID() {
-		t.Fatalf("installation identity = %+v, %v", response, err)
+	response := httptest.NewRecorder()
+	host.identityMiddleware(app.Router()).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/identity", nil))
+	if response.Code != http.StatusOK || response.Body.String() != data.User.GetID() {
+		t.Fatalf("installation identity = %d %s", response.Code, response.Body.String())
 	}
 	for _, route := range []string{"/", "/notes", bridgeScriptPath} {
-		response, err := host.Do(context.Background(), &Request{URL: DefaultOrigin + route})
-		if err != nil || response.Status != http.StatusNotFound {
-			t.Fatalf("unused UI route %s = %+v, %v", route, response, err)
+		response := httptest.NewRecorder()
+		app.Router().ServeHTTP(response, httptest.NewRequest(http.MethodGet, route, nil))
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("unused UI route %s = %d", route, response.Code)
 		}
 	}
 	if initialized.Load() != 1 || started.Load() != 1 || seeded.Load() != 1 {
@@ -138,15 +148,264 @@ func TestServiceOnlyRunsCompleteLifecycleWithoutUI(t *testing.T) {
 	}
 }
 
+func requireNoServiceTransport(t *testing.T, host *Host) {
+	t.Helper()
+	if host.ln != nil || host.client != nil || host.jar != nil {
+		t.Fatal("service-only host constructed a listener, HTTP client or cookie jar")
+	}
+}
+
+func TestServiceOnlyHasNoTransport(t *testing.T) {
+	var wrapped atomic.Int32
+	app, _, host := lifecycleHost(t, func(app *framework.App) {
+		app.WrapServer(func(next http.Handler) http.Handler {
+			wrapped.Add(1)
+			return next
+		})
+	}, 0)
+	t.Run("construction", func(t *testing.T) { requireNoServiceTransport(t, host) })
+	assertUnavailable := func(t *testing.T) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		for _, request := range []*Request{nil, {URL: DefaultOrigin + "/"}} {
+			if response, err := host.Do(ctx, request); response != nil || !errors.Is(err, ErrServiceOnly) {
+				t.Errorf("Do = %+v, %v; want ErrServiceOnly", response, err)
+			}
+			if stream, err := host.Open(ctx, request); stream != nil || !errors.Is(err, ErrServiceOnly) {
+				if stream != nil {
+					_ = stream.Close()
+				}
+				t.Errorf("Open = %+v, %v; want ErrServiceOnly", stream, err)
+			}
+		}
+	}
+	t.Run("before-start", assertUnavailable)
+	if err := host.Start(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-app.ServicesReady():
+	default:
+		t.Fatal("Start returned before ServicesReady")
+	}
+	if wrapped.Load() != 0 {
+		t.Fatal("service-only startup composed the HTTP server handler")
+	}
+	t.Run("running", assertUnavailable)
+	if err := host.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("after-stop", assertUnavailable)
+	requireNoServiceTransport(t, host)
+}
+
+func TestServiceOnlyStopDuringBoot(t *testing.T) {
+	for _, phase := range []string{"seed", "start"} {
+		t.Run(phase, func(t *testing.T) {
+			entered := make(chan struct{})
+			finished := make(chan struct{})
+			var stopped atomic.Int32
+			app, data, host := lifecycleHost(t, func(app *framework.App) {
+				block := func(ctx context.Context) error {
+					close(entered)
+					defer close(finished)
+					<-ctx.Done()
+					return ctx.Err()
+				}
+				if phase == "seed" {
+					app.WithSeed(block)
+				} else {
+					app.OnStart(block)
+				}
+				app.OnStop(func() error { stopped.Add(1); return nil })
+			}, 0)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			startDone := make(chan error, 1)
+			go func() { startDone <- host.Start() }()
+			select {
+			case <-entered:
+			case <-ctx.Done():
+				t.Fatal("boot hook did not start")
+			}
+			if err := host.Stop(ctx); err != nil {
+				t.Fatalf("Stop during %s = %v", phase, err)
+			}
+			select {
+			case err := <-startDone:
+				if err == nil {
+					t.Fatal("Start reported readiness after boot was stopped")
+				}
+			case <-ctx.Done():
+				t.Fatal("Stop left Start waiting")
+			}
+			select {
+			case <-finished:
+			default:
+				t.Fatal("Stop left the boot hook running")
+			}
+			select {
+			case <-host.done:
+			default:
+				t.Fatal("Stop left the app run goroutine running")
+			}
+			select {
+			case <-app.ServicesReady():
+				t.Fatal("stopped boot published readiness")
+			default:
+			}
+			if stopped.Load() != 1 || data.DB.Ping() == nil {
+				t.Fatalf("boot teardown: stops=%d, database must be closed", stopped.Load())
+			}
+			requireNoServiceTransport(t, host)
+		})
+	}
+}
+
+func TestServiceOnlyConcurrentStartStop(t *testing.T) {
+	entered := make(chan struct{})
+	failure := errors.New("stop hook failed")
+	var stopped atomic.Int32
+	_, _, host := lifecycleHost(t, func(app *framework.App) {
+		app.OnStart(func(ctx context.Context) error {
+			close(entered)
+			<-ctx.Done()
+			return ctx.Err()
+		})
+		app.OnStop(func() error { stopped.Add(1); return failure })
+	}, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	startDone := make(chan error, 1)
+	go func() { startDone <- host.Start() }()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("boot hook did not start")
+	}
+	if err := host.Start(); err == nil {
+		t.Fatal("concurrent Start admitted a second run")
+	}
+	stops := make(chan error, 8)
+	for range cap(stops) {
+		go func() { stops <- host.Stop(ctx) }()
+	}
+	var first error
+	for range cap(stops) {
+		select {
+		case err := <-stops:
+			if !errors.Is(err, failure) {
+				t.Fatalf("concurrent Stop lost teardown error: %v", err)
+			}
+			if first == nil {
+				first = err
+			} else if err != first {
+				t.Fatalf("concurrent Stops returned different results: %v, %v", first, err)
+			}
+		case <-ctx.Done():
+			t.Fatal("concurrent Stop leaked a caller")
+		}
+	}
+	select {
+	case err := <-startDone:
+		if err == nil {
+			t.Fatal("stopped boot reported success")
+		}
+	case <-ctx.Done():
+		t.Fatal("concurrent Stop left Start running")
+	}
+	if stopped.Load() != 1 {
+		t.Fatalf("concurrent Stop ran teardown %d times", stopped.Load())
+	}
+	requireNoServiceTransport(t, host)
+}
+
+func TestServiceOnlyRejectsReadyHooksDuringBoot(t *testing.T) {
+	var stopped atomic.Int32
+	_, data, host := lifecycleHost(t, func(app *framework.App) {
+		app.OnStart(func(context.Context) error {
+			app.OnReady(func(string) {})
+			return nil
+		})
+		app.OnStop(func() error { stopped.Add(1); return nil })
+	}, 0)
+	if err := host.Start(); err == nil || !strings.Contains(err.Error(), "OnReady") {
+		t.Fatalf("listener-dependent startup = %v; want OnReady refusal", err)
+	}
+	for range 2 {
+		if err := host.Stop(context.Background()); err == nil || !strings.Contains(err.Error(), "OnReady") {
+			t.Fatalf("Stop lost startup failure: %v", err)
+		}
+	}
+	if stopped.Load() != 1 || data.DB.Ping() == nil {
+		t.Fatalf("startup rollback: stops=%d, database must be closed", stopped.Load())
+	}
+}
+
+func TestServiceOnlyStopWaitsForTeardown(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	failure := errors.New("teardown failed")
+	_, _, host := lifecycleHost(t, func(app *framework.App) {
+		app.OnStop(func() error {
+			close(entered)
+			<-release
+			return failure
+		})
+	}, 0)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	if err := host.Start(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stopDone := make(chan error, 1)
+	go func() { stopDone <- host.Stop(ctx) }()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("teardown did not start")
+	}
+	select {
+	case <-host.done:
+	case <-ctx.Done():
+		t.Fatal("app run did not return while teardown was pending")
+	}
+	select {
+	case err := <-stopDone:
+		t.Fatalf("Stop returned before teardown finished: %v", err)
+	default:
+	}
+	close(release)
+	select {
+	case err := <-stopDone:
+		if !errors.Is(err, failure) {
+			t.Fatalf("Stop lost teardown failure: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("Stop did not join teardown")
+	}
+	requireNoServiceTransport(t, host)
+}
+
 func TestStartupFailureDrainsAndStopIsRepeatable(t *testing.T) {
 	failure := errors.New("startup failed")
-	for _, phase := range []string{"early-validation", "migration", "seed", "init", "start"} {
+	for _, phase := range []string{"early-validation", "http-validation", "migration", "seed", "init", "start"} {
 		t.Run(phase, func(t *testing.T) {
 			var stopped atomic.Int32
-			_, data, host := lifecycleHost(t, func(app *framework.App) {
+			_, data, host := lifecycleHostMode(t, func(app *framework.App) {
 				app.OnStop(func() error { stopped.Add(1); return nil })
 				switch phase {
 				case "early-validation":
+					app.OnReady(func(string) {})
+				case "http-validation":
 					app.Config.RequestTimeout = time.Minute
 					app.Config.HTTPServerTimeouts.WriteTimeout = new(time.Second)
 				case "migration":
@@ -159,10 +418,10 @@ func TestStartupFailureDrainsAndStopIsRepeatable(t *testing.T) {
 				case "start":
 					app.OnStart(func(context.Context) error { return failure })
 				}
-			}, 0)
+			}, 0, phase != "http-validation")
 			if err := host.Start(); err == nil {
 				t.Fatal("startup failure was hidden")
-			} else if phase != "migration" && phase != "early-validation" && !errors.Is(err, failure) {
+			} else if phase != "migration" && phase != "early-validation" && phase != "http-validation" && !errors.Is(err, failure) {
 				t.Fatalf("lost startup cause: %v", err)
 			}
 			if stopped.Load() != 1 {
@@ -203,7 +462,7 @@ func TestStartupTimeoutCancelsAndJoinsWorkers(t *testing.T) {
 	select {
 	case <-host.done:
 	default:
-		t.Fatal("startup returned before Serve finished")
+		t.Fatal("startup returned before the app run finished")
 	}
 	// The deadline also covers migrations. Under load it can expire before
 	// OnStart runs, so only a worker that actually started must be joined.
@@ -222,7 +481,7 @@ func TestStartupTimeoutCancelsAndJoinsWorkers(t *testing.T) {
 }
 
 func TestServiceOnlyPreservesForeignAuthenticator(t *testing.T) {
-	_, _, host := lifecycleHost(t, func(app *framework.App) {
+	app, _, host := lifecycleHost(t, func(app *framework.App) {
 		owner.SetExtractor(func(context.Context) (any, bool) { return "authenticated", true })
 		app.Router().Get("/identity", http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 			if _, ok := handler.GetUser(request.Context()); ok {
@@ -235,9 +494,10 @@ func TestServiceOnlyPreservesForeignAuthenticator(t *testing.T) {
 	if err := host.Start(); err != nil {
 		t.Fatal(err)
 	}
-	response, err := host.Do(context.Background(), &Request{URL: DefaultOrigin + "/identity"})
-	if err != nil || response.Status != http.StatusNoContent {
-		t.Fatalf("local identity replaced the authenticator: %+v %v", response, err)
+	response := httptest.NewRecorder()
+	host.identityMiddleware(app.Router()).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/identity", nil))
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("local identity replaced the authenticator: %d", response.Code)
 	}
 }
 
@@ -258,7 +518,7 @@ func TestStopDrainsLongRequestWithOneShutdownOwner(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var stopped atomic.Int32
-	_, _, host := lifecycleHost(t, func(app *framework.App) {
+	_, _, host := lifecycleHostMode(t, func(app *framework.App) {
 		app.OnStop(func() error { stopped.Add(1); return nil })
 		app.Router().Get("/held", http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 			close(entered)
@@ -268,7 +528,7 @@ func TestStopDrainsLongRequestWithOneShutdownOwner(t *testing.T) {
 			case <-request.Context().Done():
 			}
 		}))
-	}, 0)
+	}, 0, false)
 	t.Cleanup(func() {
 		select {
 		case <-release:
@@ -333,7 +593,7 @@ func TestStopDrainsLongRequestWithOneShutdownOwner(t *testing.T) {
 func TestStopCancelsOutstandingBridgeRequestsBeforeClosingStorage(t *testing.T) {
 	entered := make(chan struct{})
 	finished := make(chan struct{})
-	_, _, host := lifecycleHost(t, func(app *framework.App) {
+	_, _, host := lifecycleHostMode(t, func(app *framework.App) {
 		app.Router().Get("/watch", http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 			close(entered)
 			<-request.Context().Done()
@@ -347,7 +607,7 @@ func TestStopCancelsOutstandingBridgeRequestsBeforeClosingStorage(t *testing.T) 
 				return errors.New("bridge handler outlived request drain")
 			}
 		})
-	}, 0)
+	}, 0, false)
 	if err := host.Start(); err != nil {
 		t.Fatal(err)
 	}

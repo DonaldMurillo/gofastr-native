@@ -107,10 +107,11 @@ limits](mobile-runtime.md), including the remaining browser-Back checkpoint gap.
 
 Drafts are neither encrypted storage nor repository saves. `behavior.Editor`
 supplies shared save/draft/leave policy; `nativeui.Runtime` supplies instance and
-request coordination, capabilities and effect receipts. Native startup no longer
-mounts unused web screens, but still uses in-memory Serve for full lifecycle
-ownership. Keyed collection reconciliation, Android native, deep links,
-restoration, tabs and listener-free startup remain roadmap work.
+request coordination, capabilities and effect receipts. Native startup mounts
+no web screens and uses `App.Run(ctx, framework.ServicesHost())`
+for listener-free lifecycle ownership. See [lifecycle tests](mobile-lifecycle.md).
+Keyed collection reconciliation, Android native, deep links, restoration and
+tabs remain roadmap work.
 
 ## Native source, not screen templates
 

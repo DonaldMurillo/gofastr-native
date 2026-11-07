@@ -40,7 +40,7 @@ type stopResult struct {
 }
 
 // Start opens Notes for this installation. Call off the platform UI thread.
-// Shared startup uses App.Serve in memory, with no mounted web presentation.
+// Shared startup uses App.Run with ServicesHost, with no mounted web presentation.
 func Start(dataDir string) error {
 	state.Lock()
 	defer state.Unlock()

@@ -1,6 +1,7 @@
-// Package mobilehost runs a GoFastr app inside a phone app's process and
-// serves the WebView's requests in-process: no listener socket, no port,
-// no loopback origin. PROTOTYPE.
+// Package mobilehost runs a GoFastr app inside a phone app's process.
+// Service-only hosts use framework.App.Run with framework.ServicesHost:
+// no listener, HTTP server or HTTP client. WebView hosts serve requests
+// in-process with no listener socket, port or loopback origin. PROTOTYPE.
 //
 // The native side (a WKURLSchemeHandler on iOS, a WebViewClient's
 // shouldInterceptRequest on Android) hands each WebView request to
@@ -39,6 +40,9 @@ import (
 // passes its own Origin.
 const DefaultOrigin = "https://appassets.androidplatform.net"
 
+// ErrServiceOnly reports that a service-only Host has no HTTP transport.
+var ErrServiceOnly = errors.New("mobilehost: service-only host has no HTTP transport")
+
 // maxBufferedBody caps Do's response body. A larger answer is a streamed
 // one and belongs on Open.
 const maxBufferedBody = 64 << 20
@@ -51,10 +55,13 @@ type Config struct {
 	// Origin is the scheme://host the WebView loads; DefaultOrigin when
 	// empty. Requests for any other origin are refused.
 	Origin string
-	// StartTimeout bounds Start; 30s when zero.
+	// StartTimeout bounds the readiness wait; 30s when zero. A timeout
+	// requests Stop with a separate five-second shutdown context.
 	StartTimeout time.Duration
-	// ServiceOnly skips the WebView bridge and UIHost requirement. The app
-	// still runs its complete App.Serve lifecycle on an in-memory listener.
+	// ServiceOnly runs App.Run with framework.ServicesHost and waits on
+	// App.ServicesReady. It creates no listener, HTTP server, client or
+	// cookie jar, and needs no UIHost. Do and Open return ErrServiceOnly.
+	// The App must not register OnReady hooks, which require HTTP.
 	ServiceOnly bool
 }
 
@@ -101,27 +108,29 @@ func New(app *framework.App, cfg Config) (*Host, error) {
 	if cfg.Data == nil || cfg.Data.User == nil {
 		return nil, errors.New("mobilehost: Config.Data is required; open it with localapp.Open")
 	}
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, err
-	}
-	ln := newMemListener()
 	bridgeContext, cancelBridge := context.WithCancel(context.Background())
 	h := &Host{
 		cfg:           cfg,
 		origin:        origin,
 		app:           app,
-		ln:            ln,
-		jar:           jar,
 		user:          cfg.Data.User,
 		ready:         make(chan struct{}),
 		done:          make(chan struct{}),
 		bridgeContext: bridgeContext,
 		cancelBridge:  cancelBridge,
+	}
+	if !cfg.ServiceOnly {
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			cancelBridge()
+			return nil, err
+		}
+		h.jar = jar
+		h.ln = newMemListener()
 		//gofastr:allow(clienttimeout) the same client carries held SSE streams (Open), which a client-wide Timeout would cut; Do is bounded by its caller's context and a Stream by Close
-		client: &http.Client{
+		h.client = &http.Client{
 			Transport: &http.Transport{
-				DialContext: ln.dial,
+				DialContext: h.ln.dial,
 				// The WebView negotiates its own encodings; pass bytes
 				// through untouched.
 				DisableCompression:  true,
@@ -133,7 +142,7 @@ func New(app *framework.App, cfg Config) (*Host, error) {
 			// interception API can return a redirect to the WebView, so the
 			// native shim follows it there.)
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		},
+		}
 	}
 	app.RegisterBattery(h)
 	return h, nil
@@ -159,10 +168,10 @@ func (h *Host) Init(app *framework.App) error {
 		app.NoteAuthenticator()
 	}
 	app.Use(h.identityMiddleware)
-	app.OnReady(func(string) { close(h.ready) })
 	if h.cfg.ServiceOnly {
 		return nil
 	}
+	app.OnReady(func(string) { close(h.ready) })
 	var ui *uihost.UIHost
 	for _, m := range app.Mountables() {
 		if u, ok := m.(*uihost.UIHost); ok {
@@ -180,9 +189,10 @@ func (h *Host) Init(app *framework.App) error {
 	return nil
 }
 
-// Start runs the app on the in-memory listener and returns once it is
-// serving. Migrations, seeds and start hooks run here, so the native side
-// should call it off the UI thread and show its launch screen meanwhile.
+// Start runs the app and waits for ServicesReady in service-only mode,
+// or OnReady after Serve starts the WebView's in-memory listener.
+// Migrations, seeds and start hooks run here, so the native side should
+// call it off the UI thread and show its launch screen meanwhile.
 func (h *Host) Start() error {
 	h.mu.Lock()
 	if h.started || h.stopDone != nil {
@@ -190,10 +200,20 @@ func (h *Host) Start() error {
 		return errors.New("mobilehost: Start called twice")
 	}
 	h.started = true
-	// The OS owns a phone app's lifecycle; there is no SIGTERM to drain on.
-	h.app.Config.DisableSignalHandling = true
+	ready := (<-chan struct{})(h.ready)
+	if h.cfg.ServiceOnly {
+		ready = h.app.ServicesReady()
+	} else {
+		// The OS owns a phone app's lifecycle; there is no SIGTERM to drain on.
+		h.app.Config.DisableSignalHandling = true
+	}
 	go func() {
-		err := h.app.Serve(h.ln)
+		var err error
+		if h.cfg.ServiceOnly {
+			err = h.app.Run(context.Background(), framework.ServicesHost())
+		} else {
+			err = h.app.Serve(h.ln)
+		}
 		var shutdownDone chan struct{}
 		h.mu.Lock()
 		if h.stopDone == nil {
@@ -206,10 +226,12 @@ func (h *Host) Start() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			err = errors.Join(err, h.app.Shutdown(ctx))
 			cancel()
-			_ = h.ln.Close()
+			h.closeTransport()
 		}
 		h.serveErr = err
-		h.client.CloseIdleConnections()
+		if h.client != nil {
+			h.client.CloseIdleConnections()
+		}
 		close(h.done)
 		if shutdownDone != nil {
 			h.stopErr = err
@@ -220,7 +242,13 @@ func (h *Host) Start() error {
 	timer := time.NewTimer(h.cfg.StartTimeout)
 	defer timer.Stop()
 	select {
-	case <-h.ready:
+	case <-ready:
+		h.mu.Lock()
+		stopping := h.stopDone != nil
+		h.mu.Unlock()
+		if stopping {
+			return errors.New("mobilehost: start: app stopped before it was ready")
+		}
 		return nil
 	case <-h.done:
 		err := h.serveErr
@@ -236,7 +264,7 @@ func (h *Host) Start() error {
 }
 
 // Stop drains the app (OnStop hooks, batteries, open streams) and waits
-// for Serve to return.
+// for Run or Serve to return within ctx. Concurrent calls share one result.
 func (h *Host) Stop(ctx context.Context) error {
 	h.mu.Lock()
 	if done := h.stopDone; done != nil {
@@ -253,8 +281,7 @@ func (h *Host) Stop(ctx context.Context) error {
 	h.mu.Unlock()
 	h.cancelBridge()
 	err := h.app.Shutdown(ctx)
-	_ = h.ln.Close()
-	h.client.CloseIdleConnections()
+	h.closeTransport()
 	if started {
 		select {
 		case <-h.done:
@@ -266,6 +293,15 @@ func (h *Host) Stop(ctx context.Context) error {
 	h.stopErr = err
 	close(h.stopDone)
 	return err
+}
+
+func (h *Host) closeTransport() {
+	if h.ln != nil {
+		_ = h.ln.Close()
+	}
+	if h.client != nil {
+		h.client.CloseIdleConnections()
+	}
 }
 
 // Request is one WebView request.
@@ -286,7 +322,8 @@ type Response struct {
 	Body   []byte
 }
 
-// Do serves req and buffers the whole answer.
+// Do serves req and buffers the whole answer, or returns ErrServiceOnly
+// when the Host has no HTTP transport.
 func (h *Host) Do(ctx context.Context, req *Request) (*Response, error) {
 	resp, err := h.roundTrip(ctx, req)
 	if err != nil {
@@ -325,7 +362,8 @@ func (s *Stream) Read(max int) ([]byte, error) {
 // Close ends the stream; the server sees the request context cancelled.
 func (s *Stream) Close() error { return s.body.Close() }
 
-// Open serves req and returns as soon as the response headers are in.
+// Open serves req and returns as soon as the response headers are in,
+// or returns ErrServiceOnly when the Host has no HTTP transport.
 func (h *Host) Open(ctx context.Context, req *Request) (*Stream, error) {
 	resp, err := h.roundTrip(ctx, req)
 	if err != nil {
@@ -345,6 +383,9 @@ func (h *Host) Open(ctx context.Context, req *Request) (*Stream, error) {
 // jar. The page's JavaScript therefore never sees these cookies (see
 // README: the runtime's serverAction reads one from document.cookie).
 func (h *Host) roundTrip(ctx context.Context, req *Request) (*http.Response, error) {
+	if h.cfg.ServiceOnly {
+		return nil, ErrServiceOnly
+	}
 	if req == nil {
 		return nil, errors.New("mobilehost: nil request")
 	}

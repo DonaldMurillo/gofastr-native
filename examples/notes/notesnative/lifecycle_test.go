@@ -3,7 +3,6 @@ package notesnative
 import (
 	"context"
 	"errors"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,8 +45,8 @@ func TestNativeStartupDoesNotDependOnWebPresentation(t *testing.T) {
 	state.Unlock()
 	for _, route := range []string{"/", "/notes", "/notes/new", "/__gofastr-mobile/bridge.js"} {
 		response, err := host.Do(context.Background(), &mobilehost.Request{URL: mobilehost.DefaultOrigin + route})
-		if err != nil || response.Status != http.StatusNotFound {
-			t.Fatalf("native startup installed unused web route %s: %+v %v", route, response, err)
+		if response != nil || !errors.Is(err, mobilehost.ErrServiceOnly) {
+			t.Fatalf("native startup exposed HTTP route %s: %+v %v", route, response, err)
 		}
 	}
 	if _, err := Render(Root(), "{}"); err != nil {
