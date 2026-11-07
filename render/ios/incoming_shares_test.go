@@ -32,8 +32,22 @@ func TestIncomingSharesExecutableInbox(t *testing.T) {
 	if output, err := exec.Command("xcrun", "--sdk", "macosx", "swiftc", "-parse-as-library", library, checks, "-o", executable).CombinedOutput(); err != nil {
 		t.Fatalf("Swift inbox compile: %v\n%s", err, output)
 	}
-	if output, err := exec.Command(executable, filepath.Join(directory, "inbox")).CombinedOutput(); err != nil {
-		t.Fatalf("Swift inbox behavior: %v\n%s", err, output)
+	for _, name := range []string{"direct", "symlink-parent"} {
+		t.Run(name, func(t *testing.T) {
+			inbox := filepath.Join(directory, name, "inbox")
+			if name == "symlink-parent" {
+				target := filepath.Join(directory, "target")
+				if err := os.Mkdir(target, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, filepath.Dir(inbox)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if output, err := exec.Command(executable, inbox).CombinedOutput(); err != nil {
+				t.Fatalf("Swift inbox behavior: %v\n%s", err, output)
+			}
+		})
 	}
 }
 
@@ -41,7 +55,7 @@ const incomingShareChecks = `
 import Foundation
 @main struct IncomingShareChecks {
  static func rejects(_ action: () throws -> Void) { do { try action(); fatalError("unsafe input accepted") } catch {} }
- static func check(_ value: @autoclosure () throws -> Bool) rethrows { let checked = try value(); precondition(checked) }
+ static func check(_ value: @autoclosure () throws -> Bool, file: StaticString = #filePath, line: UInt = #line) rethrows { let checked = try value(); precondition(checked, file: file, line: line) }
  static func main() throws {
   let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
   let inbox = try MobileIncomingShareInbox(directory: directory)

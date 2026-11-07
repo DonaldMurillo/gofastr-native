@@ -66,6 +66,11 @@ func buildIOSExtensions(r *runner, a app, work, appDir, sdk string, t iosTarget,
 		for _, framework := range f.frameworks {
 			args = append(args, "-framework", framework)
 		}
+		if f.name == "Share" {
+			// Principal-class extensions enter through Foundation, rather than
+			// a Swift @main declaration (which the Widget supplies itself).
+			args = append(args, "-Xlinker", "-e", "-Xlinker", "_NSExtensionMain")
+		}
 		args = append(args, "-o", filepath.Join(bundle, ext.Exe))
 		args = append(args, sources...)
 		if err := r.run("compile "+f.name+" extension", "xcrun", args...); err != nil {

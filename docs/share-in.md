@@ -11,7 +11,9 @@ must appear in both entitlements and the extension's `GofastrAppGroup` plist
 value. The extension executable contains `GofastrIncomingShares.swift` and
 `shareextension/GofastrShareViewController.swift`, with principal class
 `GofastrShareViewController`. It links UIKit, Social, and UniformTypeIdentifiers
-and requires iOS 14 or newer.
+and requires iOS 14 or newer. The CLI links the principal-class Share extension
+with Foundation's `_NSExtensionMain` entry point; the Widget extension supplies
+its own Swift `@main` entry point.
 
 ## Shared Go flow
 
@@ -19,7 +21,10 @@ An admitted app action requests `sharein.Request{Operation: sharein.Next}` throu
 `nativeui.ServiceRequest.IncomingShare`. A completed result's `IncomingShare`
 contains the oldest item, or is nil when the inbox is empty. Reading does not
 consume it. Show the item to the user before importing it. The returned
-identifier is stable through repeated reads and app restarts.
+identifier is stable through repeated reads and app restarts. Publishing the
+same identifier preserves the original item, including when the inbox parent
+is reached through a filesystem alias such as macOS `/var` or `/tmp`. Inbox
+deduplication compares identifier filenames rather than full URL spellings.
 
 After accepting or discarding the content, send
 `sharein.Request{Operation: sharein.Acknowledge, Identifier: item.Identifier}`.
@@ -65,7 +70,8 @@ backup and use protection until the first unlock after boot.
 `go test ./device/sharein` checks identifiers, operation shapes, content validation,
 and combined byte limits. `go test ./render/ios -run IncomingShares` compiles and
 executes the Foundation inbox checks on macOS. These cover repeated reads,
-acknowledgement, retained-launch deduplication, quota, and expiry. Windows skips
+acknowledgement, retained-launch deduplication through direct and symlinked
+parent paths, quota, and expiry. Windows skips
 the executable Swift check. Java sources compile against Android SDK 36 with
 the framework's API 24 minimum.
 
