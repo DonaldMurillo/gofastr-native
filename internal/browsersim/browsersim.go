@@ -364,7 +364,16 @@ func (session *Session) relay(payload string) {
 		out = string(encoded)
 	}
 	quoted, _ := json.Marshal(out)
-	if _, _, err := cdpruntime.Evaluate("window.__simPort && window.__simPort.postMessage(" + string(quoted) + ")").Do(executor); err != nil && session.ctx.Err() == nil {
+	if _, _, err := cdpruntime.Evaluate("window.__simPort && window.__simPort.postMessage(" + string(quoted) + ")").Do(executor); err != nil && !retiredDocument(err) && session.ctx.Err() == nil {
 		session.note("reply %s: %v", reply.ID, err)
 	}
+}
+
+// retiredDocument reports a reply addressed to a document that navigation
+// already replaced. A phone drops it the same way: the port dies with the
+// page that asked. A navigating reply starts the navigation before it is
+// posted, so how often this happens depends only on timing.
+func retiredDocument(err error) bool {
+	var protocol *cdproto.Error
+	return errors.As(err, &protocol) && protocol.Code == -32000 && protocol.Message == "Inspected target navigated or closed"
 }
