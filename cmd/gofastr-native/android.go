@@ -349,7 +349,7 @@ func androidDevice(r *runner, sdk androidSDK, want string) (string, error) {
 				return s, nil
 			}
 			if strings.HasPrefix(s, "emulator-") {
-				if name, err := r.quietOutput(sdk.adb, "-s", s, "emu", "avd", "name"); err == nil && strings.Split(strings.TrimSpace(name), "\n")[0] == want {
+				if name, err := r.quietOutput(sdk.adb, "-s", s, "emu", "avd", "name"); err == nil && consoleAVDName(name) == want {
 					return s, nil
 				}
 			}
@@ -447,6 +447,13 @@ func (r *runner) quietOutput(name string, args ...string) (string, error) {
 	cmd := r.command(name, args...)
 	b, err := cmd.Output()
 	return string(b), err
+}
+
+// consoleAVDName reads the AVD name from `adb emu avd name`. The emulator
+// console ends lines with CRLF and follows the name with an OK line.
+func consoleAVDName(out string) string {
+	first, _, _ := strings.Cut(out, "\n")
+	return strings.TrimSpace(first)
 }
 
 // parseADBDevices reads `adb devices`: the serials in state "device".

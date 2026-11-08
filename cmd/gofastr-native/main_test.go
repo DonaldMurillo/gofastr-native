@@ -232,6 +232,15 @@ func TestParseADBDevices(t *testing.T) {
 	}
 }
 
+func TestConsoleAVDName(t *testing.T) {
+	// The emulator console answers with CRLF line endings.
+	for _, out := range []string{"Pixel_9\r\nOK\r\n", "Pixel_9\nOK\n", "Pixel_9"} {
+		if got := consoleAVDName(out); got != "Pixel_9" {
+			t.Errorf("consoleAVDName(%q) = %q", out, got)
+		}
+	}
+}
+
 func writeZip(t *testing.T, path string, entries map[string]string) {
 	t.Helper()
 	f, err := os.Create(path)
