@@ -1,7 +1,7 @@
 # UIKit controls, collections, tabs, and local URLs
 
 All application screens and handlers remain Go-authored. The optional component
-DTOs extend the frozen `docs/mobile-components.md` wire contract without changing
+DTOs extend the frozen `docs/design/mobile-components.md` wire contract without changing
 `GofastrNativeBackend.init`, `makeWindow()`, or `stop()`. Ordinary `*.swift` sources
 are embedded unchanged by `sources.go`; no production dependencies are added.
 
@@ -162,7 +162,7 @@ on iOS 26.5 and exercised filters, simultaneous selection, row-menu pin,
 switch/save, retained tabs and dirty editor text. Empty filters remain in the AX
 tree because the empty message is a real cell; background/zero-row footer labels
 did not suffice. Public compose/share tab symbols now map to actual SF Symbols.
-See [measured acceptance and limits](../../../docs/mobile-components.md#verification).
+See [measured acceptance and limits](../../../docs/design/mobile-components.md#verification).
 Actual native swipes, cold/warm URL delivery past the OS confirmation, VoiceOver,
 physical devices, IME, and rotation remain unverified. Native Android is deferred.
 

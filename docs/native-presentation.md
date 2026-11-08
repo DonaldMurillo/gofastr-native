@@ -11,7 +11,7 @@ Its application-owned Swift file has been removed from the current design.
 The same Go mobile definitions now also render through the generic
 [WebView adapter](shared-mobile-screens.md). This document describes the UIKit
 path; shared headless behaviors and stronger async guarantees remain in the
-[mobile presentation roadmap](mobile-roadmap.md).
+[mobile presentation roadmap](design/mobile-roadmap.md).
 
 ## Ownership and structure
 
@@ -163,9 +163,9 @@ Notes uses the shared Go file draft store; the optional older backend without
 but are not encrypted secrets, committed notes, cloud sync, autosave, or conflict
 handling. The shared Notes list still caps at 200 entries.
 
-The later [component slice](mobile-components.md) adds tabs, typed mixed form
+The later [component slice](design/mobile-components.md) adds tabs, typed mixed form
 controls, filters/selection/paging, swipes, and bounded route restoration; the
-[device service slice](mobile-services.md) adds typed platform tasks. Photo
+[device service slice](design/mobile-services.md) adds typed platform tasks. Photo
 acquisition now lives in a [compiled extension](compiled-extensions.md), and Notes
 media content uses a library-owned [rendering component](rendering-extensions.md).
 

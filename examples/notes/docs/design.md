@@ -95,7 +95,7 @@ VoiceOver/TalkBack, Android-native, or real-device acceptance.
 
 During native QA, returning to a retained Notes list sometimes exposed the
 stale-list Retry state; Retry recovered it. The subsequent
-[shared reliability slice](mobile-reliability.md) adds bounded read-only session
+[shared reliability slice](../../../docs/design/mobile-reliability.md) adds bounded read-only session
 recovery in both renderers rather than suppressing the error visually. Native
 tab/foreground interaction acceptance is still separate from compilation and
 startup inspection.

@@ -1,6 +1,6 @@
 # Native retained-screen reliability
 
-This extends the shared [mobile reliability contract](../../../docs/mobile-reliability.md)
+This extends the shared [mobile reliability contract](../../../docs/design/mobile-reliability.md)
 inside the reusable UIKit renderer only. It does not add Notes-specific behavior,
 new dependencies, new GoFastr core behavior, or native Android support.
 
@@ -103,7 +103,7 @@ executed native tab gestures, real background suspension/expiration, OS URL
 delivery, IME, VoiceOver, permission dialogs, provider completion, or physical
 device acceptance. The parent rebuilt/bound/installed the Notes QA app and
 observed its existing notes and live list after a real simulator background/resume
-cycle; see the [shared validation record](../../../docs/mobile-reliability.md).
+cycle; see the [shared validation record](../../../docs/design/mobile-reliability.md).
 No simulator reset or app-data deletion was used. Abrupt termination before a checkpoint runs, UserDefaults metadata
 flush timing, cross-process mutation reconciliation, and crash exactly-once
 effects remain outside this bounded change.

@@ -4,11 +4,11 @@ This is an implementation experiment, not a new cross-platform rendering API.
 GoFastr remains web-first. The mobile presentation lives **outside GoFastr** in
 the importable `github.com/DonaldMurillo/gofastr-native/render/webview/mobileui` package. No
 changes to either GoFastr checkout are needed, and no dependencies were added.
-An additional [Go-defined native presenter](native-presentation.md) exercises
+An additional [Go-defined native presenter](../native-presentation.md) exercises
 the boundary with real UIKit controls. Apps compose mobile screens/actions in
 Go; the library owns the platform renderer, not application Swift templates.
 
-The newer [shared mobile screen adapter](shared-mobile-screens.md) also renders
+The newer [shared mobile screen adapter](../shared-mobile-screens.md) also renders
 `notesscreens` through WebView. The `notesweb` presentation described here remains
 an independent compatibility example, not the UI used by `notesmobile.Start`.
 
@@ -156,7 +156,7 @@ by this repository's local `go.work`; neither checkout was modified.
 
 - A universal screen schema, widget tree, renderer interface, or plugin loader.
   These adapters are compiled into the application, not downloaded code.
-- Native controls. A separate [UIKit presenter](native-presentation.md) now
+- Native controls. A separate [UIKit presenter](../native-presentation.md) now
   implements the native Notes slice; desktop/Three.js renderers remain future work.
 - Native-quality push/pop animations, interactive or predictive Back,
   per-tab stacks, collapsing titles, tabs, sheets, swipe actions, or pull refresh.
@@ -178,7 +178,7 @@ components and screens through public APIs.
 The native host now demonstrates Go-owned mobile screens/actions without HTML
 and composes its services without mounting a web UI. It uses the listener-free
 `App.Run(ctx, framework.ServicesHost())` lifecycle in gofastr v0.96.0. See
-[Gate A and Gate B](mobile-lifecycle.md). Extract only the demonstrated gaps:
+[Gate A and Gate B](../mobile-lifecycle.md). Extract only the demonstrated gaps:
 destination/action identity independent of HTTP,
 explicit host capabilities, and screen activation/disposal/navigation delivery.
 A native renderer should mount native controls, a canvas renderer should own its

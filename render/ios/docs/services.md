@@ -182,7 +182,7 @@ acceptance must verify those, plus cold launch, VoiceOver, IME and real playback
   cancellation needs both generation invalidation and a Go checkpoint to release
   the long-poll wait. Next time, test stale callbacks before adding automatic retry.
 - Scope: `ios/live`. Restored/retained controllers can outlive retired watch
-  instances. Use the bounded read-only policy in [mobile reliability](../../../docs/mobile-reliability.md),
+  instances. Use the bounded read-only policy in [mobile reliability](../../../docs/design/mobile-reliability.md),
   not a hidden action retry or connection reset that invalidates dirty editors.
 - Scope: `ios/audio`. AVAudioRecorder writes may buffer until Stop; size polling
   alone cannot validate the final transfer. Next time, bound the final read and

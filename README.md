@@ -19,7 +19,7 @@ no port, no loopback origin. Native rendering does not remove WebView support.
 This remains experimental, not a supported production framework yet.
 
 Previously named `gofastr-mobile`; the module and CLI are now `gofastr-native`.
-See [rename and migration](docs/project-rename.md) for the new paths and the
+See [rename and migration](docs/design/project-rename.md) for the new paths and the
 compatibility identifiers deliberately left unchanged.
 
 The module builds on gofastr's public API only. Go's `internal/` rule goes by
@@ -119,25 +119,25 @@ Notes also exposes typed reminder scheduling/status/cancellation, rich note and
 attachment sharing, explicit clipboard writes, and private voice recordings.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
-acceptance limits](docs/mobile-services.md). Native Android uses the same Go
+acceptance limits](docs/design/mobile-services.md). Native Android uses the same Go
 protocol and screens. See [Windows and Android builds and acceptance](docs/android.md).
 
 [Incoming shares, secure storage with biometrics, and home-screen widgets](docs/device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
-The [Notes integrations](docs/notes-device-features.md) add reviewed shared
+The [Notes integrations](examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 
-[Portable Notes workflows](docs/notes-portable-workflows.md) add reviewed backup
+[Portable Notes workflows](examples/notes/docs/portable-workflows.md) add reviewed backup
 and restore, matching search passages, bulk selection, and guarded editor saves.
 
-The same Notes app now exercises [mobile components](docs/mobile-components.md):
+The same Notes app now exercises [mobile components](docs/design/mobile-components.md):
 typed toggles/selects/date/time, filters and accumulated Load more, stable-ID
 multi-selection and bulk actions with undo, Notes/Files/Settings tabs, and row
 swipes with labelled menu alternatives. UIKit retains a navigation stack per tab;
 WebView retains each tab's last route/scroll/focus within GoFastr's shared history.
-The [mobile document design](docs/mobile-design.md) keeps writing first, puts
+The [mobile document design](examples/notes/docs/design.md) keeps writing first, puts
 photos/files inside the note, and gives the Files tab a real attachment library
 with readable metadata and reusable previews. Styling stays in renderer libraries;
 the example app still authors only Go screen definitions.
@@ -156,16 +156,16 @@ UIKit now composes services/installation data without mounting unused web
 screens. It uses `App.Run(ctx, framework.ServicesHost())` for the complete
 listener-free lifecycle and waits on `App.ServicesReady()`. Shared editor
 policy, durable draft storage, capabilities and observed effect receipts live in [mobile runtime services](docs/mobile-runtime.md).
-See [the architecture, public APIs, validation, and limitations](docs/presentation-prototype.md)
+See [the architecture, public APIs, validation, and limitations](docs/design/presentation-prototype.md)
 and [the native host contract](docs/native-presentation.md), plus
-[implementation notes](docs/agent-notes.md).
+[implementation notes](docs/design/agent-notes.md).
 
 The [shared-screen implementation](docs/shared-mobile-screens.md) documents the
-working APIs and limits. The [mobile presentation roadmap](docs/mobile-roadmap.md)
+working APIs and limits. The [mobile presentation roadmap](docs/design/mobile-roadmap.md)
 tracks remaining shared headless task behaviors, async correctness, and explicit
 platform capabilities. Sharing definitions is not yet behavior parity.
 
-The [shared reliability layer](docs/mobile-reliability.md) gates actions/departure
+The [shared reliability layer](docs/design/mobile-reliability.md) gates actions/departure
 on durable drafts, guards app history Back/Forward, checkpoints on backgrounding,
 and recovers retired live reads without replaying writes or replacing inputs.
 
@@ -372,7 +372,7 @@ interception path and `Open`, which hands chunks over as they arrive.
 
 ## Next steps
 
-Follow the [milestones and acceptance gates](docs/mobile-roadmap.md#build-order-and-acceptance-gates):
+Follow the [milestones and acceptance gates](docs/design/mobile-roadmap.md#build-order-and-acceptance-gates):
 
 1. Finish the remaining M2 Back/IME/accessibility gates over the shared editor/runtime.
 2. Preserve the tested listener-free lifecycle and WebView shutdown boundaries; do not copy framework startup.
@@ -381,6 +381,6 @@ Follow the [milestones and acceptance gates](docs/mobile-roadmap.md#build-order-
    signing, and measured optimization. Re-pin to framework releases as required
    public seams become available.
 
-The [component slice](docs/mobile-components.md) implements the first controls,
+The [component slice](docs/design/mobile-components.md) implements the first controls,
 collection, tab, and swipe contracts; uncapped repository paging, richer sheets,
 and complete device/accessibility acceptance remain roadmap work.

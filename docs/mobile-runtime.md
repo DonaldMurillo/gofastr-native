@@ -76,7 +76,7 @@ without executing the action. Failed completion persistence blocks navigation
 and effects; read-only completion retry never reruns the mutation. Discard waits
 for conditional cleanup, clean residue does not override fresh repository data,
 and canonical draft-key migration stores the new key first. See
-[reliability guarantees and fault coverage](mobile-reliability.md).
+[reliability guarantees and fault coverage](design/mobile-reliability.md).
 
 The default runtime retains at most 128 connections/screens, 64 action records
 per screen, and expires idle sessions after 30 minutes. Limits are configurable
@@ -89,7 +89,7 @@ not cross-process coordination for a shared draft directory.
 
 ## Honest adapter limits
 
-Retained live collections use [bounded read-only recovery](mobile-reliability.md)
+Retained live collections use [bounded read-only recovery](design/mobile-reliability.md)
 when their watch instance is retired or expired. This does not retry mutations
 or silently renegotiate an expired renderer connection.
 

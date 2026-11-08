@@ -132,7 +132,7 @@ focused race checks, and 48 renderer Node tests also passed.
 UIKit typechecking/helper tests and a simulator picker test do not verify a
 physical camera, its system permission prompt, iCloud/provider behavior,
 VoiceOver, or actual WKWebView/Android WebView file integration. Keep those
-acceptance claims separate. Record observed runs in `docs/agent-notes.md`.
+acceptance claims separate. Record observed runs in `docs/design/agent-notes.md`.
 
 ## Platform references
 

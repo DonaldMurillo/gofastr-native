@@ -28,7 +28,7 @@ the confirmed save. Repeated reads, interrupted acknowledgement, and retained OS
 launches reuse the original receipt and preserve subsequent edits to the note.
 
 Reviewed inbox payloads are bounded private installation files. The platform
-inbox keeps its own byte and expiry limits. See [Receiving shares](share-in.md).
+inbox keeps its own byte and expiry limits. See [Receiving shares](../../../docs/share-in.md).
 
 ## Widgets
 
@@ -45,7 +45,7 @@ controls placement and refresh timing.
 
 Only ordinary saved Notes records can be selected for publication. Widget text
 is bounded to a 200-byte title and a 2,048-byte preview. See
-[Home-screen widgets](widgets.md).
+[Home-screen widgets](../../../docs/widgets.md).
 
 ## Protected notes
 
@@ -74,7 +74,7 @@ authentication flow.
 Unsaved protected edits clear on background. Deletion asks for confirmation and
 removes the secure record before its index entry. Missing or invalidated keys
 leave the note locked and require explicit removal. Enrollment changes can make
-previously protected content unrecoverable. See [Secure storage](secure-storage.md).
+previously protected content unrecoverable. See [Secure storage](../../../docs/secure-storage.md).
 
 ## Verification
 

@@ -5,7 +5,7 @@
 - Trigger: gofastr v0.96.0 adds `App.Run`, `ServicesHost` and `ServicesReady`; the old listener-free Gate B status is superseded.
 - Approach: run services on `context.Background()` and let the first Host.Stop own Shutdown's deadline; do not cancel the bridge context as Run's lifetime or register OnReady.
 - Evidence: `mobilehost/lifecycle_test.go` covers no transport, stop during boot, concurrent Start/Stop, rollback once and waiting past Run completion; HTTP drain/ownership assertions use WebView hosts.
-- Details: [lifecycle contract and regression checks](mobile-lifecycle.md). Run can return nil before a pending Shutdown finishes; pre-boot refusal still needs composition cleanup.
+- Details: [lifecycle contract and regression checks](../mobile-lifecycle.md). Run can return nil before a pending Shutdown finishes; pre-boot refusal still needs composition cleanup.
 - Next time: read the pinned `framework/host.go` with `GOWORK=off`; preserve the Stop owner and use recorder-based handlers for unused-route checks, not service-only Do/Open.
 - Status: active.
 
@@ -14,7 +14,7 @@
 - Trigger: `248d14e` introduced host-independent Windows test paths and partial symlink resolution; `66f1ec7` introduced URL-based inbox deduplication and a Share executable without an entry point.
 - Approach: use host-native scaffold fixtures; check lexical and resolved containment through missing suffixes, failing closed on resolution errors; deduplicate inbox items by filename; link Share with `_NSExtensionMain` while preserving Widget `@main`.
 - Evidence: exact five regression tests pass with `GOWORK=off`; added missing-path/alias/outward/dangling-link checks and executable Swift checks through a symlinked parent. Compiler logs and Swift assertion call-site lines now survive failures.
-- Details: [release containment](release.md), [incoming shares](share-in.md). macOS Foundation directory listings canonicalize `/var`/`/tmp` aliases; URL equality is not item identity.
+- Details: [release containment](../release.md), [incoming shares](../share-in.md). macOS Foundation directory listings canonicalize `/var`/`/tmp` aliases; URL equality is not item identity.
 - Next time: run the executable macOS checks and full `GOWORK=off go test -count=1 ./...`; resolve both paths consistently before trusting release containment, and keep Windows backslash fixtures on Windows.
 - Status: active.
 
@@ -32,7 +32,7 @@
 - Approach: `Screen.Components` carries bounded library payloads and an opaque destination map; per-app validation checks identity, routes and mandatory renderer support. Notes uses `extension/media` instead of legacy media slots.
 - Evidence: `go test ./extension/... ./nativeui ./extensions/media ./examples/notes/...` covers strict policy, component-only screens, missing adapters and actual Notes attachment wire/persistence.
 - Next time: reconcile by component ID, retain dirty form/IME state, and route only declared event keys through existing guards. Keep derived attachment metadata round-trippable and reject forged `icon`/`detail` fields.
-- Details: [rendering extensions](rendering-extensions.md); physical-device acceptance remains a separate gate.
+- Details: [rendering extensions](../rendering-extensions.md); physical-device acceptance remains a separate gate.
 - Status: active.
 
 ## 2026-11-05 - Keep native build, launch and interaction evidence separate
@@ -41,7 +41,7 @@
 - Approach: install over `dev.gofastr.designqa` without wiping data; use a simulator capture to verify startup and record interactive workflows as NOT RUN.
 - Evidence: full Go tests/vet, 143 Node tests, targeted race/public-pin suites, optimized gomobile/UIKit build and `simctl launch` pass; device doctor correctly fails unavailable hardware.
 - Next time: retry native workflow acceptance only with a working UI control surface; never promote compilation, a launch screenshot or cached device records to provider/VoiceOver/IME acceptance.
-- Details: [rendering verification](rendering-extensions.md#local-validation--november-5-2026); [physical gate](ios-device-acceptance.md).
+- Details: [rendering verification](../rendering-extensions.md#local-validation--november-5-2026); [physical gate](../ios-device-acceptance.md).
 - Status: active.
 
 ## 2026-11-05 - Decoded image dimensions do not prove painted previews
@@ -58,7 +58,7 @@
 - Approach: library package init uses `extension/webassets.Register`; per-app `NewWithExtensions` still controls authorization/loading. CLI discovers manifests only in compiled iOS dependencies and copies Swift unchanged.
 - Evidence: the legacy-builder coexistence suite catches the sealed-manifest case; Notes photo E2E covers both WebView styles, and CLI/UIKit tests cover core-only and extension-enabled sources.
 - Next time: separate static asset publication from runtime registration; preserve opaque `file-result -> complete`, current authorization, cancellation and unknown-write locks instead of adding another task lifecycle.
-- Details: [compiled extension authoring and limits](compiled-extensions.md). Native Android and physical camera/provider/VoiceOver/IME acceptance remain deferred.
+- Details: [compiled extension authoring and limits](../compiled-extensions.md). Native Android and physical camera/provider/VoiceOver/IME acceptance remain deferred.
 - Status: active.
 
 ## 2026-11-05 - Swipe snap-back must not animate open action targets
@@ -89,7 +89,7 @@
 - Scope: nativeui, ios, drafts, lifecycle.
 - Trigger: failed checkpoints could admit writes/departure, and same-revision native replies could undo mutation state.
 - Approach: gate action/leave/effects on storage success, preserve buffers on failed cleanup, persist canonical keys first. Fence replies in both adapters, defer completion/leave/discard checkpoints, sequence short native calls, and bound background batches.
-- Evidence: Notes Stop/Start and ENOTDIR faults, wire/storage regressions, Foundation execution, and optimized UIKit linking. Details: [runtime](../nativeui/docs/agent-notes.md), [UIKit](../render/ios/docs/reliability.md).
+- Evidence: Notes Stop/Start and ENOTDIR faults, wire/storage regressions, Foundation execution, and optimized UIKit linking. Details: [runtime](../../nativeui/docs/agent-notes.md), [UIKit](../../render/ios/docs/reliability.md).
 - Next time: keep long saves out of the checkpoint dependency chain; test unknown restart locks and newer text separately from clean completion.
 - Status: active; no crash exactly-once guarantee or native Android implementation.
 
@@ -252,7 +252,7 @@
 - Scope: presentation, mobile, terminal
 - Trigger: native-looking mobile screens must not turn GoFastr into a cross-platform widget framework.
 - Approach: keep application services typed and UI-free; let external packages own screens, CSS, and behavior through public registry APIs.
-- Evidence: `go test ./examples/notes/notesapp -run 'TestTerminalAndWebSharePersistedNotes|TestPresentationCoreDoesNotImportWeb'`; `render/webview/mobileui/`; `docs/presentation-prototype.md`.
+- Evidence: `go test ./examples/notes/notesapp -run 'TestTerminalAndWebSharePersistedNotes|TestPresentationCoreDoesNotImportWeb'`; `render/webview/mobileui/`; `docs/design/presentation-prototype.md`.
 - Next time: inspect `go.work` before surveying GoFastr, and run `GOWORK=off go test ./mobileui ./examples/notes/...` to verify the public pin too.
 - Status: active
 
@@ -363,7 +363,7 @@
 ## 2026-11-05 - Verify the complete mobile document hierarchy
 - Scope: mobile, design, renderer, acceptance
 - Trigger: accumulated feature controls and attachment metadata made Notes look like an API demonstration rather than a document app.
-- Approach: follow [mobile document design](mobile-design.md); keep document/detail/file-preview semantics in Go and reusable styling in the adapters. Update SSR, live replacement rows, and refreshed attachment cards together.
+- Approach: follow [mobile document design](../../examples/notes/docs/design.md); keep document/detail/file-preview semantics in Go and reusable styling in the adapters. Update SSR, live replacement rows, and refreshed attachment cards together.
 - Evidence: `internal/simtest/design_test.go`, `internal/simtest/components_test.go`, `internal/simtest/files_test.go`, and `internal/simtest/photos_test.go` exercise real host screens, metadata, previews, and menu bounds. Isolate browser state per scheme: root navigation can restore the last tab route.
 - Next time: inspect screenshots in light/dark and large text; center offscreen rows before real menu clicks, assert menus clear fixed tabs, and suppress compatibility taps after cancelled/vertical drags too. Keep Swift wire DTOs Foundation-only, separate from UIKit views.
 - Status: active
@@ -371,7 +371,7 @@
 ## 2026-11-06 - Trace and inspect without changing settlement
 - Scope: nativeui, diagnostics, cli, sim
 - Trigger: debugging native-renderer apps needed command traces, a live snapshot and a capability walk without leaking user data or changing replies.
-- Approach: `RuntimeOptions.Observer` gets a redacted `TraceEvent` after the reply is final and all locks are released; `Runtime.Inspect` try-locks sessions; `gofastr-native inspect` builds a harness through `go build -overlay` that can send only hello, open and close. It suppresses app stdout/stderr and reports opaque screen IDs, adding registered patterns only through `InspectApp`. See [debugging](debugging.md) and [component gallery](component-gallery.md).
+- Approach: `RuntimeOptions.Observer` gets a redacted `TraceEvent` after the reply is final and all locks are released; `Runtime.Inspect` try-locks sessions; `gofastr-native inspect` builds a harness through `go build -overlay` that can send only hello, open and close. It suppresses app stdout/stderr and reports opaque screen IDs, adding registered patterns only through `InspectApp`. See [debugging](../debugging.md) and [component gallery](../component-gallery.md).
 - Evidence: `nativeui/trace_settlement_test.go` compares replies with nil, recording and panicking observers; `examples/notes/notesnative/debugtrace_privacy_test.go` (tag `gofastr_debugtrace`) checks canaries; `cmd/gofastr-native/inspect_command_test.go` checks allowed kinds, cleanup and an untouched module; `internal/simtest/gallery_test.go` walks the gallery in headless Chromium.
 - Next time: the WebView's first paint renders outside a Runtime, so `RendererContract` is false there. Runtime pre-validation answers "Required." before the action handler runs, so assert on the field-error key, not the handler's message. Go's `-overlay` accepts a file in a directory that does not exist on Go 1.27. The Windows file draft store tests flake about 1 in 6 full `nativeui` runs, also at 88e0a85.
 - Status: active

@@ -6,7 +6,7 @@ GoFastr, `nativeui`, HTML, UIKit, or a particular application's model. All
 dependencies are in the Go standard library.
 
 The shared runtime now integrates this policy with UIKit and WebView; see
-[runtime](mobile-runtime.md) and [reliability](mobile-reliability.md) for actual
+[runtime](mobile-runtime.md) and [reliability](design/mobile-reliability.md) for actual
 acknowledgement, restart, and history coverage. This package's unit tests alone
 are not renderer/device acceptance. Native Android and complete real-device
 lifecycle/IME/accessibility verification remain deferred.

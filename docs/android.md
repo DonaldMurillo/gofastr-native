@@ -75,7 +75,7 @@ apply to the controls.
 The Android appearance library gives lists, documents, file cards, toolbar
 actions, and tabs a shared light/dark palette, typography, spacing, and icons.
 External links reuse a matching retained screen instead of opening another
-editor for the same note. See [Notes device features](notes-device-features.md)
+editor for the same note. See [Notes device features](../examples/notes/docs/device-features.md)
 for reviewed imports, selected-note widgets, and protected text notes.
 
 Android native is a negotiated `android` renderer. A required extension without

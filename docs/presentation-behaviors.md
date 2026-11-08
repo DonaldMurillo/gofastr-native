@@ -110,4 +110,4 @@ These are two renderer launchers of the same Go-authored example, not two apps
 with separately implemented screens. Physical-device, VoiceOver/TalkBack,
 interactive swipe cancellation, and broader keyboard checks remain separate.
 See [runtime](mobile-runtime.md), [screen setup](shared-mobile-screens.md), and
-[roadmap](mobile-roadmap.md).
+[roadmap](design/mobile-roadmap.md).

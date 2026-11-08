@@ -169,7 +169,7 @@ The parent owns real-browser E2E and the hosted bootstrap. Native Android,
 background recording, speech recognition, remote sync and durable background
 work are deferred/not implemented here.
 
-Retained live collections now use [bounded session recovery](../../../docs/mobile-reliability.md)
+Retained live collections now use [bounded session recovery](../../../docs/design/mobile-reliability.md)
 for stale/expired watch instances. The real-bridge regression is
 `internal/simtest/reliability_test.go`; automatic reopen never replays a write, and failed
 reauthorization or repeated retirement still exposes the read error.
@@ -184,7 +184,7 @@ revision before replay; tags survive reload. Cancel/failed acknowledgement keep
 the editor. Untagged history fails closed by restoring the current URL with
 `replaceState`; use in-app navigation instead. Hidden/pagehide events initiate
 best-effort Go checkpoints without Save or committing local IME. See the
-[shared reliability contract](../../../docs/mobile-reliability.md).
+[shared reliability contract](../../../docs/design/mobile-reliability.md).
 Checkpoint sequence/mutation fences reject late same-revision snapshots, while
 completion/leave/discard hold background snapshots until buffers are settled.
 Typing checkpoints do not wait behind long mutations. Completion mismatch is

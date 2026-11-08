@@ -4,8 +4,8 @@ Implementation roadmap, updated November 6, 2026. The M1 shared-screen rendering
 is implemented. Shared editor/runtime services and UI-independent startup now
 have working implementations; the remaining acceptance gaps are listed below.
 The current APIs and renderer differences are described in
-[shared mobile screens](shared-mobile-screens.md),
-[native presentation](native-presentation.md), and
+[shared mobile screens](../shared-mobile-screens.md),
+[native presentation](../native-presentation.md), and
 [the external presentation prototype](presentation-prototype.md).
 
 ## Direction
@@ -18,8 +18,8 @@ platform controls, web markup, and host integration.
 Support three explicit paths:
 
 1. **Go mobile definitions to native controls:** UIKit and Android adapters now
-   implement the shared runtime. See [Android acceptance](android.md) and
-   [opt-in device features](device-features.md) for platform validation limits.
+   implement the shared runtime. See [Android acceptance](../android.md) and
+   [opt-in device features](../device-features.md) for platform validation limits.
 2. **The same Go mobile definitions to mobile WebView:** a new renderer using
    the existing `mobileui` design system and public GoFastr web seams.
 3. **Existing GoFastr web applications in WebView:** preserve the current host
@@ -239,7 +239,7 @@ is deferred because no Android runtime is available in this environment.
   draft behavior and full-page WebView sheets are documented, not behavior parity.
 - The original rendering proof is now extended with negotiated capabilities,
   instance/revision coordination, observed effect receipts and editable inputs
-  during saves. See [the implemented contract](mobile-runtime.md).
+  during saves. See [the implemented contract](../mobile-runtime.md).
 
 ### M2 — Shared editor policy and async correctness
 
@@ -272,7 +272,7 @@ collection updates. Do not label the entire M2 gate complete from this slice.
 web presentation and use `App.Run(ctx, framework.ServicesHost())` with
 `App.ServicesReady()` for the full listener-free lifecycle. WebView hosts keep
 `App.Serve` on their in-memory transport. See
-[lifecycle guarantees and tests](mobile-lifecycle.md).
+[lifecycle guarantees and tests](../mobile-lifecycle.md).
 
 - Split entity/service/identity/data composition from web mounting and transport.
   Native boot must stop mounting unused web screens. Reuse public lifecycle
@@ -308,14 +308,14 @@ continue to run in Chromium; they are not Android-native evidence.
 **Presentation, file/photo, and first component slices implemented in Notes.**
 Shared Go decisions cover alerts, confirmations, menus, dialogs, sheets, and
 single/multiple selection. Typed continuations remain in the application Go
-registry; UIKit and WebView own controls. See [contract and limits](presentation-behaviors.md).
+registry; UIKit and WebView own controls. See [contract and limits](../presentation-behaviors.md).
 The first typed file-service slice adds import/export and private attachments
-to that same Notes application; see [file services and limits](files-services.md).
+to that same Notes application; see [file services and limits](../files-services.md).
 The still-photo slice adds library selection and camera acquisition to saved
-note attachments using the same task lifecycle; see [photo services](photos-services.md).
+note attachments using the same task lifecycle; see [photo services](../photos-services.md).
 Saved notes now display their photos, with tappable bounded previews shared by
 UIKit and WebView. Native navigation uses explicit primary/overflow composition
-rather than automatic toolbar collapse; see [image previews](image-previews.md).
+rather than automatic toolbar collapse; see [image previews](../image-previews.md).
 Physical-camera and actual WebView OS integration remain acceptance gates.
 The [component slice](mobile-components.md) now adds typed controls, filters,
 stable-ID selection/bulk actions, bounded undo, accumulated Load more, tab
@@ -342,12 +342,12 @@ hosted-WebView provider acceptance, and M6 extensions remain separate gates.
 
 ### M6 — Extensions, developer experience, and measured optimization
 
-The [compiled extensions](compiled-extensions.md) cover explicit Go registration,
+The [compiled extensions](../compiled-extensions.md) cover explicit Go registration,
 package-owned UIKit/WebView adapters and dependency discovery. Photo acquisition
-reuses the existing file lifecycle; [rendering components](rendering-extensions.md)
+reuses the existing file lifecycle; [rendering components](../rendering-extensions.md)
 own Notes media screen pieces with keyed reconciliation and guarded navigation.
-[Authoring tools](extension-tooling.md) and a separate
-[device readiness/acceptance gate](ios-device-acceptance.md) accompany these seams.
+[Authoring tools](../extension-tooling.md) and a separate
+[device readiness/acceptance gate](../ios-device-acceptance.md) accompany these seams.
 Arbitrary service extensions, generated bindings, inspector, full signing/deploy
 automation and measured optimization remain future work, not completed parity.
 

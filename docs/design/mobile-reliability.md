@@ -48,7 +48,7 @@ completion cannot overwrite a newer editor or emit navigation/device effects.
 Restarted pending/unknown saves preserve newer text and remain unknown. They are
 not retried or unlocked by Keep/Discard. Failed completion persistence suppresses
 effects; only observation, never the write, may be retried. See the
-[runtime fault-test notes](../nativeui/docs/agent-notes.md).
+[runtime fault-test notes](../../nativeui/docs/agent-notes.md).
 
 ## WebView history and backgrounding
 
@@ -90,7 +90,7 @@ checkpoint dependency chain. Reply fences reject pre-mutation snapshots, even at
 the same revision. Completion/leave defer checkpoints so old buffers cannot
 recreate discarded drafts or undo canonicalization. Restoration never reopens
 retained pending editors; only visible attached controllers resume reads.
-See [UIKit details and limits](../render/ios/docs/reliability.md).
+See [UIKit details and limits](../../render/ios/docs/reliability.md).
 
 ## What must never be retried
 
@@ -98,7 +98,7 @@ Automatic recovery issues only read/open/close operations. It does not replay
 actions, presentation continuations, file/device results, saves, or OS effects.
 It does not replace editor buffers, take semantic draft ownership, or unlock
 pending or unknown writes. Editor recovery continues to use the existing
-[draft and runtime contract](mobile-runtime.md).
+[draft and runtime contract](../mobile-runtime.md).
 
 This is not crash-consistent exactly-once business execution. Immediate
 termination before a checkpoint, cross-process ownership, crash-time mutation

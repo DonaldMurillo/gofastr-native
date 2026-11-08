@@ -1,6 +1,6 @@
 # WebView controls and collection adapter
 
-The frozen [shared contract](../../../docs/mobile-components.md) is authored in
+The frozen [shared contract](../../../docs/design/mobile-components.md) is authored in
 Go. `webview.New` renders it through the existing GoFastr UIHost/router. The
 library embeds `components.js`, `webview.js`, and CSS; applications supply no
 JavaScript, HTML, CSS, gesture handlers, or alternative router.

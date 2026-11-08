@@ -3,8 +3,8 @@
 Implementation and acceptance guide, November 6, 2026. Application authors still
 write Go screens/actions. Ordinary library Swift, Java, and JavaScript adapt them; no
 application-owned native screens, JavaScript, or behavior templates are required.
-GoFastr core remains unchanged. See [native Android](android.md) for its adapters
-and acceptance limits. [Share-in, secure storage, and widgets](device-features.md)
+GoFastr core remains unchanged. See [native Android](../android.md) for its adapters
+and acceptance limits. [Share-in, secure storage, and widgets](../device-features.md)
 add opt-in Go contracts for both native platforms.
 
 ## Four additions in the same Notes application
@@ -24,7 +24,7 @@ are not implemented. No background recording or remote sync is promised.
 Recording defaults to at most 60 seconds/1 MiB in the service contract. Notes
 uses 60 seconds/**512 KiB** to fit its versioned duration/content envelope in
 the existing private attachment store. Audio signature checks are not full
-server-side media decoding. See [Notes persistence](../examples/notes/docs/mobile-services.md).
+server-side media decoding. See [Notes persistence](../../examples/notes/docs/mobile-services.md).
 
 ## Runtime and host boundary
 
@@ -40,7 +40,7 @@ uses `mobilehost/ios.GofastrWebViewServices`, restricted to the exact trusted
 origin and main frame/current document. Native and WebView hosts package the
 same service runner; custom hosts must explicitly integrate it. Optional
 `--microphone-usage` adds the purpose string. An omitted purpose string leaves
-native recording unavailable. See [UIKit details](../render/ios/docs/services.md).
+native recording unavailable. See [UIKit details](../../render/ios/docs/services.md).
 
 Plain-browser notifications are unsupported, not in-page timer imitations.
 Sharing/download and clipboard fallbacks are explicit. MediaRecorder requires
@@ -62,7 +62,7 @@ retire old queries; selected IDs survive refresh only while still valid/visible.
 Selection-toolbar actions and opaque hidden values are reconciled with those
 rows, so archive/Undo does not retain a missing or obsolete receipt. Host Stop
 cancels its bridge polls before draining HTTP; direct callers retain their own
-contexts. See [lifecycle ownership](mobile-lifecycle.md).
+contexts. See [lifecycle ownership](../mobile-lifecycle.md).
 
 ## Repeatable acceptance
 

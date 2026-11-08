@@ -70,8 +70,8 @@ The four slices are implemented in `nativeui/`, `behavior/`, `render/ios/`,
 `render/webview/`, and the single `examples/notes/notesscreens` application.
 The exact validation rules live in [component contracts](component-contracts.md);
 adapter details and selectors are in
-[UIKit components](../render/ios/docs/components.md) and
-[WebView components](../render/webview/docs/components.md).
+[UIKit components](../../render/ios/docs/components.md) and
+[WebView components](../../render/webview/docs/components.md).
 
 November 5 native evidence: fresh optimized gomobile bind/Swift link/install/run
 on iPhone 17 Pro, iOS 26.5 simulator; real UI checks exercised active/archived

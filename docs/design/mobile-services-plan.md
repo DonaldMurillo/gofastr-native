@@ -10,7 +10,7 @@ platform implementations. Preserve the existing dirty work and do not commit.
 ## Ownership
 
 - Go services worker: `device/notifications`, `device/sharing`, `device/audio`,
-  `nativeui/**`, new `behavior/task*`, and `docs/device-services.md`.
+  `nativeui/**`, new `behavior/task*`, and `docs/design/device-services.md`.
 - UIKit worker: `render/ios/**`, including the reusable native service runner.
 - WebView worker: `render/webview/**`, using the same typed command boundary.
 - Notes worker: `examples/notes/**`, including real repository paging, change

@@ -127,7 +127,7 @@ add remote executable presentation or upload attachments to a server.
   future consumers must provide their own parsers and safety policy.
 - Device-provider errors and real-device signing/permissions still need physical
   device testing. Consult renderer-specific notes under `render/*/docs/files.md`
-  and the verification evidence in `docs/agent-notes.md`.
+  and the verification evidence in `docs/design/agent-notes.md`.
 
 ## Verification evidence
 

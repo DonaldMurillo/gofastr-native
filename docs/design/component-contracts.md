@@ -1,6 +1,6 @@
 # Shared Go component contracts
 
-`docs/mobile-components.md` remains the frozen cross-agent contract. This file
+`docs/design/mobile-components.md` remains the frozen cross-agent contract. This file
 documents the shared Go implementation in `nativeui` and `behavior`; it does not
 claim that a renderer implements a control, gesture, or accessibility behavior.
 
