@@ -94,7 +94,21 @@ type Key struct {
 	Code KeyCode
 	Rune rune
 	Mods Mods
+	// Action tells a fresh press from the terminal's auto-repeat. It is
+	// KeyUnreported unless the decoder's EventTypes is on and the terminal
+	// sent the key as an escape code.
+	Action KeyAction
 }
+
+// KeyAction is what a key event reports. Legacy terminal input cannot tell
+// a held key's repeats from new presses, so it stays KeyUnreported.
+type KeyAction uint8
+
+const (
+	KeyUnreported KeyAction = iota
+	KeyPress
+	KeyRepeat
+)
 
 func (k Key) String() string {
 	if k.Code == KeyRune {

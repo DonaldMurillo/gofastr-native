@@ -44,6 +44,10 @@ var (
 	// KittyKeyboard pushes the kitty keyboard protocol's disambiguate flag.
 	// Terminals without the protocol ignore it.
 	KittyKeyboard = Mode{"kitty-keyboard", "\x1b[>1u", "\x1b[<u"}
+	// KittyKeyboardEvents pushes the disambiguate, event type, all keys as
+	// escape codes and associated text flags (1, 2, 8 and 16), so a held
+	// key's repeats are marked. Decode with input.Decoder.EventTypes on.
+	KittyKeyboardEvents = Mode{"kitty-keyboard-events", "\x1b[>27u", "\x1b[<u"}
 	// GraphemeClusters makes the terminal treat each grapheme cluster as one
 	// character (mode 2027). Enable it only when probe reports it available,
 	// and lay text out with uni.Graphemes while it is on.

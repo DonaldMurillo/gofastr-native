@@ -85,6 +85,48 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+// With event types on, keys sent as escape codes say whether they are a
+// press or auto-repeat, releases are dropped, and reported text is the
+// rune. Plain bytes stay unreported.
+func TestDecodeEventTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []Event
+	}{
+		{"space press", "\x1b[32;;32u", []Event{Key{Rune: ' ', Action: KeyPress}}},
+		{"space repeat", "\x1b[32;1:2;32u", []Event{Key{Rune: ' ', Action: KeyRepeat}}},
+		{"space release", "\x1b[32;1:3u", nil},
+		{"shift a types A", "\x1b[97;2;65u", []Event{Key{Rune: 'A', Action: KeyPress}}},
+		{"ctrl c", "\x1b[99;5u", []Event{Key{Rune: 'c', Mods: ModCtrl, Action: KeyPress}}},
+		{"enter repeat", "\x1b[13;1:2u", []Event{Key{Code: KeyEnter, Action: KeyRepeat}}},
+		{"backspace", "\x1b[127u", []Event{Key{Code: KeyBackspace, Action: KeyPress}}},
+		{"up press", "\x1b[A", []Event{Key{Code: KeyUp, Action: KeyPress}}},
+		{"up repeat", "\x1b[1;1:2A", []Event{Key{Code: KeyUp, Action: KeyRepeat}}},
+		{"page down release", "\x1b[6;1:3~", nil},
+		{"left shift dropped", "\x1b[57441;2u", nil},
+		{"legacy bytes unreported", " \r", []Event{Key{Rune: ' '}, Key{Code: KeyEnter}}},
+		{"mouse untouched", "\x1b[<0;3;4M", []Event{Mouse{X: 2, Y: 3, Button: ButtonLeft, Action: MousePress}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d := Decoder{EventTypes: true}
+			var got []Event
+			emit := func(e Event) { got = append(got, e) }
+			d.Feed([]byte(test.in), emit)
+			d.Flush(emit)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("decode(%q)\n got %#v\nwant %#v", test.in, got, test.want)
+			}
+		})
+	}
+	// Without event types an arrow release is not a thing the terminal
+	// sends, and keys stay unreported.
+	if got := decode(t, "\x1b[32;;32u"); !reflect.DeepEqual(got, []Event{Key{Rune: ' '}}) {
+		t.Fatalf("text key without event types: %#v", got)
+	}
+}
+
 // Delivering a sequence one byte per read must decode exactly like one read:
 // terminals and ssh links split writes arbitrarily.
 func TestSplitReadsDecodeIdentically(t *testing.T) {

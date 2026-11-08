@@ -90,7 +90,15 @@ node that takes it, and that node captures the pointer until every button is
 up. Presses on the same cell within 400 ms count as a double or triple click.
 A left drag that no node takes selects screen text, and the release copies
 it. A `FocusTrap` widget (the modal) keeps Tab inside itself and gives focus
-back to the node that had it when it closes.
+back to the node that had it when it closes. The modal keeps every other
+key from what is under it, except Ctrl+C and Ctrl+Z, which reach the app.
+
+`Options.KeyEvents` pushes the kitty keyboard protocol's event type, all
+keys as escape codes and associated text flags (`term.KittyKeyboardEvents`).
+Keys then carry `input.KeyPress` or `input.KeyRepeat` in `Key.Action`,
+releases are dropped, and the reported text is the rune, so `Shift+a` is
+still `A`. Keys from a terminal without the protocol arrive as before, with
+`KeyUnreported`. It is off by default.
 
 `widget` widgets are controlled: they draw the `Value` they are given and
 report edits through `OnChange`, so the program's state is the only copy.

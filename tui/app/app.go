@@ -42,6 +42,11 @@ type Options struct {
 	Unhandled func(a *App, e input.Event) bool
 	// NoDefaultKeys turns off the ctrl+c and ctrl+z defaults.
 	NoDefaultKeys bool
+	// KeyEvents asks the terminal to mark auto-repeat (the kitty keyboard
+	// protocol's event types, with every key sent as an escape code), so
+	// input.Key.Action tells a fresh press from a held key. Keys from a
+	// terminal without the protocol report KeyUnreported.
+	KeyEvents bool
 	// Start runs on the loop before the first frame, for example to start
 	// background work with After or Every.
 	Start func(a *App)
@@ -231,7 +236,12 @@ func (a *App) run(root func(*App) view.Element, signals <-chan os.Signal, opts O
 			return err
 		}
 	}
-	for _, m := range []term.Mode{term.AltScreen, term.HideCursor, term.NoAutowrap, term.BracketedPaste, term.FocusEvents, term.KittyKeyboard} {
+	keyboard := term.KittyKeyboard
+	if opts.KeyEvents {
+		keyboard = term.KittyKeyboardEvents
+		decoder.EventTypes = true
+	}
+	for _, m := range []term.Mode{term.AltScreen, term.HideCursor, term.NoAutowrap, term.BracketedPaste, term.FocusEvents, keyboard} {
 		if err := a.term.Set(m, true); err != nil {
 			return err
 		}

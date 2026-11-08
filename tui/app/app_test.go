@@ -5,6 +5,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -174,6 +175,37 @@ func TestClickTypeAndQuit(t *testing.T) {
 	}
 	raw := s.rawOutput()
 	for _, want := range []string{"\x1b[?1003h", "\x1b[?1049l", "\x1b[?2004l"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("output lacks %q", want)
+		}
+	}
+}
+
+// KeyEvents pushes the event-type flags and decodes the keys they produce:
+// a repeat of space is marked, and ctrl+c sent as an escape code quits.
+func TestKeyEventsMarkRepeats(t *testing.T) {
+	var got []input.KeyAction
+	root := func(a *App) view.Element {
+		return widget.OnKey(func(k input.Key) bool {
+			if k.Rune == ' ' {
+				got = append(got, k.Action)
+			}
+			return k.Rune == ' '
+		}, widget.Label(fmt.Sprintf("spaces %d", len(got))))
+	}
+	s := start(t, 30, 5, root, Options{KeyEvents: true})
+	s.waitFor("spaces 0")
+	s.send("\x1b[32;;32u\x1b[32;1:2;32u\x1b[32;1:3u")
+	s.waitFor("spaces 2")
+	s.send("\x1b[99;5u") // ctrl+c
+	if r := s.exit(); r != nil {
+		t.Fatalf("run returned %v", r)
+	}
+	if !slices.Equal(got, []input.KeyAction{input.KeyPress, input.KeyRepeat}) {
+		t.Fatalf("space actions %v, want press then repeat", got)
+	}
+	raw := s.rawOutput()
+	for _, want := range []string{"\x1b[>27u", "\x1b[<u"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("output lacks %q", want)
 		}

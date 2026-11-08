@@ -224,7 +224,8 @@ func Limit(w, h int, e view.Element) view.Element {
 
 // Modal covers the screen, dims what is under it, keeps focus inside, and
 // shows its child centered. Escape or a click on the backdrop calls
-// OnClose. Put it last in a Stack.
+// OnClose. Put it last in a Stack. Ctrl+C and Ctrl+Z pass through, so the
+// app can still quit or suspend while a modal is open.
 type Modal struct {
 	OnClose func()
 }
@@ -254,6 +255,8 @@ func (m Modal) Handle(n *view.Node, e view.Event) bool {
 			m.OnClose()
 		case e.Code == input.KeyTab:
 			return false // the tree moves focus within the modal
+		case e.Code == input.KeyRune && e.Mods == input.ModCtrl && (e.Rune == 'c' || e.Rune == 'z'):
+			return false // quit and suspend still work
 		}
 		return true // keys never reach what is under the modal
 	case *view.PointerEvent:

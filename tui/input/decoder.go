@@ -26,6 +26,13 @@ var pasteEnd = []byte("\x1b[201~")
 type Decoder struct {
 	// MaxPaste caps paste text in bytes. Zero means DefaultMaxPaste.
 	MaxPaste int
+	// EventTypes is on when the terminal was asked for event types and
+	// for every key as an escape code (term.KittyKeyboardEvents). Keys
+	// sent as escape codes then carry KeyPress or KeyRepeat, releases are
+	// dropped, and a key's reported text becomes its rune. Plain bytes
+	// still decode as before, with KeyUnreported, since they come from a
+	// terminal without the protocol.
+	EventTypes bool
 
 	buf       []byte
 	pasting   bool
@@ -481,6 +488,24 @@ func (d *Decoder) csiEvent(s csi) Event {
 	if s.inter != "" {
 		return nil
 	}
+	e := d.plainCSI(s)
+	k, ok := e.(Key)
+	if !ok || !d.EventTypes {
+		return e
+	}
+	switch s.sub(1, 1, 1) {
+	case 3:
+		return nil // releases are not reported
+	case 2:
+		k.Action = KeyRepeat
+	default:
+		k.Action = KeyPress
+	}
+	return k
+}
+
+// plainCSI decodes a CSI sequence without a private marker.
+func (d *Decoder) plainCSI(s csi) Event {
 	mods := modifiers(s.param(1, 1))
 	switch s.final {
 	case 't':
@@ -540,7 +565,15 @@ func kittyKey(s csi) Event {
 	if s.sub(1, 1, 1) == 3 { // release events are not reported
 		return nil
 	}
-	return functionalKey(s.sub(0, 0, 0), modifiers(s.sub(1, 0, 1)))
+	mods := modifiers(s.sub(1, 0, 1))
+	// With associated text (flag 16) the text is what the key typed, as
+	// legacy input would send it: shift is already applied.
+	if text := s.sub(2, 0, 0); text != 0 {
+		if k, ok := functionalKey(text, mods&^ModShift).(Key); ok && k.Code == KeyRune {
+			return k
+		}
+	}
+	return functionalKey(s.sub(0, 0, 0), mods)
 }
 
 func functionalKey(code int, mods Mods) Event {

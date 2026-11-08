@@ -449,6 +449,16 @@ func TestModalTrapsFocusAndCloses(t *testing.T) {
 	if open {
 		t.Fatal("escape did not close")
 	}
+	open = true
+	h.frame()
+	for _, r := range "cz" {
+		if h.tree.Dispatch(ctrl(r)) {
+			t.Fatalf("modal consumed ctrl+%c, so the app cannot quit or suspend", r)
+		}
+	}
+	if h.tree.Dispatch(ctrl('a')) == false {
+		t.Fatal("modal let ctrl+a reach what is under it")
+	}
 }
 
 func TestScrollWheelAndFollowEnd(t *testing.T) {
