@@ -55,9 +55,9 @@ real bottom-aligned modal overlay.
 node --check render/webview/presentation.js
 node --check render/webview/webview.js
 node --test render/webview/presentation.test.cjs
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test -race ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./render/webview
+go test ./render/webview
+go test -race ./render/webview
+go vet ./render/webview
 ```
 
 The dependency-free Node tests cover renderer DOM/wire glue using a small DOM

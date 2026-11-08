@@ -27,7 +27,6 @@ From this repository, substitute the path to an **existing owner-authorized sign
 device-test build**. `--app` never builds, replaces or signs it.
 
 ```sh
-export GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL
 go run ./cmd/gofastr-native doctor --platform ios-device --dry-run
 go run ./cmd/gofastr-native doctor --platform ios-device \
   --app /absolute/path/to/ExistingTest.app \

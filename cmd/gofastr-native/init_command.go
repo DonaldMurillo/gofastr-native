@@ -28,8 +28,8 @@ go tool. It never writes into an existing directory.
   --name     home-screen name (default: the package name, capitalized)
   --native   gofastr-native checkout directory (used through a replace) or
              a published module version. Default: whatever the current
-             module uses. gofastr-native has no published version yet, so
-             today this means a checkout.
+             module uses, or this CLI's own version when it was installed
+             from a published release.
   --dry-run  print the files and commands without creating anything
 `
 

@@ -67,8 +67,8 @@ contexts. See [lifecycle ownership](../mobile-lifecycle.md).
 ## Repeatable acceptance
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./internal/simtest -run 'TestNotes(AudioRecordingBrowser|DeviceServicesProtocolWebView|BrowserReminderUnsupported|LivePagingWebView)$' -count=3
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./nativeui ./behavior ./device/... ./examples/notes/... ./cmd/gofastr-native ./mobilehost/ios ./render/ios ./render/webview
+go test ./internal/simtest -run 'TestNotes(AudioRecordingBrowser|DeviceServicesProtocolWebView|BrowserReminderUnsupported|LivePagingWebView)$' -count=3
+go test ./nativeui ./behavior ./device/... ./examples/notes/... ./cmd/gofastr-native ./mobilehost/ios ./render/ios ./render/webview
 node --test render/webview/*.test.cjs
 ```
 

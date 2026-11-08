@@ -230,9 +230,9 @@ node --check extension/photos/photos.js
 node --check render/webview/presentation.js
 node --check render/webview/webview.js
 node --test render/webview/files.test.cjs render/webview/presentation.test.cjs
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test -race ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./render/webview
+go test ./render/webview
+go test -race ./render/webview
+go vet ./render/webview
 ```
 
 ## 2026-11-04 - Activation and uncertain file writes

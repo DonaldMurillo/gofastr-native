@@ -56,8 +56,8 @@ nothing.
 
 ### Which gofastr-native the app uses
 
-gofastr-native has no published version yet. Until it does, the generated
-`go.mod` points at a local checkout with a `replace` directive:
+Run from a checkout of this repository, `init` points the generated `go.mod`
+at that checkout with a `replace` directive:
 
 ```
 require github.com/DonaldMurillo/gofastr-native v0.0.0-00010101000000-000000000000
@@ -65,10 +65,12 @@ replace github.com/DonaldMurillo/gofastr-native => /path/to/gofastr-native
 ```
 
 The app's `README.md` names the checkout and says how to switch to a
-published version later:
+published version:
 `go mod edit -dropreplace github.com/DonaldMurillo/gofastr-native`, then
 `go get github.com/DonaldMurillo/gofastr-native@<version>`. `--native` takes
-either a checkout directory or a version such as `v0.2.0`.
+either a checkout directory or a version such as `v0.0.1`, and a CLI run
+from a release (`go run github.com/DonaldMurillo/gofastr-native/cmd/gofastr-native@v0.0.1 init ...`)
+requires its own version with no `replace`.
 
 The `go.mod` also pins the CLI, `gomobile`, and `gobind` with `tool`
 directives. `go tool gofastr-native` then runs the CLI built from the same

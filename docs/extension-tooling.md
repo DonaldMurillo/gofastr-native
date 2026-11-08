@@ -111,8 +111,8 @@ metadata to reject an unsafe or unusable plan.
 ## Verification and durable notes
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./cmd/gofastr-native -count=1
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./cmd/gofastr-native
+go test ./cmd/gofastr-native -count=1
+go vet ./cmd/gofastr-native
 go test ./extensions/documents ./extensions/text
 gofastr-native extension check --pkg ./my/consuming/bind/package
 ```

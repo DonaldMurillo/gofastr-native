@@ -138,9 +138,9 @@ open a menu; reduced motion continues to disable it entirely.
 ## Verification and platform limits
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test -race ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./render/webview
+go test ./render/webview
+go test -race ./render/webview
+go vet ./render/webview
 for source in render/webview/*.js; do node --check "$source"; done
 node --test render/webview/*.test.cjs
 ```

@@ -147,10 +147,9 @@ note rendered with saved status and the same window marker, confirming that
 navigation and save did not reload the WebView. This does not verify physical
 keyboard behavior, screen readers, or Android's WebView implementation.
 
-Local verification on November 4, 2026 used the linked framework worktree
-`fd6c39e12` and separately passed the pinned-module checks with `GOWORK=off`.
-The standalone `/Users/dom/programming/gofastr` checkout is not the one selected
-by this repository's local `go.work`; neither checkout was modified.
+Local verification on November 4, 2026 used a local gofastr checkout at
+`fd6c39e12` through `go.work`, and separately passed the pinned-module checks
+with `GOWORK=off`.
 
 ## Deliberately not implemented in the mobile-web presentation
 

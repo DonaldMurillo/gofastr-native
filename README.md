@@ -38,8 +38,9 @@ go tool gofastr-native dev --platform android-emu --renderer native --pkg ./hell
 `doctor` checks the toolchain without changing anything and prints the fix
 for whatever is missing. `init` creates a module with Go screens, a private
 item store, durable drafts, tests, and the CLI pinned as a `go tool`. It
-never writes into an existing directory. Until gofastr-native publishes a
-version, the new `go.mod` uses this checkout through a `replace`. `dev`
+never writes into an existing directory. Run from this checkout, the new
+`go.mod` uses it through a `replace`; pass `--native v0.0.1` to require the
+release instead. `dev`
 rebuilds, reinstalls and restarts the app after each change; it is not hot
 reload. Use `--platform ios-sim` for the iOS simulator.
 
@@ -136,3 +137,11 @@ the known gaps and the next steps are in
 
 The project was previously named `gofastr-mobile`; see
 [the rename](docs/design/project-rename.md) for the old paths.
+
+Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+MIT; see [LICENSE](LICENSE). The tables and test data in `tui/uni` come from
+the Unicode Character Database and are used under the
+[Unicode License v3](https://www.unicode.org/license.txt).
