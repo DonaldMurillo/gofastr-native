@@ -199,8 +199,20 @@ func (s *system) canSuspend() bool { return true }
 
 // suspend stops the process group, as ctrl+z would, with SIGSTOP. SIGTSTP is
 // not used because a program that watches SIGTSTP would catch its own signal.
+//
+// Kill can hand the signal to another thread of this process, and then the
+// stop starts after Kill returns. On Linux the caller would get as far as
+// re-entering raw mode before the stop, leaving the shell a raw terminal. So
+// suspend returns only after the SIGCONT that ends the stop.
 func (s *system) suspend() error {
-	return unix.Kill(0, unix.SIGSTOP)
+	cont := make(chan os.Signal, 1)
+	signal.Notify(cont, unix.SIGCONT)
+	defer signal.Stop(cont)
+	if err := unix.Kill(0, unix.SIGSTOP); err != nil {
+		return err
+	}
+	<-cont
+	return nil
 }
 
 func (s *system) release() {
