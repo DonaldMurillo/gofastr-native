@@ -1,0 +1,15 @@
+#!/bin/sh
+# Runs the repository hygiene check before each commit.
+# Install once per clone: git config core.hooksPath scripts/hooks
+# Skip for one commit: git commit --no-verify
+cd "$(git rev-parse --show-toplevel)" || exit 1
+if ! command -v go >/dev/null 2>&1; then
+	echo "pre-commit: go is not on PATH; skipping the repocheck hygiene test" >&2
+	exit 0
+fi
+if ! output=$(GOWORK=off go test -count=1 ./internal/repocheck 2>&1); then
+	echo "$output" >&2
+	echo >&2
+	echo "pre-commit: repocheck found something that should not ship (see RELEASING.md)." >&2
+	exit 1
+fi

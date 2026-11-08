@@ -51,3 +51,12 @@ verified.
 
 Tested against the VT emulator and real ptys on macOS. On Windows it builds
 and passes vet but has not been run.
+
+### Repository
+
+- `internal/repocheck` runs with `go test ./...` and fails on local paths,
+  tool names, credentials, stale release claims, uncredited third-party
+  notices and module layout mistakes.
+- `go run ./internal/releasecheck vX.Y.Z` checks a release from a fresh clone,
+  including dependency licenses. See [RELEASING.md](RELEASING.md).
+- `scripts/hooks/pre-commit` runs the repocheck test before each commit.

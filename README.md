@@ -78,7 +78,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | `mobilehost/` | Runs a GoFastr app inside the phone app's process, with the native bridge (`bridge.js`). |
 | `cmd/gofastr-native/` | The CLI: `doctor`, `init`, `dev`, `build`, `run`, `inspect`, `extension`. |
 | `tui/` | The terminal UI library, a separate module. |
-| `internal/` | Private file helpers, the Chromium phone simulator used by tests (`browsersim`), and the integration tests that drive it (`simtest`). |
+| `internal/` | Private file helpers, the Chromium phone simulator used by tests (`browsersim`), the integration tests that drive it (`simtest`), and the repository checks (`repocheck`, `releasecheck`). |
 | `scripts/` | Android emulator smoke tests. |
 | `docs/` | Guides, indexed in [`docs/README.md`](docs/README.md). Design notes and the project status are in [`docs/design/`](docs/design/). |
 
@@ -138,7 +138,8 @@ the known gaps and the next steps are in
 The project was previously named `gofastr-mobile`; see
 [the rename](docs/design/project-rename.md) for the old paths.
 
-Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+Changes are listed in [CHANGELOG.md](CHANGELOG.md). [RELEASING.md](RELEASING.md)
+describes how versions are tagged and the checks that run first.
 
 ## License
 
