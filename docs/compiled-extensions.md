@@ -170,7 +170,7 @@ Ordinary file pick/export and existing service requests are unchanged.
   including invalid results, completion recovery, unknown outcomes, and no replay.
 - `node --test render/webview/*.test.cjs`: existing adapter regressions plus an
   independently registered non-photo acquisition through the shared dialog.
-- `go test ./sim -run TestNotesPhotosWebView -count=1`: real Chromium chooser,
+- `go test ./internal/simtest -run TestNotesPhotosWebView -count=1`: real Chromium chooser,
   normalization, persistence, inline preview, export, cancellation and errors in
   both iOS/Android **WebView styles**, not Android native execution.
 - `go test ./cmd/gofastr-native ./render/ios`: real import-graph discovery,

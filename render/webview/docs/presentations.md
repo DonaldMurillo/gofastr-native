@@ -61,7 +61,7 @@ GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./render/webview
 ```
 
 The dependency-free Node tests cover renderer DOM/wire glue using a small DOM
-fixture. `go test ./sim -run TestNotesBehaviorShowcaseWebView -count=1` exercises
+fixture. `go test ./internal/simtest -run TestNotesBehaviorShowcaseWebView -count=1` exercises
 all seven Notes flows through the real bridge in Chromium, with iOS/Android
 styles, corrective validation, 200% text, dark mode, and opener focus restoration.
 A November 4, 2026 iOS 26.5 simulator smoke check also verified menu/confirmation

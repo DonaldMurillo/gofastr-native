@@ -80,7 +80,7 @@ light/dark. It also checks 200% text at 320 CSS pixels without horizontal overfl
 ```sh
 SIM_SHOTS=/tmp/gofastr-design-shots \
 GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL \
-go test ./sim -run 'TestNotesVisualHierarchyWebView|TestMobileComponentsWebView|TestNotesFilesWebView|TestNotesPhotosWebView|TestNotesLivePagingWebView|TestNotesDeviceServicesProtocolWebView' -count=1
+go test ./internal/simtest -run 'TestNotesVisualHierarchyWebView|TestMobileComponentsWebView|TestNotesFilesWebView|TestNotesPhotosWebView|TestNotesLivePagingWebView|TestNotesDeviceServicesProtocolWebView' -count=1
 ```
 
 Screenshots require visual inspection, not just successful DOM assertions.

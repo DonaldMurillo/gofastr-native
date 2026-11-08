@@ -7,6 +7,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 
 - [Getting started](getting-started.md): from an empty directory to a running app.
 - [Developer workflow](developer-workflow.md): the CLI commands and what each one checks.
+- [Running on a simulator, emulator or device](running-on-devices.md): what `run` does on each platform.
 - [Android](android.md): native Android builds, from macOS, Linux or Windows.
 - [Release builds](release.md): signing iOS and Android builds with your own credentials.
 - [Debugging](debugging.md): traces and inspection for the `nativeui` runtime.
@@ -21,6 +22,10 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Editor behavior](editor-behavior.md): checkpoints and drafts with the `behavior` package.
 - [Image previews](image-previews.md)
 - [Component gallery](component-gallery.md): every screen contract, one at a time.
+
+## Hosting a GoFastr web app
+
+- [How a WebView request reaches Go](webview-hosting.md): the in-memory listener, the bridge and cookies.
 
 ## Device services
 
@@ -40,6 +45,6 @@ own guide in [`tui/README.md`](../tui/README.md).
 
 ## Design notes
 
-[`design/`](design/) holds the roadmap, plans, cross-renderer contracts and
-the implementation log. They record why things are the way they are and are
+[`design/`](design/) holds the [project status](design/status.md), the
+roadmap, plans, cross-renderer contracts and the implementation log. They record why things are the way they are and are
 not needed to build an app.

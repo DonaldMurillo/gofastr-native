@@ -72,4 +72,4 @@ A screen whose requirement the renderer lacks is refused before any handler runs
 
 - `go test ./examples/gallery/...` renders and reaches every route, runs every declared action, checks validation keys, unknown-save blocking, honest requirement refusals, the capability text, file import reporting and presentation results.
 - `go test -tags gofastr_debugtrace ./examples/gallery/gallerynative` checks the tagged trace hook.
-- `go test ./sim -run TestGalleryWebView` walks every tab and row in headless Chromium for both phone shapes and drives validation, save, unknown save, a refusal, the capability text, live updates, each presentation kind, an announcement, and push and pop. Set `SIM_SHOTS` to keep screenshots.
+- `go test ./internal/simtest -run TestGalleryWebView` walks every tab and row in headless Chromium for both phone shapes and drives validation, save, unknown save, a refusal, the capability text, live updates, each presentation kind, an announcement, and push and pop. Set `SIM_SHOTS` to keep screenshots.

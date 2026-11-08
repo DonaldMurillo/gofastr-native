@@ -133,7 +133,7 @@ go run ./cmd/gofastr-native run --platform ios-sim --renderer webview \
   --pkg ./examples/notes/notesmobile --id dev.gofastr.notesshared \
   --name 'Shared Notes' --out dist/mobile/ios-shared-webview
 
-SIM_SHOTS=/tmp/gofastr-shared-screens go test ./sim \
+SIM_SHOTS=/tmp/gofastr-shared-screens go test ./internal/simtest \
   -run TestSharedMobileScreensWebView -count=1 -v
 go test ./...
 GOWORK=off go test ./...

@@ -141,7 +141,7 @@ export GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL
 node --test render/webview/*.test.cjs
 go test ./render/ios ./cmd/gofastr-native ./nativeui ./behavior
 go test -race ./nativeui ./behavior ./examples/notes/notesnative ./render/webview
-go test -race ./sim -run 'TestMobileComponentsWebView|TestMobileHistoryWaitsForDurableDraft|TestMobileBackgroundCheckpointSurvivesReload|TestMobileBackgroundCheckpointWaitsForDiscard|TestRetainedCollectionRecoversReadWithoutReplayingActions|TestSharedMobileScreensWebView' -count=3
+go test -race ./internal/simtest -run 'TestMobileComponentsWebView|TestMobileHistoryWaitsForDurableDraft|TestMobileBackgroundCheckpointSurvivesReload|TestMobileBackgroundCheckpointWaitsForDiscard|TestRetainedCollectionRecoversReadWithoutReplayingActions|TestSharedMobileScreensWebView' -count=3
 go test -p 1 ./...
 GOWORK=off go test -p 1 ./...
 ```

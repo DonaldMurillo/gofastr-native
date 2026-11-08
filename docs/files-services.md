@@ -131,7 +131,7 @@ add remote executable presentation or upload attachments to a server.
 
 ## Verification evidence
 
-- `go test ./sim -run TestNotesFilesWebView -count=3` passes for both iOS and
+- `go test ./internal/simtest -run TestNotesFilesWebView -count=3` passes for both iOS and
   Android styling through the real in-memory bridge. The test imports a file,
   verifies actual downloaded unsaved Markdown bytes, exercises attachment
   add/export-cancel/remove, verifies visible cards and text previews, keeps dirty

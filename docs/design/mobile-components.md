@@ -104,8 +104,8 @@ Relevant repeatable commands:
 GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./...
 GOWORK=off GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./...
 GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test -race ./behavior ./nativeui ./render/webview ./examples/notes/...
-SIM_SHOTS=/tmp/gofastr-component-shots GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./sim -run TestMobileComponentsWebView -count=3
-SIM_SHOTS=/tmp/gofastr-component-shots GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./sim -run 'TestMobileComponentsWebView|TestSharedMobileScreensWebView|TestNotesBehaviorShowcaseWebView|TestNotesFilesWebView|TestNotesPhotosWebView' -count=3
+SIM_SHOTS=/tmp/gofastr-component-shots GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./internal/simtest -run TestMobileComponentsWebView -count=3
+SIM_SHOTS=/tmp/gofastr-component-shots GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./internal/simtest -run 'TestMobileComponentsWebView|TestSharedMobileScreensWebView|TestNotesBehaviorShowcaseWebView|TestNotesFilesWebView|TestNotesPhotosWebView' -count=3
 node --test render/webview/*.test.cjs
 ```
 

@@ -1,6 +1,7 @@
-// gofastr-native provides Go-authored screens, behaviors, and device services
-// with native UIKit and mobile WebView renderers. Existing GoFastr web apps
-// run over an in-memory listener, without sockets. It uses public APIs only.
+// gofastr-native provides Go-authored phone screens, behaviors, and device
+// services with UIKit, Android and WebView renderers. The terminal UI library
+// is the separate tui module. Existing GoFastr web apps run over an in-memory
+// listener, without sockets. It uses public APIs only.
 //
 // gofastr v0.96.0 is the first release with the seams this module needs
 // (App.Serve, the runtime host transport, framework/localapp). For local

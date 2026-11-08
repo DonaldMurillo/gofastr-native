@@ -25,6 +25,9 @@ Each layer depends only on the layers below it.
 `probe` sits above `input` because it decodes the replies, and it reports
 results as `cell` options and a `uni` width method.
 
+`examples/chordharp` in the repository root is a larger app built on these
+layers: a chord harp with sound.
+
 `cmd/netmon` is the test app: a read-only network connection monitor built on
 every layer. `cmd/tui-demo` runs the whole startup path: probe, mode setup, then a paint
 loop. Drag to paint, right-click to erase, scroll to change color. The status
@@ -165,72 +168,6 @@ process. Escape leaves the filter, then clears it. `p` pauses, `r` refreshes,
 resize it. Sockets that appeared in the latest refresh are green, and the
 selection stays on its socket when rows move. Toasts report a failed
 refresh, the recovery after it, pause and resume, and copied text.
-
-## chordharp
-
-`cmd/chordharp` is a chord harp for the terminal. It is laid out like the
-electronic autoharps of the early 1980s: a grid of 27 chords, a strumplate,
-and a rhythm box.
-
-```sh
-cd tui
-GOWORK=off go run ./cmd/chordharp
-GOWORK=off go run ./cmd/chordharp -silent   # no sound device
-```
-
-The top three letter rows hold major, minor and seventh chords, rooted from
-E flat to B in fifths (`q` is E flat, `r` is C, `o` is B). Terminals send no
-key releases, so a chord stays held until another is pressed, and Esc
-releases it. A held-down key repeats, so a chord key only ever selects its
-chord. It asks for the kitty keyboard protocol's event types, so in
-kitty, Ghostty, WezTerm, foot and other terminals that have it, a held
-strum key, `/`, Space, Enter or Esc acts once and every new tap counts.
-Other terminals send repeats as plain presses. There Space, the one
-toggle, ignores a second Space within 700 ms, a window that slides with
-each repeat. Enter starts the rhythm, or restarts it from beat 1, and
-Backspace stops it; neither toggles, so they act on every press. Clicking
-the held chord's pad releases it, since a click does not repeat.
-The number row, `1` to `=`, plucks the
-strumplate's 12 zones, and dragging the mouse across the plate strums it.
-A fast drag still plucks every zone it crossed. `/` sweeps the whole
-plate.
-The zones play the held chord's tones upward from G3, so the plate stays in
-one register when the chord changes. The header keeps the audio state at
-its right edge, cutting the text before it on a narrow screen. Space
-starts the rhythm (rock, waltz,
-slow rock, latin, foxtrot, swing), and with the rhythm running the bass and
-chord accompaniment follow the held chord. The arrow keys, a click, a drag
-or the wheel set volume, the chord, harp and rhythm levels, tempo and harp
-sustain. A click on a control's name or number only selects it; the bar
-sets the value, from 0 at its first cell to full at its last.
-
-`?` opens help. On a short terminal the arrow and page keys scroll it,
-and Esc, Enter or its Close button shut it. Ctrl+C quits from anywhere,
-help included: the framework's `Modal` passes Ctrl+C and Ctrl+Z on to the
-app.
-
-The layout follows the terminal's height. From 24 rows each chord pad shows
-its key under its name, and from 32 rows the pads grow taller. From 21 rows
-the key goes before the name. From 17 rows section rules replace the
-boxes. The strumplate keeps at least three rows in all of them. Below 60×17
-the screen says how big it needs to be, and how to quit. Each strumplate
-zone is labeled with its key and note, and state that colors show (the held
-chord, the beat, the pattern) also has a mark or an attribute, for
-`NO_COLOR` and 16-color terminals.
-
-The music and the synthesizer live in `cmd/chordharp/harp`, which the
-Android app in `examples/chordharp` shares. The synthesizer is plain Go: additive voices for the pad and harp, and
-synthesized drums. Plucks scheduled ahead, such as the sweep, start on an
-exact sample. On macOS with cgo it plays through an AudioQueue with three
-256-frame buffers, about 17 ms. On Windows it plays through WinMM's
-`waveOut`, loaded from `winmm.dll` with `x/sys/windows`, so a
-cross-compiled `GOOS=windows` build needs neither cgo nor anything
-installed: four 768-frame buffers of 16-bit PCM, about 70 ms queued,
-refilled as the driver signals each one done. Without cgo on macOS, and on
-other systems, it pipes samples to the first of `pw-cat`, `pacat`, `aplay`
-or `ffplay` on `PATH`, staying 30 ms ahead of the clock. The tests drive the engine and the screen
-through a real tree. `CHORDHARP_AUDIO_TEST=1` also opens the sound device,
-with nothing playing, and checks that it pulls samples at 44.1 kHz.
 
 ## Decisions
 
@@ -384,10 +321,7 @@ What the tests cover:
   clusters laid out to the column, and the mode turned off on exit.
 
 Not yet verified: Windows has been compiled and vetted, not run, and so has
-netmon's netstat source, the PowerShell clipboard path and chordharp's
-WinMM output (`CHORDHARP_AUDIO_TEST=1 go test ./cmd/chordharp` on Windows
-checks it, and `TestWaveStructLayout` checks the structs against the C
-layout). Images have not
+netmon's netstat source and the PowerShell clipboard path. Images have not
 been looked at in a real kitty, WezTerm, iTerm2 or sixel terminal; tests use
 the emulator. Images inside tmux or screen need passthrough, which is not
 implemented. The console

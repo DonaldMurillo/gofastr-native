@@ -48,7 +48,7 @@
 - Scope: WebView, rendering extensions, visual acceptance.
 - Trigger: the photo-detail screenshot was blank even though Chromium reported the expected `naturalWidth`.
 - Approach: await `img.decode()` and animation frames, then sample the fixture's actual screenshot pixels and require usable dimensions.
-- Evidence: `SIM_SHOTS=/tmp/gfn-component-shots go test ./sim -run TestNotesVisualHierarchyWebView -count=1` passes both styles and schemes, including painted photo details.
+- Evidence: `SIM_SHOTS=/tmp/gfn-component-shots go test ./internal/simtest -run TestNotesVisualHierarchyWebView -count=1` passes both styles and schemes, including painted photo details.
 - Next time: inspect saved screenshots and preserve detail-gallery containment; do not substitute DOM presence or image metadata for visible content.
 - Status: active.
 
@@ -65,7 +65,7 @@
 - Scope: webview, gestures, acceptance.
 - Trigger: bounded real-pointer traces showed a summary hit on pointerdown and its row link on pointerup; stage 11 then began offscreen and left the menu open.
 - Approach: end snap-back when the row disclosure opens; keep the animation for closed menus and capture at most 80 interaction events on E2E failure.
-- Evidence: stationary-target regression failed in both styles before the CSS fix; `go test ./sim -run '^TestMobileComponentsWebView$' -count=30 -timeout=8m` then passed.
+- Evidence: stationary-target regression failed in both styles before the CSS fix; `go test ./internal/simtest -run '^TestMobileComponentsWebView$' -count=30 -timeout=8m` then passed.
 - Next time: inspect down/up targets and computed geometry before blaming browser timing or changing event delivery.
 - Status: active; this proves the stage 11 cause, not the cause of every earlier stage 8 timeout.
 
@@ -149,7 +149,7 @@
 - Trigger: after Load more, new rows appeared but selecting a checkbox immediately reset it and disabled the remaining controls.
 - Evidence: Chromium confirmed the same `[data-gfw-screen]` element survived while its config and descendants changed; its previous query-pending state remained live.
 - Approach: adapter initialization must recognize changed screen config/form identity, not only WeakMap membership. Retire stale async state before reopening the current screen instance.
-- Next time: run `go test ./sim -run TestMobileComponentsWebView -count=1` and test interaction after navigation, not merely the new row count. Keep rendered-instance readiness separate from URL and DOM-root identity.
+- Next time: run `go test ./internal/simtest -run TestMobileComponentsWebView -count=1` and test interaction after navigation, not merely the new row count. Keep rendered-instance readiness separate from URL and DOM-root identity.
 - Status: fixed; retained-root Node regressions and real browser selection/cancel/apply/undo flows pass. Full component acceptance also drives real CDP touch events.
 
 ## 2026-11-05 - Touch capture transfers emit descendant loss events
@@ -197,7 +197,7 @@
 - Trigger: Go-authored photo tasks need native acquisition without another modal stack, app platform code, or accidental write retries.
 - Approach: add optional `FileRequest.Photo`, negotiate `photos/v1` and `camera/v1` independently of `files/v1`, normalize in each adapter, and validate the complete bounded JPEG again in Go.
 - Evidence: full workspace/public-pin tests and vet, race tests, 48 Node tests, and three Chromium runs of photo/file/presentation workflows passed. Real UIKit selected the generated 3000×1800 fixture into a 2048×1229, 40,805-byte JPEG; cancel kept one attachment and note text unchanged.
-- Next time: run `SIM_SHOTS=/tmp/gofastr-photo-qa GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./sim -run 'TestNotesPhotosWebView|TestNotesFilesWebView|TestNotesBehavior' -count=3`; keep physical-camera and actual WebView chooser acceptance separate.
+- Next time: run `SIM_SHOTS=/tmp/gofastr-photo-qa GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./internal/simtest -run 'TestNotesPhotosWebView|TestNotesFilesWebView|TestNotesBehavior' -count=3`; keep physical-camera and actual WebView chooser acceptance separate.
 - Status: active; public contract and limits are in `docs/photos-services.md`.
 
 ## 2026-11-04 - Simulator camera availability is not capture evidence
@@ -212,7 +212,7 @@
 - Scope: files, native, webview, protocol
 - Trigger: a picker needs a typed Go continuation without introducing app Swift/JS or a competing modal stack.
 - Approach: issue `fileId` only on settlement, reuse the connection foreground slot, validate bounds/filename policy again in Go, and run mutating continuations outside UI/session locks.
-- Evidence: native binding/storage tests plus `go test ./sim -run TestNotesFilesWebView -count=3` pass; a fresh iOS 26.5 simulator build exported an unsaved buffer and imported the saved Markdown through the real Files picker. API/limits and acceptance gaps are in `docs/files-services.md`.
+- Evidence: native binding/storage tests plus `go test ./internal/simtest -run TestNotesFilesWebView -count=3` pass; a fresh iOS 26.5 simulator build exported an unsaved buffer and imported the saved Markdown through the real Files picker. API/limits and acceptance gaps are in `docs/files-services.md`.
 - Next time: keep transfers at 1 MiB until streaming exists, never equate download initiation with durable external save, and never retry an uncertain file mutation.
 - Status: active
 
