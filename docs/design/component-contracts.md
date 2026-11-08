@@ -137,6 +137,6 @@ remain part of the same packages. There is no new integration lane.
 - Scope: nativeui, behavior
 - Trigger: typed metadata and collection targets share the existing string map.
 - Approach: validate current definitions at Dispatch/continuation boundaries; merge partial form buffers and canonical saves before editor settlement.
-- Evidence: `nativeui/components_test.go`, `behavior/collection_test.go`; `GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test -race ./nativeui ./behavior`.
+- Evidence: `nativeui/components_test.go`, `behavior/collection_test.go`; `go test -race ./nativeui ./behavior`.
 - Next time: extend these shared validators and public command tests instead of adding renderer-specific validation or replacing partial baselines.
 - Status: active

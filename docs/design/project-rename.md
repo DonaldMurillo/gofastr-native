@@ -13,7 +13,6 @@ UIKit; the rename does not claim a desktop renderer or native Android support.
 | Go module | `github.com/DonaldMurillo/gofastr-native` |
 | CLI source | `cmd/gofastr-native` |
 | CLI executable | `gofastr-native` |
-| Local checkout | `/Users/dom/programming/gofastr-native` |
 
 From the renamed checkout:
 
@@ -43,16 +42,14 @@ changes: commit/push and version publication remain separate operations.
   environment variables retain their existing debug contract.
 - `dist/mobile`, installation IDs, application data directories, owner identity,
   drafts, private files, and protocol versions are not migrated or reset.
-- Historical screenshot paths under `/tmp/gofastr-mobile-prototype` still refer
-  to their actual evidence files.
 
 This is a naming/import-path migration, not a new rendering architecture or a
 data migration. Existing uncommitted work is preserved.
 
 ## Verification
 
-- The GitHub repository retains ID `1444582614`; `origin` points at the renamed
-  repository, and the existing T3 project uses the new title and checkout path.
+- The GitHub repository kept its history and ID through the rename, and
+  `origin` points at the renamed repository.
 - The renamed CLI's help, dry-run, usage, and native-host tests pass. An actual
   `go run ./cmd/gofastr-native --help` reports the new command name.
 - Fresh complete workspace and public-pin Go suites pass after fixing moving
@@ -66,5 +63,5 @@ data migration. Existing uncommitted work is preserved.
 - The latest UIKit showcase was installed and launched without resetting its
   data; row menus, filter disclosure, and live pause/retry were checked in the
   simulator. Coordinate-only tab/editor acceptance remains limited by the
-  automation environment. No Android runtime execution, commit, or push is part
-  of this continuation. The GitHub repository rename itself is already live.
+  automation environment. Android runtime checks were not part of the rename.
+  The GitHub repository rename itself is already live.

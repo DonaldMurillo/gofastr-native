@@ -137,7 +137,7 @@ and compositor frames, then checks the fixture's painted pixels; a nonzero
   and launches with both compiled catalogs. A startup screenshot confirms the
   retained Notes collection; no simulator data was erased.
 - Interactive native workflow verification remains **NOT RUN** for this slice:
-  computer-use failed with `Sky Computer Use native pipe startup failed`.
+  the UI automation tool could not attach to the simulator.
   The launch capture does not prove attachment navigation, audio, IME or provider
   interactions. Physical-iPhone readiness remains **BLOCKED**: no usable device
   or signed physical build was available.

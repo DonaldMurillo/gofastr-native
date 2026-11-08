@@ -86,7 +86,7 @@ downloaded, fetched by URL, or persisted in browser storage.
 
 ```sh
 node --test render/webview/*.test.cjs
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/webview ./extensions/media ./nativeui
+go test ./render/webview ./extensions/media ./nativeui
 ```
 
 `rendering.test.cjs` executes the real bundled descriptor through the generic

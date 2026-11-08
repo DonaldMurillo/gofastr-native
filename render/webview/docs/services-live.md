@@ -155,9 +155,9 @@ remain unchanged.
 ```sh
 for source in render/webview/*.js; do node --check "$source"; done
 node --test render/webview/*.test.cjs
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test -race ./render/webview
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./render/webview
+go test ./render/webview
+go test -race ./render/webview
+go vet ./render/webview
 ```
 
 Node tests use dependency-free DOM/device primitives and transport fakes. Go

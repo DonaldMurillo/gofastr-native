@@ -153,8 +153,8 @@ simulator dylib compile/link catches Swift definite-
 initialization and UIKit API errors that `-typecheck` can miss. Run:
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./cmd/gofastr-native ./render/ios
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./cmd/gofastr-native ./render/ios
+go test ./cmd/gofastr-native ./render/ios
+go vet ./cmd/gofastr-native ./render/ios
 ```
 
 November 5 parent acceptance also built/bound/linked/installed/launched the app

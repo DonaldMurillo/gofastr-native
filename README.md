@@ -38,8 +38,9 @@ go tool gofastr-native dev --platform android-emu --renderer native --pkg ./hell
 `doctor` checks the toolchain without changing anything and prints the fix
 for whatever is missing. `init` creates a module with Go screens, a private
 item store, durable drafts, tests, and the CLI pinned as a `go tool`. It
-never writes into an existing directory. Until gofastr-native publishes a
-version, the new `go.mod` uses this checkout through a `replace`. `dev`
+never writes into an existing directory. Run from this checkout, the new
+`go.mod` uses it through a `replace`; pass `--native v0.0.1` to require the
+release instead. `dev`
 rebuilds, reinstalls and restarts the app after each change; it is not hot
 reload. Use `--platform ios-sim` for the iOS simulator.
 
@@ -77,7 +78,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | `mobilehost/` | Runs a GoFastr app inside the phone app's process, with the native bridge (`bridge.js`). |
 | `cmd/gofastr-native/` | The CLI: `doctor`, `init`, `dev`, `build`, `run`, `inspect`, `extension`. |
 | `tui/` | The terminal UI library, a separate module. |
-| `internal/` | Private file helpers, the Chromium phone simulator used by tests (`browsersim`), and the integration tests that drive it (`simtest`). |
+| `internal/` | Private file helpers, the Chromium phone simulator used by tests (`browsersim`), the integration tests that drive it (`simtest`), and the repository checks (`repocheck`, and the `release` command that checks and publishes versions). |
 | `scripts/` | Android emulator smoke tests. |
 | `docs/` | Guides, indexed in [`docs/README.md`](docs/README.md). Design notes and the project status are in [`docs/design/`](docs/design/). |
 
@@ -102,7 +103,10 @@ and point it at the checkout. `go.work` is gitignored.
 
 ## Run the tests
 
-Validation is local-only; this repository intentionally has no CI workflows.
+CI (`.github/workflows/ci.yml`) runs tidy, gofmt, vet and the tests below for
+each module on Linux, on every pull request and push to `main`. Simulator,
+emulator, Xcode and Android SDK checks stay local. To run the same set
+yourself:
 
 ```sh
 go vet ./...
@@ -136,3 +140,12 @@ the known gaps and the next steps are in
 
 The project was previously named `gofastr-mobile`; see
 [the rename](docs/design/project-rename.md) for the old paths.
+
+Changes are listed in [CHANGELOG.md](CHANGELOG.md). [RELEASING.md](RELEASING.md)
+describes how versions are tagged and the checks that run first.
+
+## License
+
+MIT; see [LICENSE](LICENSE). The tables and test data in `tui/uni` come from
+the Unicode Character Database and are used under the
+[Unicode License v3](https://www.unicode.org/license.txt).

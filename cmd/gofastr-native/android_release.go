@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -145,15 +146,25 @@ func checkBadging(b badging, a app) error {
 	return nil
 }
 
-// parseSignerDigests reads the signer SHA-256 digests from
-// `apksigner verify --print-certs`.
+// signerDigestLine matches the signer certificate digest lines of
+// `apksigner verify --print-certs`. The label differs by build-tools
+// version and signature scheme: "Signer #1" (35 and older), "Signer
+// (minSdkVersion=33, maxSdkVersion=...)" (with a v3.1 block) and "V3.0
+// Signer:" (37). Source stamp and lineage certificates do not match.
+var signerDigestLine = regexp.MustCompile(`^(?:V[0-9.]+ )?Signer(?: #\d+| \([^)]*\))?:? certificate SHA-256 digest: *([0-9A-Fa-f]+)$`)
+
+// parseSignerDigests reads the distinct signer SHA-256 digests from
+// `apksigner verify --print-certs`. One key signing several schemes is
+// one digest.
 func parseSignerDigests(text string) []string {
 	var digests []string
 	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Signer #") && strings.Contains(line, "certificate SHA-256 digest:") {
-			_, digest, _ := strings.Cut(line, "digest:")
-			digests = append(digests, strings.ToLower(strings.TrimSpace(digest)))
+		m := signerDigestLine.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		if d := strings.ToLower(m[1]); !slices.Contains(digests, d) {
+			digests = append(digests, d)
 		}
 	}
 	return digests
@@ -302,7 +313,7 @@ func releaseAndroidAPK(r *runner, sdk androidSDK, a app, o releaseOptions, out s
 	if !r.dryRun {
 		digests := parseSignerDigests(verify)
 		if len(digests) != 1 || digests[0] != cert.sha256 {
-			return "", fmt.Errorf("apksigner reports signer digests %v, want the release key %s", digests, cert.sha256)
+			return "", fmt.Errorf("apksigner reports signer digests %v, want the release key %s; apksigner printed:\n%s", digests, cert.sha256, verify)
 		}
 	}
 	rep.check("apksigner verify --print-certs -Werr; signer is the release key", nil, "")

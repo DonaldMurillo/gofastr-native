@@ -155,8 +155,8 @@ late result is invalidated and closed, not falsely claimed to be interrupted.
 ## Regression commands and limits
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./cmd/gofastr-native ./render/ios
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./cmd/gofastr-native ./render/ios
+go test ./cmd/gofastr-native ./render/ios
+go vet ./cmd/gofastr-native ./render/ios
 ```
 
 `TestServicesSwiftWireBoundsAndOneShotLifecycle` compiles and executes optimized

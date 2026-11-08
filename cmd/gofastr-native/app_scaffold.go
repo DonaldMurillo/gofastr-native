@@ -261,7 +261,7 @@ func appScaffoldFiles(s appScaffold) (map[string][]byte, error) {
 	files[".gitignore"] = []byte("/dist/\n")
 	note := "It requires gofastr-native " + s.Native.version + "."
 	if s.Native.dir != "" {
-		note = "It uses the gofastr-native checkout at `" + filepath.ToSlash(s.Native.dir) + "` through a `replace` in go.mod, because gofastr-native has no published version yet. Once one exists, replace it with a normal requirement: `go mod edit -dropreplace " + nativeModulePath + "` then `go get " + nativeModulePath + "@<version>`."
+		note = "It uses the gofastr-native checkout at `" + filepath.ToSlash(s.Native.dir) + "` through a `replace` in go.mod. To use a published version instead: `go mod edit -dropreplace " + nativeModulePath + "` then `go get " + nativeModulePath + "@<version>`."
 	}
 	readme, err := renderAppScaffold("readme.md.tmpl", map[string]string{
 		"Name": s.Name, "Module": s.Module, "Package": s.Package, "NativeNote": note, "IdentityFlags": s.identityFlags(),

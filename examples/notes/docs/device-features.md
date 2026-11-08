@@ -85,8 +85,7 @@ owner scoping, foreground grant revocation, plaintext-file exclusion, late
 protected callbacks, explicit widget selection, saved-note publication, and
 failed widget cleanup.
 
-On November 6, 2026, the Android 14 x86-64 emulator in T3 Code's visible Device
-panel accepted a real content-provider URI share, previewed its 22-byte text
+On November 6, 2026, an Android 14 x86-64 emulator accepted a real content-provider URI share, previewed its 22-byte text
 attachment, saved the reviewed title, and retained one note and attachment
 after restarting. A real AppWidgetHost rendered the selected note, opened its
 editor on tap, displayed a later saved edit, and displayed the empty state
@@ -99,8 +98,8 @@ The final Go suite, vet, 143 Node tests, Android SDK compilation, APK build,
 and v2/v3 signature verification passed. An earlier full run overlapped a Swift
 source edit and reported an embedded-source mismatch; rebuilding the tests
 resolved it. A WebView interaction timeout passed on rerun. The legacy Android
-UIAutomator smoke runner could not dump the hierarchy while T3's helper was
-active, so Device-panel interaction checks do not count as a pass of that runner.
+UIAutomator smoke runner could not dump the hierarchy while another automation
+client was attached, so these manual checks do not count as a pass of that runner.
 
 Windows can compile and package the Android renderer and run the shared Go and
 WebView suites. Physical Android enrollment/lockout, hardware input, and the iOS

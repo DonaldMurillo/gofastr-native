@@ -164,7 +164,7 @@ recovery, current-draft preservation, exact result fingerprints, revoked source
 actions, immutable input snapshots, unknown-write locks, cross-service
 foreground contention, live cancellation/query authorization and obsolescence.
 
-Run with `GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL`:
+Run:
 
 ```sh
 go test ./nativeui ./behavior ./device/notifications ./device/sharing ./device/audio

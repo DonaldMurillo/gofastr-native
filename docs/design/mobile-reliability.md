@@ -137,7 +137,6 @@ checkpointed and recovered after reload. Node tests additionally delay a pending
 snapshot beyond completion and check canonicalization and bounded observation.
 
 ```sh
-export GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL
 node --test render/webview/*.test.cjs
 go test ./render/ios ./cmd/gofastr-native ./nativeui ./behavior
 go test -race ./nativeui ./behavior ./examples/notes/notesnative ./render/webview
@@ -170,7 +169,7 @@ three race-enabled repetitions of all six browser workflows listed above.
 
 The earlier full race suite also exposed a stale browser-node handle at
 `internal/simtest/files_test.go:117`, which reproduced in an untouched snapshot of checkpoint
-`16786d5`. It was not changed in this continuation. Fresh normal full suites
+`16786d5`. It was left unchanged. Fresh normal full suites
 passed; no product action was retried to mask a failure.
 
 UIKit compilation and Foundation execution are not native tab/foreground gesture
@@ -180,18 +179,17 @@ be reported separately.
 On November 5, 2026, the rebuilt `dev.gofastr.designqa` simulator app launched
 with its existing fixture notes and showed live updates without Retry. A later
 full gomobile rebuild/install and Settings-to-Notes background/resume smoke check
-also retained those notes and returned to live updates. Screenshots were inspected
-at `/tmp/gofastr-reliability-native-start.png` and
-`/tmp/gofastr-reliability-native-resume.png`.
+also retained those notes and returned to live updates. Screenshots of start and resume
+were inspected locally; they are not checked in.
 
 This does not establish native dirty-editor/IME, tab gestures, background-task
 expiration, or device-provider acceptance. Earlier coordinate input returned
-`noWindowsAvailable`, and Agent device access was disabled. No simulator reset
+`noWindowsAvailable`, and automated device access was unavailable. No simulator reset
 or app-data deletion was used as a workaround.
 
 A subsequent full renamed-CLI rebuild/install retained the same fixture notes.
 Accessibility-driven simulator checks opened and closed row actions, expanded
 and collapsed filters, and paused/restarted live reads, returning to Live
 updates without changing note contents or metadata. Coordinate-only tab/editor
-checks still returned `noWindowsAvailable`; they are not reported as verified by
-this continuation. Native Android remains deferred.
+checks still returned `noWindowsAvailable`; they are not reported as verified.
+Native Android remains deferred.

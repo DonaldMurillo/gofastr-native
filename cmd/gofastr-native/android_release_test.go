@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -246,6 +247,26 @@ func TestBadgingParserAndMismatch(t *testing.T) {
 	}
 	if d := parseSignerDigests("Signer #1 certificate DN: CN=x\nSigner #1 certificate SHA-256 digest: ABCD\n"); len(d) != 1 || d[0] != "abcd" {
 		t.Fatal(d)
+	}
+}
+
+// apksigner's --print-certs labels changed across build-tools versions.
+func TestParseSignerDigestsAcrossBuildTools(t *testing.T) {
+	cases := map[string]struct {
+		text string
+		want []string
+	}{
+		"35":                        {"Signer #1 certificate DN: CN=x\nSigner #1 certificate SHA-256 digest: AB12\nSigner #1 certificate SHA-1 digest: ff\n", []string{"ab12"}},
+		"37":                        {"V3.0 Signer: certificate DN: CN=x\nV3.0 Signer: certificate SHA-256 digest: ab12\nV3.0 Signer: certificate SHA-1 digest: ff\n", []string{"ab12"}},
+		"v3.1 rotation":             {"Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: cd34\nSigner (minSdkVersion=24, maxSdkVersion=32) certificate SHA-256 digest: ab12\n", []string{"cd34", "ab12"}},
+		"one key, two schemes":      {"V3.1 Signer: certificate SHA-256 digest: ab12\nV3.0 Signer: certificate SHA-256 digest: AB12\n", []string{"ab12"}},
+		"stamp and lineage ignored": {"Signer #1 certificate SHA-256 digest: ab12\nSource Stamp Signer certificate SHA-256 digest: 9999\nSigner #1 in lineage certificate SHA-256 digest: 8888\n", []string{"ab12"}},
+		"none":                      {"Verifies\n", nil},
+	}
+	for name, c := range cases {
+		if got := parseSignerDigests(c.text); !slices.Equal(got, c.want) {
+			t.Errorf("%s: got %v, want %v", name, got, c.want)
+		}
 	}
 }
 

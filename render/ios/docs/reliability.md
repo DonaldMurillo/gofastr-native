@@ -84,8 +84,8 @@ explicit reactivation resets this separate read-only budget.
 ## Verification and limits
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/ios ./cmd/gofastr-native
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go vet ./render/ios ./cmd/gofastr-native
+go test ./render/ios ./cmd/gofastr-native
+go vet ./render/ios ./cmd/gofastr-native
 ```
 
 `TestReliabilitySwiftCheckpointOrderingAndRestoration` executes the actual

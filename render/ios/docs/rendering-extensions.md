@@ -95,7 +95,7 @@ and `native.file.preview` IDs remain on their original primitives.
 ## Verification and remaining acceptance
 
 ```sh
-GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./render/ios -count=1
+go test ./render/ios -count=1
 ```
 
 On macOS/Xcode this executes Foundation regressions for actual wire extraction,

@@ -1,5 +1,13 @@
 # Implementation notes
 
+## 2026-11-08 - Minimal CI on Linux
+- Scope: build, tooling.
+- Trigger: the no-CI policy was lifted for v0.0.1; the module checks should run on every PR, not only before a release.
+- Approach: one GitHub Actions workflow, a job per module on `ubuntu-latest` with `GOWORK=off`: `go mod tidy -diff`, gofmt, vet, `go test ./...` (repocheck and the Chromium simulator tests included), and the WebView Node tests in the root job.
+- Evidence: all three modules vet for linux/amd64; the first PR run is the first Linux test run.
+- Next time: keep CI to checks that need no simulator, emulator, Xcode or Android SDK; those stay local and keep their NOT RUN gates.
+- Status: active.
+
 ## 2026-11-07 - Service-only lifecycle without transport
 - Scope: mobilehost, native, lifecycle.
 - Trigger: gofastr v0.96.0 adds `App.Run`, `ServicesHost` and `ServicesReady`; the old listener-free Gate B status is superseded.
@@ -23,8 +31,8 @@
 - Trigger: repository policy excludes CI; the desktop Notes command also cannot link as a CGO-disabled iOS executable.
 - Approach: keep no CI workflows; run Go tests/vet, Node tests and mobile-library cross-builds locally.
 - Evidence: README documents local commands; `go list -f '{{if ne .Name "main"}}{{.ImportPath}}{{end}}' ./mobilehost/... ./examples/...` selects portable library packages.
-- Next time: do not add CI; validate the public pin locally, leave executable checks to gomobile, and keep generated app bundles outside Git.
-- Status: active.
+- Next time: validate the public pin locally, leave executable checks to gomobile, and keep generated app bundles outside Git.
+- Status: superseded on 2026-11-08 by minimal CI; the local checks still apply to simulators and devices.
 
 ## 2026-11-05 - Rendering extensions use keyed snapshots, not another command loop
 - Scope: extensions, nativeui, Notes, UIKit, WebView.
@@ -37,7 +45,7 @@
 
 ## 2026-11-05 - Keep native build, launch and interaction evidence separate
 - Scope: UIKit, simulator, acceptance.
-- Trigger: the fresh compiled-component app built and launched, but computer-use failed with `Sky Computer Use native pipe startup failed`.
+- Trigger: the fresh compiled-component app built and launched, but the UI automation tool could not attach to the simulator.
 - Approach: install over `dev.gofastr.designqa` without wiping data; use a simulator capture to verify startup and record interactive workflows as NOT RUN.
 - Evidence: full Go tests/vet, 143 Node tests, targeted race/public-pin suites, optimized gomobile/UIKit build and `simctl launch` pass; device doctor correctly fails unavailable hardware.
 - Next time: retry native workflow acceptance only with a working UI control surface; never promote compilation, a launch screenshot or cached device records to provider/VoiceOver/IME acceptance.
@@ -197,7 +205,7 @@
 - Trigger: Go-authored photo tasks need native acquisition without another modal stack, app platform code, or accidental write retries.
 - Approach: add optional `FileRequest.Photo`, negotiate `photos/v1` and `camera/v1` independently of `files/v1`, normalize in each adapter, and validate the complete bounded JPEG again in Go.
 - Evidence: full workspace/public-pin tests and vet, race tests, 48 Node tests, and three Chromium runs of photo/file/presentation workflows passed. Real UIKit selected the generated 3000×1800 fixture into a 2048×1229, 40,805-byte JPEG; cancel kept one attachment and note text unchanged.
-- Next time: run `SIM_SHOTS=/tmp/gofastr-photo-qa GOCACHE=/tmp/gofastr-native-build-cache.IUXdIL go test ./internal/simtest -run 'TestNotesPhotosWebView|TestNotesFilesWebView|TestNotesBehavior' -count=3`; keep physical-camera and actual WebView chooser acceptance separate.
+- Next time: run `SIM_SHOTS=/tmp/gofastr-photo-qa go test ./internal/simtest -run 'TestNotesPhotosWebView|TestNotesFilesWebView|TestNotesBehavior' -count=3`; keep physical-camera and actual WebView chooser acceptance separate.
 - Status: active; public contract and limits are in `docs/photos-services.md`.
 
 ## 2026-11-04 - Simulator camera availability is not capture evidence
@@ -228,7 +236,7 @@
 - Scope: mobile, webview, verification
 - Trigger: the same Go screen package must work through Chromium's Android-body constraints and actual WKWebView, not only adapter unit tests.
 - Approach: test create/validation/save/drafts/share/search with the in-memory bridge; use the simulator eval hook for WKWebView and retain a window marker across navigation.
-- Evidence: `TestSharedMobileScreensWebView`; real iOS 26.5 flow returned `ok:true` with `same document`; `/tmp/gofastr-shared-screens/wk-shared-verified.png`.
+- Evidence: `TestSharedMobileScreensWebView`; real iOS 26.5 flow returned `ok:true` with `same document`; screenshot inspected locally.
 - Next time: click GoFastr's dirty-leave HTML dialog explicitly; delay the test MessagePort rather than replacing the read-only transport, and normalize visually transformed text in predicates.
 - Status: active
 
@@ -260,7 +268,7 @@
 - Scope: native, ios, verification
 - Trigger: Go API tests alone cannot prove the library's Swift decoder and UIKit composition.
 - Approach: build with `--renderer native`, then exercise validation/save/search, draft restart, system share UI without sending, and Go-defined sheet dismissal.
-- Evidence: iPhone 17 Pro / iOS 26.5; `/tmp/gofastr-go-native-editor-accessibility-light.png`, `/tmp/gofastr-go-native-editor-keyboard-light.png`; largest accessibility text and standard keyboard spot-checked.
+- Evidence: iPhone 17 Pro / iOS 26.5; largest accessibility text and standard keyboard spot-checked in local screenshots.
 - Next time: run the actual generated/bound host and inspect rendered pixels; keep physical-device, VoiceOver, haptics, and native Android claims separate.
 - Status: active
 
@@ -268,7 +276,7 @@
 - Scope: mobile, ios, verification
 - Trigger: setting `GOFASTR_MOBILE_EVAL` on the parent CLI does not forward it into the simulator app.
 - Approach: launch with `SIMCTL_CHILD_GOFASTR_MOBILE_EVAL` and use the existing simulator-only async evaluation hook.
-- Evidence: real WKWebView list navigation and Done-save retained a window marker; screenshots are under `/tmp/gofastr-mobile-prototype/wkwebview-final-*.png`.
+- Evidence: real WKWebView list navigation and Done-save retained a window marker; screenshots inspected locally.
 - Next time: verify a component-submitted save through the native bridge, not just a direct transport call or Chromium emulation.
 - Status: active
 
@@ -348,7 +356,7 @@
 - Scope: build, gomobile, verification
 - Trigger: gomobile/link/vet reported missing `~/Library/Caches/go-build/*-d` files during repeated builds.
 - Approach: use an isolated cache (`GOCACHE="$(mktemp -d /tmp/gofastr-native-build-cache.XXXXXX)"`) instead of changing dependencies or clearing the global cache.
-- Evidence: the real UIKit framework/Swift build completed using `/tmp/gofastr-native-build-cache.IUXdIL`.
+- Evidence: the real UIKit framework/Swift build completed with an isolated cache.
 - Next time: isolate `GOCACHE` for the command and rerun before attributing missing-cache errors to source changes.
 - Status: active
 
