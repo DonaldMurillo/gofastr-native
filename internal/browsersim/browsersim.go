@@ -35,7 +35,7 @@ import (
 	"github.com/chromedp/chromedp"
 
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 // ErrNoBrowser reports that no Chrome, Chromium or Edge executable was found.

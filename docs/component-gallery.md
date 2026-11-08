@@ -11,7 +11,7 @@ The gallery keeps all state in memory except drafts. Saves never touch disk.
 | `examples/gallery/gallery` | The screens. `New()` returns the `*nativeui.App`. |
 | `examples/gallery/gallerynative` | gomobile bind package for `--renderer native`: `Start`, `Stop`, `Root`, `Command`, `Render`, `Dispatch`. |
 | `examples/gallery/galleryweb` | `Build(dataDir, platform, options)` composes the gallery with the WebView renderer inside an in-process `mobilehost`. It opens no listener. |
-| `examples/gallery/cmd/gallery-sim` | Opens the WebView build in a phone-shaped Chromium window through `sim/browsersim`. |
+| `examples/gallery/cmd/gallery-sim` | Opens the WebView build in a phone-shaped Chromium window through `internal/browsersim`. |
 
 ## Running it
 

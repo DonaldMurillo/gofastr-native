@@ -29,7 +29,7 @@
 ## 2026-11-05 - Rendering extensions use keyed snapshots, not another command loop
 - Scope: extensions, nativeui, Notes, UIKit, WebView.
 - Trigger: file acquisition proved package ownership but did not let libraries render screen content.
-- Approach: `Screen.Components` carries bounded library payloads and an opaque destination map; per-app validation checks identity, routes and mandatory renderer support. Notes uses `extensions/media` instead of legacy media slots.
+- Approach: `Screen.Components` carries bounded library payloads and an opaque destination map; per-app validation checks identity, routes and mandatory renderer support. Notes uses `extension/media` instead of legacy media slots.
 - Evidence: `go test ./extension/... ./nativeui ./extensions/media ./examples/notes/...` covers strict policy, component-only screens, missing adapters and actual Notes attachment wire/persistence.
 - Next time: reconcile by component ID, retain dirty form/IME state, and route only declared event keys through existing guards. Keep derived attachment metadata round-trippable and reject forged `icon`/`detail` fields.
 - Details: [rendering extensions](rendering-extensions.md); physical-device acceptance remains a separate gate.
@@ -80,7 +80,7 @@
 - Scope: webview, reliability, navigation.
 - Trigger: browser Back bypassed durable Keep, and capture-phase `popstate` interception did not stop the actual router despite passing DOM mocks.
 - Approach: compose `_interceptPopstate`, repair the tagged source entry, await Go leave/Keep, then replay with revision-bound permission. Reuse history lineage after reload; untagged history fails closed.
-- Evidence: `sim/reliability_test.go` holds real acknowledgement, cancels/retries, types during Keep, and recovers Forward without sessionStorage. Wait for dialog removal, not just `open=false`, before another traversal.
+- Evidence: `internal/simtest/reliability_test.go` holds real acknowledgement, cancels/retries, types during Keep, and recovers Forward without sessionStorage. Wait for dialog removal, not just `open=false`, before another traversal.
 - Acceptance waits: synchronize with committed screen route and instance, not URL alone or outgoing fields. Preserve query strings when checking a return from About; its destination may still be a filtered Notes list.
 - Next time: prove interception against the real bridge/router before trusting mocked event ordering; never build another navigator or replay a write to repair history.
 - Status: active; termination, foreign-history and actual OS/IME limits are in [mobile reliability](mobile-reliability.md).
@@ -98,9 +98,9 @@
 - Trigger: native tab restoration/reuse could display Retry because opening any other screen intentionally retires earlier watches on the connection.
 - Approach: recover only stale/expired watch instances with one read-only reopen, preserving collection controls/selection/scroll; retain visible errors on repeated failure or revoked authorization.
 - Cancellation race: the preceding worker may still be stopping after local abort; allow at most three 150ms `pending`/`cancelled` watch retries, never a mutation retry or unbounded reopen.
-- Evidence: `sim/reliability_test.go` reproduced the real-bridge failure in both platform modes; renderer tests cover bounded recovery, permanent errors, and suspended results. See [mobile reliability](mobile-reliability.md).
+- Evidence: `internal/simtest/reliability_test.go` reproduced the real-bridge failure in both platform modes; renderer tests cover bounded recovery, permanent errors, and suspended results. See [mobile reliability](mobile-reliability.md).
 - Next time: distinguish retained UI identity from active runtime identity; never auto-retry a save/device effect or reset the recovery budget during its own reopen.
-- Validation caveat: full race runs can hit a stale browser-node handle in `sim/files_test.go:117`; it also reproduces on untouched checkpoint `16786d5`. The recovery/editor/component race flows passed three repeats separately.
+- Validation caveat: full race runs can hit a stale browser-node handle in `internal/simtest/files_test.go:117`; it also reproduces on untouched checkpoint `16786d5`. The recovery/editor/component race flows passed three repeats separately.
 - Component acceptance also intermittently times out at menu/touch stages 8/11; eight isolated final-code runs and the final public-pin suite passed. Failure output now includes the action index. Keep this caveat distinct from the three-repeat recovery race results.
 - Status: active
 
@@ -156,7 +156,7 @@
 - Scope: webview, gestures, acceptance
 - Trigger: a real full swipe reset after one frame; after that fix, a suppression marker swallowed the next intentional menu-close tap.
 - Approach: transferring touch capture from the starting anchor emits a bubbled `lostpointercapture`; cancel only when the row loses capture. Clear the old click-suppression marker at the next pointerdown, preserving suppression of the swipe's synthetic click only.
-- Evidence: `sim/components_test.go` drives CDP TouchStart/Move/End and verifies full-swipe unpin, trailing reveal without mutation, immediate menu-close taps, and vertical-scroll cancellation in three runs of both styles.
+- Evidence: `internal/simtest/components_test.go` drives CDP TouchStart/Move/End and verifies full-swipe unpin, trailing reveal without mutation, immediate menu-close taps, and vertical-scroll cancellation in three runs of both styles.
 - Next time: start gesture acceptance on the row link, not its checkbox/menu, and include real pointer capture rather than only state-machine inputs.
 - Status: active.
 
@@ -180,7 +180,7 @@
 - Scope: webview, navigation, e2e
 - Trigger: repeated file/photo tests clicked old editor actions or Back links after URL history changed but before the destination DOM committed.
 - Approach: wait for the rendered `data-gfw-config` route or destination-only controls, not only `location.pathname`, before the next click.
-- Evidence: `sim/files_test.go` now uses `waitForFileScreen`; repeated file/photo E2E passes for both platform styles without arbitrary sleeps.
+- Evidence: `internal/simtest/files_test.go` now uses `waitForFileScreen`; repeated file/photo E2E passes for both platform styles without arbitrary sleeps.
 - Next time: synchronize navigation acceptance with committed screen identity, especially when old/new screens share an Add file or Back control.
 - Status: active
 
@@ -220,7 +220,7 @@
 - Scope: webview, files, verification
 - Trigger: the file dialog reported completion, but Chromium never saved the Blob download because the modal's before-unload guard cancelled it.
 - Approach: exempt only the library-generated download activation, delay Blob URL revocation, and verify the actual downloaded bytes rather than trusting the result announcement.
-- Evidence: `sim/files_test.go` verifies unsaved Markdown bytes and passes three repeated runs for both platform styles; `render/webview/files.test.cjs` covers the guard and cleanup.
+- Evidence: `internal/simtest/files_test.go` verifies unsaved Markdown bytes and passes three repeated runs for both platform styles; `render/webview/files.test.cjs` covers the guard and cleanup.
 - Next time: keep ordinary navigation blocked while a file task is open, and distinguish download initiation from verified external persistence.
 - Status: active
 
@@ -252,7 +252,7 @@
 - Scope: presentation, mobile, terminal
 - Trigger: native-looking mobile screens must not turn GoFastr into a cross-platform widget framework.
 - Approach: keep application services typed and UI-free; let external packages own screens, CSS, and behavior through public registry APIs.
-- Evidence: `go test ./examples/notes/notesapp -run 'TestTerminalAndWebSharePersistedNotes|TestPresentationCoreDoesNotImportWeb'`; `mobileui/`; `docs/presentation-prototype.md`.
+- Evidence: `go test ./examples/notes/notesapp -run 'TestTerminalAndWebSharePersistedNotes|TestPresentationCoreDoesNotImportWeb'`; `render/webview/mobileui/`; `docs/presentation-prototype.md`.
 - Next time: inspect `go.work` before surveying GoFastr, and run `GOWORK=off go test ./mobileui ./examples/notes/...` to verify the public pin too.
 - Status: active
 
@@ -284,7 +284,7 @@
 - Scope: behavior, native, webview, examples
 - Trigger: transient UI must share decisions without adding a JS behavior runtime or another example app.
 - Approach: Go validates presentation instance/choice/selection; adapters submit respond then read-only complete. Cancel never invokes product code.
-- Evidence: `behavior/presentation.go`, `nativeui/runtime_presentation_test.go`, Notes `showcase.go`, `sim/behavior_showcase_test.go`.
+- Evidence: `behavior/presentation.go`, `nativeui/runtime_presentation_test.go`, Notes `showcase.go`, `internal/simtest/behavior_showcase_test.go`.
 - Next time: extend the single Notes Behaviors screen and test stale/duplicate/cancel outcomes; do not run an action from a client-provided handler name.
 - Status: active
 
@@ -308,7 +308,7 @@
 - Scope: webview, presentation, verification
 - Trigger: Modal controls lost platform fonts and Android's 48px target because the runtime wrapper surrounds the themed section.
 - Approach: Mount the HTML dialog inside `[data-gfm-platform]`; showModal supplies top-layer placement without reparenting to body.
-- Evidence: `sim/behavior_showcase_test.go` checks computed targets, 200% text, selection recovery, and focus; actual WKWebView chaining/cancel also passed.
+- Evidence: `internal/simtest/behavior_showcase_test.go` checks computed targets, 200% text, selection recovery, and focus; actual WKWebView chaining/cancel also passed.
 - Next time: Verify computed inherited tokens in a real browser; DOM-fixture tests cannot prove styling.
 - Status: active
 
@@ -364,7 +364,7 @@
 - Scope: mobile, design, renderer, acceptance
 - Trigger: accumulated feature controls and attachment metadata made Notes look like an API demonstration rather than a document app.
 - Approach: follow [mobile document design](mobile-design.md); keep document/detail/file-preview semantics in Go and reusable styling in the adapters. Update SSR, live replacement rows, and refreshed attachment cards together.
-- Evidence: `sim/design_test.go`, `sim/components_test.go`, `sim/files_test.go`, and `sim/photos_test.go` exercise real host screens, metadata, previews, and menu bounds. Isolate browser state per scheme: root navigation can restore the last tab route.
+- Evidence: `internal/simtest/design_test.go`, `internal/simtest/components_test.go`, `internal/simtest/files_test.go`, and `internal/simtest/photos_test.go` exercise real host screens, metadata, previews, and menu bounds. Isolate browser state per scheme: root navigation can restore the last tab route.
 - Next time: inspect screenshots in light/dark and large text; center offscreen rows before real menu clicks, assert menus clear fixed tabs, and suppress compatibility taps after cancelled/vertical drags too. Keep Swift wire DTOs Foundation-only, separate from UIKit views.
 - Status: active
 
@@ -372,6 +372,6 @@
 - Scope: nativeui, diagnostics, cli, sim
 - Trigger: debugging native-renderer apps needed command traces, a live snapshot and a capability walk without leaking user data or changing replies.
 - Approach: `RuntimeOptions.Observer` gets a redacted `TraceEvent` after the reply is final and all locks are released; `Runtime.Inspect` try-locks sessions; `gofastr-native inspect` builds a harness through `go build -overlay` that can send only hello, open and close. It suppresses app stdout/stderr and reports opaque screen IDs, adding registered patterns only through `InspectApp`. See [debugging](debugging.md) and [component gallery](component-gallery.md).
-- Evidence: `nativeui/trace_settlement_test.go` compares replies with nil, recording and panicking observers; `examples/notes/notesnative/debugtrace_privacy_test.go` (tag `gofastr_debugtrace`) checks canaries; `cmd/gofastr-native/inspect_command_test.go` checks allowed kinds, cleanup and an untouched module; `sim/gallery_test.go` walks the gallery in headless Chromium.
+- Evidence: `nativeui/trace_settlement_test.go` compares replies with nil, recording and panicking observers; `examples/notes/notesnative/debugtrace_privacy_test.go` (tag `gofastr_debugtrace`) checks canaries; `cmd/gofastr-native/inspect_command_test.go` checks allowed kinds, cleanup and an untouched module; `internal/simtest/gallery_test.go` walks the gallery in headless Chromium.
 - Next time: the WebView's first paint renders outside a Runtime, so `RendererContract` is false there. Runtime pre-validation answers "Required." before the action handler runs, so assert on the field-error key, not the handler's message. Go's `-overlay` accepts a file in a directory that does not exist on Go 1.27. The Windows file draft store tests flake about 1 in 6 full `nativeui` runs, also at 88e0a85.
 - Status: active

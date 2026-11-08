@@ -6,7 +6,7 @@
 // shouldInterceptRequest). What the simulation cannot show: the native
 // platforms' own interception limits (no redirects, no cookies, see
 // README), streamed SSE (CDP's fulfill is buffered), and real WebKit.
-package sim
+package simtest
 
 import (
 	"context"
@@ -38,7 +38,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 const origin = mobilehost.DefaultOrigin

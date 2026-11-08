@@ -15,9 +15,9 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/examples/gallery/gallery"
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	screenweb "github.com/DonaldMurillo/gofastr-native/render/webview"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 // Build composes the gallery for platform in dataDir, which must be an

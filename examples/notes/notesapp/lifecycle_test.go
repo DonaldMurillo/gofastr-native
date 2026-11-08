@@ -15,7 +15,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 func TestLegacyBuildersKeepWebPresentationAndSharedService(t *testing.T) {

@@ -13,9 +13,9 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	"github.com/DonaldMurillo/gofastr-native/render/webview"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	"github.com/DonaldMurillo/gofastr/core/router"
 )
 

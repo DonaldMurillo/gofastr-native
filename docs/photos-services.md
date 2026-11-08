@@ -13,7 +13,7 @@ arbitrary camera/filesystem access. Native Android remains deferred.
 
 ## Go API
 
-Register `photos.Definition()` from `extensions/photos` with
+Register `photos.Definition()` from `extension/photos` with
 `nativeui.NewWithExtensions`; see [compiled extension authoring](compiled-extensions.md).
 
 ```go
@@ -116,7 +116,7 @@ or broad photo-library purpose key is added by this feature.
 command envelope, validation, cancellation, and duplicate outcomes.
 `examples/notes/notesnative/photos_test.go` exercises the public binding and
 private photo persistence across restart without changing the note.
-`sim/photos_test.go` exercises actual image normalization, attachment/export
+`internal/simtest/photos_test.go` exercises actual image normalization, attachment/export
 bytes, camera chooser hints, cancellation, invalid images, and large text in
 Chromium through the in-memory bridge for both platform styles.
 

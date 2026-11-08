@@ -1,6 +1,6 @@
 package main
 
-import "github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
+import "github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 
 // keyRows maps the keyboard to the grid: the top letter row plays major
 // chords, the home row minor, the bottom row sevenths.

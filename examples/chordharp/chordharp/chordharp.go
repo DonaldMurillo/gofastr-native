@@ -12,8 +12,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/screens"
 )

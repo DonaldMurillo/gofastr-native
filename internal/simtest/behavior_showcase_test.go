@@ -1,4 +1,4 @@
-package sim
+package simtest
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/chromedp/chromedp"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	"github.com/DonaldMurillo/gofastr/framework/owner"
 )
 

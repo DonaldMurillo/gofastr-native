@@ -17,8 +17,8 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/extension"
 	"github.com/DonaldMurillo/gofastr-native/extension/webassets"
 
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	appui "github.com/DonaldMurillo/gofastr/core-ui/app"
 	"github.com/DonaldMurillo/gofastr/core-ui/component"
 	"github.com/DonaldMurillo/gofastr/core-ui/registry"

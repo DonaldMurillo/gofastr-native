@@ -4,7 +4,7 @@ Rendering extension API, lifecycle, and browser acceptance selectors:
 [`rendering-extensions.md`](rendering-extensions.md).
 
 ## 2026-11-05 - Component refresh must preserve media and detail containment
-- Scope: WebView compiled rendering components and `extensions/media/media.js`.
+- Scope: WebView compiled rendering components and `extension/media/media.js`.
 - Trigger: replacing media on refresh loses playback; sibling detail galleries broke `[data-gfw-file-preview] img` acceptance.
 - Approach: load selected descriptors before hello, mount only available support, reconcile by ID/name, preserve media nodes and active IME, and nest detail media inside the preview article.
 - Evidence: `node --test render/webview/rendering.test.cjs`; `go test ./render/webview -run 'TestRendering|TestComponentHost'`.
@@ -25,7 +25,7 @@ Service/live integration and stable parent acceptance selectors:
 - Scope: WebView row gestures and action disclosures.
 - Trigger: snap-back moved the summary from under a real pointer between down/up; the next gesture then started at an offscreen transformed coordinate.
 - Approach: disable the content transition while its row menu is open, retaining normal closed-menu snap-back and reduced-motion behavior.
-- Evidence: the computed-transform assertion in `sim/components_test.go` failed in both styles before the fix; 30 repetitions per style then passed with real CDP taps/swipes.
+- Evidence: the computed-transform assertion in `internal/simtest/components_test.go` failed in both styles before the fix; 30 repetitions per style then passed with real CDP taps/swipes.
 - Next time: assert stationary targets as soon as actions are visible; do not hide moving hit areas with sleeps, retries, or scripted clicks.
 - Status: active.
 

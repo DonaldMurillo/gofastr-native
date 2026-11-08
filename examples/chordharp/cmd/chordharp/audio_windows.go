@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 
 	"golang.org/x/sys/windows"
 )

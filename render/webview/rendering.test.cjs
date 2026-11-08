@@ -4,7 +4,7 @@ const { connected, harness, flush, plain } = require('./test-dom.cjs');
 
 const name = 'gofastr.media/v1';
 const moduleName = 'gfn-extension-' + 'a'.repeat(32);
-const mediaScript = '../../extensions/media/media.js';
+const mediaScript = '../../extension/media/media.js';
 const image = (id = 'photo') => ({ id, alt: 'Private <photo>', data: '/9j/AA==', width: 2, height: 1, destination: 'https://untrusted.invalid/image' });
 const file = (id = 'file') => ({ id, name: '<b>brief.txt', mediaType: 'text/plain', size: 12, destination: 'javascript:untrusted()' });
 const audio = () => {

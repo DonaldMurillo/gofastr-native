@@ -1,4 +1,4 @@
-package sim
+package simtest
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 func TestMobileComponentsWebView(t *testing.T) {

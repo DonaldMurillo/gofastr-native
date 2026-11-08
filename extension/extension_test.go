@@ -9,7 +9,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/extension"
-	"github.com/DonaldMurillo/gofastr-native/extensions/photos"
+	"github.com/DonaldMurillo/gofastr-native/extension/photos"
 )
 
 func TestRegistryCopiesAssetsAndMetadata(t *testing.T) {

@@ -73,7 +73,7 @@ Unsupported binary files still have useful metadata and export/share actions.
 
 The browser acceptance surface is `TestNotesVisualHierarchyWebView`, plus the
 existing components, files, photos, device-services, and live-paging tests in
-`sim/`. The design test seeds real notes, a Markdown file, and a photo, then
+`internal/simtest/`. The design test seeds real notes, a Markdown file, and a photo, then
 captures list/editor/Files/file/photo previews for both platform modes in
 light/dark. It also checks 200% text at 320 CSS pixels without horizontal overflow.
 

@@ -169,7 +169,7 @@ Fresh scoped runtime/behavior/device/WebView/Notes race checks also pass, as do
 three race-enabled repetitions of all six browser workflows listed above.
 
 The earlier full race suite also exposed a stale browser-node handle at
-`sim/files_test.go:117`, which reproduced in an untouched snapshot of checkpoint
+`internal/simtest/files_test.go:117`, which reproduced in an untouched snapshot of checkpoint
 `16786d5`. It was not changed in this continuation. Fresh normal full suites
 passed; no product action was retried to mask a failure.
 

@@ -12,9 +12,9 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesbackup"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesscreens"
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	screenweb "github.com/DonaldMurillo/gofastr-native/render/webview"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 // BuildScreensWithPlatform renders the same Go mobile screen definitions used by

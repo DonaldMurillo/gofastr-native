@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 )
 
 const sampleRate = 44100

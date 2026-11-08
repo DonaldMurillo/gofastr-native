@@ -150,7 +150,7 @@ typed validation, disabled controls, selection operands, and unregistered/unsafe
 definitions. Dependency-free Node tests cover serialization, restoration,
 thresholds/cancellation, wire effects, stale query leaves, and retained-root
 paging/Cancel→Apply/hidden-undo lifecycle. They are not a real browser or OS.
-Parent-owned `sim/components_test.go` also drives real CDP touch sequences for
+Parent-owned `internal/simtest/components_test.go` also drives real CDP touch sequences for
 full-swipe unpin, trailing action reveal, stationary open-menu targets, immediate
 follow-up taps, and vertical scroll cancellation. The stationary-target assertion
 failed in both styles before the renderer fix. These flows,

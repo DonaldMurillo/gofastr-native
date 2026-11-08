@@ -1,4 +1,4 @@
-package sim
+package simtest
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/examples/gallery/gallery"
 	"github.com/DonaldMurillo/gofastr-native/examples/gallery/galleryweb"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/internal/browsersim"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui/devtrace"
-	"github.com/DonaldMurillo/gofastr-native/sim/browsersim"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 // TestGalleryWebView walks the component gallery through sim/browsersim for

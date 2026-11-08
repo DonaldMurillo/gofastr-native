@@ -29,7 +29,7 @@ func TestRenderingComponentsSwiftLifecycleAndEvents(test *testing.T) {
 		}
 		arguments = append(arguments, path)
 	}
-	media, err := os.ReadFile("../../extensions/media/GofastrMedia.swift")
+	media, err := os.ReadFile("../../extension/media/GofastrMedia.swift")
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestRenderingComponentsMediaUIKitOptimizedCompiles(test *testing.T) {
 		}
 		arguments = append(arguments, path)
 	}
-	media, err := os.ReadFile("../../extensions/media/GofastrMedia.swift")
+	media, err := os.ReadFile("../../extension/media/GofastrMedia.swift")
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestRenderingComponentsHostContracts(test *testing.T) {
 			}
 		}
 	}
-	media, err := os.ReadFile("../../extensions/media/GofastrMedia.swift")
+	media, err := os.ReadFile("../../extension/media/GofastrMedia.swift")
 	if err != nil {
 		test.Fatal(err)
 	}

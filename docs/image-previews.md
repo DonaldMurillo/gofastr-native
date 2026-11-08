@@ -74,7 +74,7 @@ shuffle into the primary position. Menu callbacks remain registered Go actions.
   persisted photos in the note/detail, byte-identical export, and removal.
 - `render/ios/files_test.go`: executed Swift toolbar ordering and DTO checks;
   CLI/UIKit tests also compile the actual renderer sources.
-- `sim/photos_test.go`: real rendered image loading through the mobile bridge,
+- `internal/simtest/photos_test.go`: real rendered image loading through the mobile bridge,
   attachment-to-editor Back, tappable detail, dirty-text restoration, 200% text,
   and removal. Android here is Chromium styling, not Android-device validation.
 

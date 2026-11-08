@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/extension"
-	"github.com/DonaldMurillo/gofastr-native/extensions/media"
+	"github.com/DonaldMurillo/gofastr-native/extension/media"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 

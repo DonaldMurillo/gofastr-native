@@ -1,4 +1,4 @@
-package sim
+package simtest
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/photos"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	"github.com/DonaldMurillo/gofastr/framework/owner"
 )
 

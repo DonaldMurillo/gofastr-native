@@ -11,7 +11,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp/application"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesweb"
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 // Build assembles the iOS presentation for compatibility with existing callers.

@@ -10,9 +10,9 @@ import (
 	"errors"
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 	"github.com/DonaldMurillo/gofastr-native/extension"
 	"github.com/DonaldMurillo/gofastr-native/extension/webassets"
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
 )
 
 // Name is the component's rendering capability.

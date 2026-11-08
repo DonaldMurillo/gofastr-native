@@ -58,7 +58,7 @@ arbitrary user plugins.
 
 ## Media pilot and selectors
 
-`extensions/media/media.js` registers `gofastr.media/v1`. It parses `nativeui.Media`
+`extension/media/media.js` registers `gofastr.media/v1`. It parses `nativeui.Media`
 (`images`, `attachments`, `preview`) and owns themed DOM/styles, plain-text output,
 bounded JPEG data previews, file metadata, text/file detail composition, and
 private audio controls. Only `image.<index>`, `file.<index>`, and `preview` events

@@ -171,7 +171,7 @@ work are deferred/not implemented here.
 
 Retained live collections now use [bounded session recovery](../../../docs/mobile-reliability.md)
 for stale/expired watch instances. The real-bridge regression is
-`sim/reliability_test.go`; automatic reopen never replays a write, and failed
+`internal/simtest/reliability_test.go`; automatic reopen never replays a write, and failed
 reauthorization or repeated retirement still exposes the read error.
 
 Transient `pending`/`cancelled` watch replies get at most three 150ms read-only

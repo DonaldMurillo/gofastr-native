@@ -10,9 +10,9 @@ import (
 	"github.com/DonaldMurillo/gofastr/framework/owner"
 
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui/devtrace"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 func TestBuildServesGalleryInProcess(t *testing.T) {

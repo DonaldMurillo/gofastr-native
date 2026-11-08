@@ -1,4 +1,4 @@
-package sim
+package simtest
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 func TestMobileHistoryWaitsForDurableDraft(t *testing.T) {

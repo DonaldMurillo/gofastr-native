@@ -17,7 +17,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesterminal"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
 func TestTerminalAndWebSharePersistedNotes(t *testing.T) {
@@ -112,7 +112,7 @@ func TestPresentationCoreDoesNotImportWeb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dependency boundary: %v\n%s", err, output)
 	}
-	if strings.Contains(string(output), "github.com/DonaldMurillo/gofastr/") || strings.Contains(string(output), "gofastr-native/mobileui") {
+	if strings.Contains(string(output), "github.com/DonaldMurillo/gofastr/") || strings.Contains(string(output), "gofastr-native/render/webview/mobileui") {
 		t.Fatalf("shared behavior or terminal presentation imports the web stack:\n%s", output)
 	}
 }

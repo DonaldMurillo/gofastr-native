@@ -1,6 +1,6 @@
 # UIKit photo acquisition adapter
 
-Sources now live in `extensions/photos/`, discovered through its compiled package
+Sources now live in `extension/photos/`, discovered through its compiled package
 manifest and registered from Go. See [the extension contract](../../../docs/compiled-extensions.md).
 
 `GofastrPhotos.swift` implements binding-independent Foundation/CoreGraphics/ImageIO

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/DonaldMurillo/gofastr-native/extensions/photos"
+	"github.com/DonaldMurillo/gofastr-native/extension/photos"
 )
 
 func photoTestSources(t *testing.T) fstest.MapFS {

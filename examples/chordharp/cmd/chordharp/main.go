@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 
 	"github.com/DonaldMurillo/gofastr-native/tui/app"
 	"github.com/DonaldMurillo/gofastr-native/tui/view"

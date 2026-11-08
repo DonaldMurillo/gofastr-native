@@ -12,8 +12,8 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesbackup"
 	"github.com/DonaldMurillo/gofastr-native/extension"
-	"github.com/DonaldMurillo/gofastr-native/extensions/media"
-	"github.com/DonaldMurillo/gofastr-native/extensions/photos"
+	"github.com/DonaldMurillo/gofastr-native/extension/media"
+	"github.com/DonaldMurillo/gofastr-native/extension/photos"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 

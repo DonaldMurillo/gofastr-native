@@ -33,7 +33,7 @@ before its `hello` and first `open`. The catalog only needs `name`, `capabilitie
 and `MobileComponentExtensions.install`; it must not implement rendering. Each
 factory's capability dictionary has exactly one key equal to its name. The media
 factory name/capability is `gofastr.media/v1`, returns `available`, and comes from
-`extensions/media/GofastrMedia.swift`. Do not put it in `MobileFileExtensions`.
+`extension/media/GofastrMedia.swift`. Do not put it in `MobileFileExtensions`.
 An empty catalog is valid. No application imports or Go bindings belong in source.
 
 `make` and `update` run on the main thread. A same-ID/same-name component is updated

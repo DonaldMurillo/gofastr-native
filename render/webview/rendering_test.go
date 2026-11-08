@@ -11,11 +11,11 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/extension"
+	"github.com/DonaldMurillo/gofastr-native/extension/media"
 	"github.com/DonaldMurillo/gofastr-native/extension/webassets"
-	"github.com/DonaldMurillo/gofastr-native/extensions/media"
-	"github.com/DonaldMurillo/gofastr-native/mobileui"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	"github.com/DonaldMurillo/gofastr-native/render/webview"
+	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	"github.com/DonaldMurillo/gofastr/core/router"
 )
 

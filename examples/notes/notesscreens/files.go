@@ -12,7 +12,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
-	"github.com/DonaldMurillo/gofastr-native/extensions/photos"
+	"github.com/DonaldMurillo/gofastr-native/extension/photos"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 

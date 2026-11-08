@@ -60,7 +60,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 )
 
 // active is the engine the audio thread renders. The callback cannot carry

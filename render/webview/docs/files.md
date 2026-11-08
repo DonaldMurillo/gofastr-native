@@ -3,7 +3,7 @@
 Applications return the same Go `nativeui.Result.Files` definition used by the
 UIKit renderer. The library embeds `files.js` as `gfm-webview-files` and requires
 it from `gfm-webview`. Photo normalization now belongs to the explicitly registered
-`extensions/photos` compiled adapter, loaded before hello; see
+`extension/photos` compiled adapter, loaded before hello; see
 [compiled extensions](../../../docs/compiled-extensions.md). No application JavaScript, paths, URLs, file-system handles,
 new dependencies, or second application router are involved. See
 [presentations.md](presentations.md) for the companion modal adapter.
@@ -206,7 +206,7 @@ after a result write becomes uncertain, only **Check result** remains enabled.
 - `[data-gfw-file-status]`: polite or assertive accessible operation feedback.
 - `[data-gfw-file-download-link]`: ephemeral, library-created Blob download link.
 
-The parent-owned `sim/` chromedp coverage should verify `action → complete →
+The parent-owned `internal/simtest/` chromedp coverage should verify `action → complete →
 file-result → complete`, opaque identities, draft preservation, focus restoration,
 cancel and denied reads, both platform styles/dark mode/text scaling, and file ↔
 presentation chains. Use CDP file input selection rather than simulating an
@@ -226,7 +226,7 @@ lost writes, and physical chooser/camera behavior in browser/platform acceptance
 
 ```sh
 node --check render/webview/files.js
-node --check extensions/photos/photos.js
+node --check extension/photos/photos.js
 node --check render/webview/presentation.js
 node --check render/webview/webview.js
 node --test render/webview/files.test.cjs render/webview/presentation.test.cjs

@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 	"github.com/DonaldMurillo/gofastr-native/tui/cell"
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
 	"github.com/DonaldMurillo/gofastr-native/tui/input"
 	"github.com/DonaldMurillo/gofastr-native/tui/layout"
 	"github.com/DonaldMurillo/gofastr-native/tui/view"

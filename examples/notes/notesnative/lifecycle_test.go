@@ -29,7 +29,7 @@ func TestNativeStartupDoesNotDependOnWebPresentation(t *testing.T) {
 		for _, forbidden := range []string{
 			"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp",
 			"github.com/DonaldMurillo/gofastr-native/examples/notes/notesweb",
-			"github.com/DonaldMurillo/gofastr-native/mobileui",
+			"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui",
 			"github.com/DonaldMurillo/gofastr-native/render/webview",
 		} {
 			if dependency == forbidden {

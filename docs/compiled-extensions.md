@@ -20,7 +20,7 @@ screen registry, used by both UIKit and mobile WebView:
 ```go
 import (
     "github.com/DonaldMurillo/gofastr-native/extension"
-    "github.com/DonaldMurillo/gofastr-native/extensions/photos"
+    "github.com/DonaldMurillo/gofastr-native/extension/photos"
     "github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -82,7 +82,7 @@ does not promise exactly-once side effects across process crashes.
 
 ## Extension package structure
 
-The photo pilot lives in `extensions/photos/`:
+The photo pilot lives in `extension/photos/`:
 
 ```text
 photos.go                         typed Go API + Definition + validators

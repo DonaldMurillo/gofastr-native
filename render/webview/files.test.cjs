@@ -191,7 +191,7 @@ const harness = (photoOptions) => {
     setTimeout(callback, delay) { const timer = {}; timers.set(timer, { callback, delay }); return timer; }, clearTimeout(timer) { timers.delete(timer); },
     CustomEvent: class { constructor(type, options) { this.type = type; Object.assign(this, options); } } };
   const photos = photoOptions && photoPrimitives(context, document, photoOptions);
-  for (const module of ['presentation.js', '../../extensions/photos/photos.js', 'files.js', 'components.js']) runInNewContext(readFileSync(join(__dirname, module), 'utf8'), context);
+  for (const module of ['presentation.js', '../../extension/photos/photos.js', 'files.js', 'components.js']) runInNewContext(readFileSync(join(__dirname, module), 'utf8'), context);
   const root = document.createElement('div');
   root.setAttribute('data-gfw-screen', '');
   const screen = document.createElement('section');

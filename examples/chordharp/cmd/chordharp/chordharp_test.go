@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DonaldMurillo/gofastr-native/tui/cmd/chordharp/harp"
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 
 	"github.com/DonaldMurillo/gofastr-native/tui/cell"
 	"github.com/DonaldMurillo/gofastr-native/tui/input"

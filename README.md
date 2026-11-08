@@ -71,7 +71,7 @@ point it at the checkout. `go.work` is gitignored.
 |---|---|
 | `mobilehost/` | The host. `Options(data)` turns a `localapp.Data` into app options. `New(app, cfg)` registers the `mobile` battery (single-user identity). `Start` uses `ServicesHost` for service-only apps and an in-memory listener for WebView apps. `Do` and `Open` serve requests only in WebView mode; otherwise they return `ErrServiceOnly`. `Bridge` answers one message from `bridge.js`. |
 | `mobilehost/bridge.js` | The page half of the native bridge: installs `window.__gofastr_transport` and sends native POST forms over the same channel. |
-| `mobileui/` | An experimental external mobile-web presentation package: iOS/Android components, styles, behavior, and adaptive themes, using GoFastr's public registry. |
+| `render/webview/mobileui/` | An experimental external mobile-web presentation package: iOS/Android components, styles, behavior, and adaptive themes, using GoFastr's public registry. |
 | `examples/notes/notesapp/` | Composes an owner-scoped entity, rendering-independent Notes service, and handwritten mobile screens. No CSS or structural screen markup. |
 | `examples/notes/notesweb/` | Handwritten task screens composed from `mobileui`, plus the HTTP save adapter. |
 | `examples/notes/notes/`, `notesstore/` | Typed application behavior and a temporary scoped-CRUD repository adapter. No presentation code. |
@@ -86,7 +86,7 @@ point it at the checkout. `go.work` is gitignored.
 | `render/android/` | Binding-independent Java renderer and device adapters, compiled against the Android SDK without Gradle. |
 | `render/webview/` | Generic adapter from the same Go mobile definitions to `mobileui` components, actions, and GoFastr navigation. |
 | `cmd/gofastr-native/templates/` | Library-owned WebView shells and minimal native binding/bootstrap glue, plist, and manifest. Apps only supply Go screens. |
-| `sim/` | A Chromium set up as a phone WebView (390x844 @3x, touch, phone UA). Every request is intercepted through the DevTools Fetch domain and answered by `mobilehost`; a MessagePort stands in for the native channel. |
+| `internal/simtest/` | A Chromium set up as a phone WebView (390x844 @3x, touch, phone UA). Every request is intercepted through the DevTools Fetch domain and answered by `mobilehost`; a MessagePort stands in for the native channel. |
 
 ## External presentation prototype
 
@@ -354,7 +354,7 @@ interception path and `Open`, which hands chunks over as they arrive.
   the OS-neutral half (the capability registry, grants, the bridge chokepoint,
   app state), and that lives inside `battery/desktop`.
 - **Two internal helpers are copied.** `cmd/gofastr-native` copies
-  `internal/fileperm.WriteOwnerOnly`, and `sim/` spells out the Chrome start
+  `internal/fileperm.WriteOwnerOnly`, and `internal/simtest/` spells out the Chrome start
   timeouts that `internal/chromedptest` holds.
 - **The adaptive theme is opt-in.** The external Notes presentation selects
   `mobileui.Theme(platform)`; a scaffold must also choose its presentation.
