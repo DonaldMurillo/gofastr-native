@@ -1,5 +1,13 @@
 # Implementation notes
 
+## 2026-11-08 - Minimal CI on Linux
+- Scope: build, tooling.
+- Trigger: the no-CI policy was lifted for v0.0.1; the module checks should run on every PR, not only before a release.
+- Approach: one GitHub Actions workflow, a job per module on `ubuntu-latest` with `GOWORK=off`: `go mod tidy -diff`, gofmt, vet, `go test ./...` (repocheck and the Chromium simulator tests included), and the WebView Node tests in the root job.
+- Evidence: all three modules vet for linux/amd64; the first PR run is the first Linux test run.
+- Next time: keep CI to checks that need no simulator, emulator, Xcode or Android SDK; those stay local and keep their NOT RUN gates.
+- Status: active.
+
 ## 2026-11-07 - Service-only lifecycle without transport
 - Scope: mobilehost, native, lifecycle.
 - Trigger: gofastr v0.96.0 adds `App.Run`, `ServicesHost` and `ServicesReady`; the old listener-free Gate B status is superseded.
@@ -23,8 +31,8 @@
 - Trigger: repository policy excludes CI; the desktop Notes command also cannot link as a CGO-disabled iOS executable.
 - Approach: keep no CI workflows; run Go tests/vet, Node tests and mobile-library cross-builds locally.
 - Evidence: README documents local commands; `go list -f '{{if ne .Name "main"}}{{.ImportPath}}{{end}}' ./mobilehost/... ./examples/...` selects portable library packages.
-- Next time: do not add CI; validate the public pin locally, leave executable checks to gomobile, and keep generated app bundles outside Git.
-- Status: active.
+- Next time: validate the public pin locally, leave executable checks to gomobile, and keep generated app bundles outside Git.
+- Status: superseded on 2026-11-08 by minimal CI; the local checks still apply to simulators and devices.
 
 ## 2026-11-05 - Rendering extensions use keyed snapshots, not another command loop
 - Scope: extensions, nativeui, Notes, UIKit, WebView.

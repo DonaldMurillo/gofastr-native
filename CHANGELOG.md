@@ -60,3 +60,5 @@ and passes vet but has not been run.
 - `go run ./internal/releasecheck vX.Y.Z` checks a release from a fresh clone,
   including dependency licenses. See [RELEASING.md](RELEASING.md).
 - `scripts/hooks/pre-commit` runs the repocheck test before each commit.
+- CI on Linux runs tidy, gofmt, vet and tests for each module, and the WebView
+  Node tests, on pull requests and pushes to `main`.

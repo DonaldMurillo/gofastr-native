@@ -103,7 +103,10 @@ and point it at the checkout. `go.work` is gitignored.
 
 ## Run the tests
 
-Validation is local-only; this repository intentionally has no CI workflows.
+CI (`.github/workflows/ci.yml`) runs tidy, gofmt, vet and the tests below for
+each module on Linux, on every pull request and push to `main`. Simulator,
+emulator, Xcode and Android SDK checks stay local. To run the same set
+yourself:
 
 ```sh
 go vet ./...

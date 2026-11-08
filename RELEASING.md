@@ -72,7 +72,7 @@ seconds. `git commit --no-verify` skips it.
 
    `-skip-tests` skips `go test` and `node --test` for a quick pass. Run the
    full check at least once on the release commit.
-4. Merge the PR. Then tag the merge commit on `main` with the commands
+4. Merge the PR once CI passes. Then tag the merge commit on `main` with the commands
    releasecheck printed, push the tags, and create the GitHub release from
    the changelog section.
 5. Check the release resolves for someone else:

@@ -70,7 +70,8 @@ go run ./internal/releasecheck vX.Y.Z
 ```
 
 Report every line that is not PASS. A NOT RUN for the origin tag lookup or
-node needs a reason in your report.
+node needs a reason in your report. Once the PR is open, its CI run must pass
+too: CI covers Linux, releasecheck covers the machine you ran it on.
 
 ## 6. Hand back
 
