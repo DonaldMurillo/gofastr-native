@@ -1,22 +1,8 @@
-// Command releasecheck checks that the repository is ready to tag a version.
-// It changes nothing: it never tags, pushes or edits files.
-//
-//	go run ./internal/releasecheck v0.0.2
-//	go run ./internal/releasecheck -skip-tests v0.0.2   # everything but go test and node --test
-//
-// It checks, in order: the version and CHANGELOG entry, a clean working tree
-// and unused tags, the repocheck hygiene rules, then a fresh clone of HEAD
-// with GOWORK=off (tidy, gofmt, vet, tests, the WebView Node tests), and the
-// license of every dependency module that is built or tested. It ends by
-// printing the tag commands. See RELEASING.md.
 package main
 
 import (
 	"bytes"
-	"context"
-	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -31,67 +17,9 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/internal/repocheck"
 )
 
-type status string
-
-const (
-	pass   status = "PASS"
-	fail   status = "FAIL"
-	notRun status = "NOT RUN"
-)
-
-type checker struct {
-	out     io.Writer
-	results []string
-	failed  bool
-}
-
-func (c *checker) record(s status, name, detail string) {
-	line := fmt.Sprintf("%-7s %s", s, name)
-	if detail != "" {
-		line += ": " + detail
-	}
-	fmt.Fprintln(c.out, line)
-	c.results = append(c.results, line)
-	if s == fail {
-		c.failed = true
-	}
-}
-
-func main() {
-	skipTests := flag.Bool("skip-tests", false, "skip go test and node --test (tidy, gofmt, vet and licenses still run)")
-	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: go run ./internal/releasecheck [-skip-tests] vX.Y.Z")
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-	if flag.NArg() != 1 {
-		flag.Usage()
-		os.Exit(2)
-	}
-	root, err := repoRoot()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	c := &checker{out: os.Stdout}
-	run(c, root, flag.Arg(0), *skipTests)
-	fmt.Println()
-	if c.failed {
-		fmt.Println("Not ready: fix every FAIL above, commit, and run this again.")
-		os.Exit(1)
-	}
-	fmt.Println("Ready. Review the NOT RUN lines, then follow RELEASING.md to tag.")
-}
-
-func repoRoot() (string, error) {
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		return "", fmt.Errorf("run this inside the gofastr-native repository: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-func run(c *checker, root, version string, skipTests bool) {
+// runChecks runs every check for version. A non-empty skipTests skips go
+// test and node --test and is the reason reported for skipping them.
+func runChecks(c *checker, root, version, skipTests string) {
 	if !semver.IsValid(version) || semver.Canonical(version) != version {
 		c.record(fail, "version", fmt.Sprintf("%q is not a canonical semantic version such as v0.1.0", version))
 		return
@@ -117,7 +45,6 @@ func run(c *checker, root, version string, skipTests bool) {
 	}
 	checkNode(c, clone, skipTests)
 	checkLicenses(c, clone, modules)
-	printNextSteps(version)
 }
 
 var changelogHeading = regexp.MustCompile(`(?m)^## (v\S+) \((\d{4}-\d{2}-\d{2})\)\s*$`)
@@ -151,18 +78,6 @@ func checkWorkingTree(c *checker, root string) {
 	default:
 		c.record(pass, "working tree", "clean")
 	}
-}
-
-func tagNames(version string) []string {
-	var tags []string
-	for _, dir := range repocheck.ReleasedModules {
-		if dir == "." {
-			tags = append(tags, version)
-		} else {
-			tags = append(tags, dir+"/"+version)
-		}
-	}
-	return tags
 }
 
 func checkTags(c *checker, root, version string) {
@@ -202,7 +117,7 @@ func checkHygiene(c *checker, root string) {
 }
 
 func freshClone(root string) (string, func(), error) {
-	dir, err := os.MkdirTemp("", "gofastr-native-releasecheck-")
+	dir, err := os.MkdirTemp("", "gofastr-native-release-")
 	if err != nil {
 		return "", nil, err
 	}
@@ -244,7 +159,7 @@ func goEnv() []string {
 	return []string{"GOWORK=off", "GOFLAGS=-mod=readonly"}
 }
 
-func checkModule(c *checker, clone, dir string, skipTests bool) {
+func checkModule(c *checker, clone, dir, skipTests string) {
 	moddir := filepath.Join(clone, filepath.FromSlash(dir))
 	name := "module " + dir
 	if _, err := command(moddir, goEnv(), "go", "mod", "tidy", "-diff"); err != nil {
@@ -262,8 +177,8 @@ func checkModule(c *checker, clone, dir string, skipTests bool) {
 	} else {
 		c.record(pass, name+" vet", "")
 	}
-	if skipTests {
-		c.record(notRun, name+" test", "-skip-tests")
+	if skipTests != "" {
+		c.record(notRun, name+" test", skipTests)
 		return
 	}
 	if _, err := command(moddir, goEnv(), "go", "test", "-count=1", "./..."); err != nil {
@@ -286,13 +201,13 @@ func gofmtPath() string {
 	return "gofmt"
 }
 
-func checkNode(c *checker, clone string, skipTests bool) {
+func checkNode(c *checker, clone, skipTests string) {
 	files, _ := filepath.Glob(filepath.Join(clone, "render", "webview", "*.test.cjs"))
 	switch {
 	case len(files) == 0:
 		return
-	case skipTests:
-		c.record(notRun, "WebView node tests", "-skip-tests")
+	case skipTests != "":
+		c.record(notRun, "WebView node tests", skipTests)
 		return
 	}
 	if _, err := exec.LookPath("node"); err != nil {
@@ -357,52 +272,4 @@ func checkLicenses(c *checker, clone string, modules []string) {
 		return
 	}
 	c.record(pass, "licenses", fmt.Sprintf("%d dependency modules: %s", len(deps), strings.Join(summary, ", ")))
-}
-
-func printNextSteps(version string) {
-	tags := tagNames(version)
-	fmt.Println()
-	fmt.Println("When every check passes and the release commit is on main:")
-	fmt.Println()
-	for _, tag := range tags {
-		fmt.Printf("  git tag -a %s -m %q <main commit>\n", tag, tag)
-	}
-	fmt.Printf("  git push origin %s\n", strings.Join(tags, " "))
-	fmt.Printf("  gh release create %s --title %s --notes-file <the %s section of CHANGELOG.md>\n", version, version, version)
-}
-
-// command runs name in dir with extra environment and returns its stdout.
-// On failure the error carries the command and the end of its output.
-func command(dir string, env []string, name string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), env...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
-		return stdout.String(), fmt.Errorf("%s %s: %v\n%s", name, strings.Join(args, " "), err, tail(stdout.String()+stderr.String(), 40))
-	}
-	return stdout.String(), nil
-}
-
-func tail(s string, lines int) string {
-	all := strings.Split(strings.TrimRight(s, "\n"), "\n")
-	if len(all) > lines {
-		all = append([]string{"..."}, all[len(all)-lines:]...)
-	}
-	return strings.Join(all, "\n")
-}
-
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(s, "\n")
-	return line
-}
-
-func errString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }

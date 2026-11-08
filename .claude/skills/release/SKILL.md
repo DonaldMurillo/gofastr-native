@@ -22,7 +22,7 @@ With no previous tag, the range is the whole history.
 
 ```sh
 GOWORK=off go test -count=1 ./internal/repocheck
-go run ./internal/releasecheck -skip-tests vX.Y.Z
+go run ./internal/release check -skip-tests vX.Y.Z
 ```
 
 Fix every repocheck finding at its source. Add `repocheck:allow` only to a
@@ -66,15 +66,27 @@ Follow the repository's writing rules in AGENTS.md: plain words, no puffery.
 Commit on a branch, then run the full check (it takes several minutes):
 
 ```sh
-go run ./internal/releasecheck vX.Y.Z
+go run ./internal/release check vX.Y.Z
 ```
 
 Report every line that is not PASS. A NOT RUN for the origin tag lookup or
 node needs a reason in your report. Once the PR is open, its CI run must pass
-too: CI covers Linux, releasecheck covers the machine you ran it on.
+too: CI covers Linux, the check covers the machine you ran it on.
 
 ## 6. Hand back
 
-Tell the user: the branch and commit, the releasecheck result, what you
-changed, what you could not verify, and the exact tag commands releasecheck
-printed. Tagging happens on the merge commit on main, after the PR merges.
+Tell the user: the PR, the check result, the CI result, what you changed and
+what you could not verify. Do not merge without being asked.
+
+## 7. Publish, only when asked
+
+After the PR merges and CI passes on main:
+
+```sh
+git switch main && git pull --ff-only
+go run ./internal/release publish -dry-run vX.Y.Z
+```
+
+Show the user the dry-run plan. Run `publish -yes vX.Y.Z` only after they
+confirm in this conversation; the prompt it skips is their confirmation, not
+yours. Report every line, including the module proxy results.

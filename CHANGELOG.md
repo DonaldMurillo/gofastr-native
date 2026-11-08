@@ -57,8 +57,10 @@ and passes vet but has not been run.
 - `internal/repocheck` runs with `go test ./...` and fails on local paths,
   tool names, credentials, stale release claims, uncredited third-party
   notices and module layout mistakes.
-- `go run ./internal/releasecheck vX.Y.Z` checks a release from a fresh clone,
-  including dependency licenses. See [RELEASING.md](RELEASING.md).
+- `go run ./internal/release check vX.Y.Z` checks a release from a fresh clone,
+  including dependency licenses. `publish vX.Y.Z` tags both modules from
+  `main` after CI passes, pushes the tags, creates the GitHub release and
+  checks the module proxy. See [RELEASING.md](RELEASING.md).
 - `scripts/hooks/pre-commit` runs the repocheck test before each commit.
 - CI on Linux runs tidy, gofmt, vet and tests for each module, and the WebView
   Node tests, on pull requests and pushes to `main`.

@@ -4,7 +4,7 @@
 // copyright, and module layout mistakes.
 //
 // Its test runs as part of go test ./..., so every normal test run checks
-// the tree. internal/releasecheck runs the same checks before a tag.
+// the tree. internal/release runs the same checks before a tag.
 //
 // A line that must keep a match (a test fixture, a documented example) can
 // carry the marker "repocheck:allow" anywhere on the line.

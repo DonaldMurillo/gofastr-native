@@ -58,7 +58,7 @@ seconds. `git commit --no-verify` skips it.
 3. Commit on a branch, then run:
 
    ```sh
-   go run ./internal/releasecheck vX.Y.Z
+   go run ./internal/release check vX.Y.Z
    ```
 
    It changes nothing. It checks the changelog entry, a clean working tree,
@@ -72,15 +72,30 @@ seconds. `git commit --no-verify` skips it.
 
    `-skip-tests` skips `go test` and `node --test` for a quick pass. Run the
    full check at least once on the release commit.
-4. Merge the PR once CI passes. Then tag the merge commit on `main` with the commands
-   releasecheck printed, push the tags, and create the GitHub release from
-   the changelog section.
-5. Check the release resolves for someone else:
+4. Open the PR and merge it once CI passes.
+5. Publish from `main`:
 
    ```sh
-   cd "$(mktemp -d)"
-   GOWORK=off GOFLAGS=-mod=mod go run github.com/DonaldMurillo/gofastr-native/cmd/gofastr-native@vX.Y.Z --help
+   git switch main && git pull --ff-only
+   go run ./internal/release publish -dry-run vX.Y.Z   # shows the plan, changes nothing
+   go run ./internal/release publish vX.Y.Z
    ```
+
+   publish refuses to run unless `HEAD` is `origin/main` and the CI run for
+   that commit's push to `main` succeeded. It repeats the checks (CI already
+   ran the tests), then asks you to type the version. After that it:
+
+   - creates an annotated tag per released module at `HEAD`
+     (`vX.Y.Z`, `tui/vX.Y.Z`)
+   - pushes both tags in one `git push --atomic`; if the push fails, it
+     deletes the local tags, so nothing is half-published
+   - creates the GitHub release from the version's CHANGELOG section, with
+     `--verify-tag` so gh never makes a tag of its own
+   - asks proxy.golang.org for each module at the new version, retrying for
+     about two and a half minutes while the proxy fetches the tag
+
+   `-yes` skips the prompt. A failure after the push says what is already
+   public and what to finish by hand.
 
 ## What the checks cannot see
 

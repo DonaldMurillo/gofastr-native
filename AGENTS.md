@@ -34,7 +34,7 @@ when you made the change.
 ## Dependencies and assets
 
 - New Go dependencies must be MIT, BSD, Apache-2.0 or ISC.
-  `go run ./internal/releasecheck -skip-tests vX.Y.Z` lists every
+  `go run ./internal/release check -skip-tests vX.Y.Z` lists every
   dependency's license.
 - New images, fonts, sounds or data files from elsewhere: confirm the license
   allows redistribution, keep their notice, and credit their path in the
