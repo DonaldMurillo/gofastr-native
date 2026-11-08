@@ -1,0 +1,1 @@
+{"name":"dev.gofastr.chordharp/v1","kind":"component","capabilities":["dev.gofastr.chordharp/v1"],"ios":{"factory":"ChordHarpComponent","sources":["ChordHarp.swift"]},"android":{"factory":"ChordHarpComponent","sources":["ChordHarpComponent.java","ChordHarpView.java"]},"webview":{"script":"harp.js"}}

@@ -77,6 +77,7 @@ point it at the checkout. `go.work` is gitignored.
 | `examples/notes/notes/`, `notesstore/` | Typed application behavior and a temporary scoped-CRUD repository adapter. No presentation code. |
 | `examples/notes/notesterminal/` | A second, line-oriented presentation of the same service, without HTML or browser dependencies. Run with `go run ./examples/notes/cmd/notes-terminal --data /absolute/directory`. |
 | `examples/notes/notesmobile/` | Thin WebView binding for shared Go mobile screens: `Start`, `Stop`, `Handle`, `Open`, `Bridge`, with strings, bytes and ints only. |
+| `examples/chordharp/` | The terminal chord harp as an Android app, in its own module. The `harpview` component draws the instrument natively and calls the shared Go synthesizer from `tui/cmd/chordharp/harp` directly. See its README. |
 | `nativeui/` | External mobile screen/action definitions in Go, local routing, and the gomobile wire envelope. |
 | `examples/notes/notesscreens/` | One Notes screen/action package, written only in Go using `nativeui`, consumed by UIKit and WebView. |
 | `examples/notes/notesnative/` | Thin native binding: lifecycle, screen rendering/action dispatch, compatibility data commands, and centrally supplied installation identity. |
