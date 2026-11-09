@@ -123,7 +123,10 @@ func freshClone(root string) (string, func(), error) {
 	}
 	cleanup := func() { os.RemoveAll(dir) }
 	clone := filepath.Join(dir, "repo")
-	if _, err := command(root, nil, "git", "clone", "--quiet", "--no-hardlinks", root, clone); err != nil {
+	// core.autocrlf=true (Git for Windows' system default) would check the
+	// clone out with CRLF endings, and gofmt and go mod tidy -diff would
+	// flag every file.
+	if _, err := command(root, nil, "git", "clone", "--quiet", "--no-hardlinks", "--config", "core.autocrlf=false", root, clone); err != nil {
 		cleanup()
 		return "", nil, err
 	}
