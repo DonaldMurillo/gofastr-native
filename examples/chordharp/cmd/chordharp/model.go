@@ -2,9 +2,14 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 
@@ -84,10 +89,39 @@ func densityFor(height int) density {
 	return dense
 }
 
+// page is what the panel beside the rhythm shows. Tab moves through them.
+type page int
+
+const (
+	pageMix page = iota
+	pageSound
+	pageTake
+	pages
+)
+
+var pageNames = [pages]string{"Mix", "Sound", "Take"}
+
+// soundRow is one row of the Sound page.
+type soundRow int
+
+const (
+	rowPreset soundRow = iota
+	rowOctave
+	rowTone
+	soundRows
+)
+
+var soundNames = [soundRows]string{"Preset", "Octave", "Tone"}
+
+// toneStep is how far one press moves Tone.
+const toneStep = 5
+
 type model struct {
 	eng   *harp.Engine
 	audio string
 	now   func() time.Time
+	// run runs a slow job, such as saving a take, off the UI loop.
+	run func(func())
 
 	chord    harp.Chord
 	held     bool
@@ -99,26 +133,232 @@ type model struct {
 	plucked  [harp.Zones]time.Time
 	help     bool
 
+	sound     harp.Sound
+	page      page
+	soundSel  soundRow
+	settings  string // where the sound is saved; empty to keep it unsaved
+	soundNote string // why the sound was not saved
+	takesDir  string // where saved takes go
+	note      takeNote
+
+	shown display // what the screen being built shows
+
 	lastKey   rune
 	lastKeyAt time.Time
 }
 
+// takeNote is the Take page's message about the last save, which a save
+// running off the UI loop writes.
+type takeNote struct {
+	mu     sync.Mutex
+	lines  [2]string
+	saving bool
+}
+
+func (n *takeNote) set(saving bool, lines ...string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.saving, n.lines = saving, [2]string{}
+	copy(n.lines[:], lines)
+}
+
+func (n *takeNote) get() (lines [2]string, saving bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.lines, n.saving
+}
+
 func newModel(eng *harp.Engine, audio string, now func() time.Time) *model {
-	m := &model{eng: eng, audio: audio, now: now, chord: harp.Chord{Root: 0, Kind: harp.Major}}
+	m := &model{
+		eng: eng, audio: audio, now: now, run: func(f func()) { go f() },
+		chord: harp.Chord{Root: 0, Kind: harp.Major}, sound: harp.DefaultSound(), takesDir: ".",
+	}
 	m.values = [controls]float64{ctlVolume: 80, ctlChord: 50, ctlHarp: 80, ctlRhythm: 60, ctlTempo: 112, ctlSustain: 1.5}
 	m.apply()
 	return m
 }
 
-// apply sends the settings to the engine.
-func (m *model) apply() {
-	m.eng.Set(harp.Params{
+// params are the engine settings the model holds.
+func (m *model) params() harp.Params {
+	return harp.Params{
 		Master: m.values[ctlVolume] / 100, Chord: m.values[ctlChord] / 100,
 		Harp: m.values[ctlHarp] / 100, Rhythm: m.values[ctlRhythm] / 100,
 		Tempo: m.values[ctlTempo], Sustain: m.values[ctlSustain],
-		Pattern: m.pattern, Playing: m.playing,
-	})
+		Pattern: m.pattern, Playing: m.playing, Sound: m.sound,
+	}
+}
+
+// apply sends the settings to the engine. While a take plays back, the
+// engine keeps playing it unless the chord or the rhythm changed.
+func (m *model) apply() {
+	m.eng.Set(m.params())
 	m.eng.SetChord(m.chord, m.held)
+}
+
+// display is what the screen shows: the model's own state, or the take's
+// while one plays back.
+type display struct {
+	chord   harp.Chord
+	held    bool
+	pattern int
+	playing bool
+	tempo   float64
+	status  harp.Status
+}
+
+func (m *model) display() display {
+	st := m.eng.Status()
+	d := display{chord: m.chord, held: m.held, pattern: m.pattern, playing: m.playing, tempo: m.values[ctlTempo], status: st}
+	if st.Playback {
+		d.chord, d.held, d.pattern, d.playing, d.tempo = st.Chord, st.Held, st.Pattern, st.Rhythm, st.Tempo
+	}
+	return d
+}
+
+// setSound changes the sound and saves it for the next run.
+func (m *model) setSound(s harp.Sound) {
+	m.sound = s.Clamp()
+	m.apply()
+	if m.settings == "" {
+		return
+	}
+	m.soundNote = ""
+	if err := harp.SaveSound(m.settings, m.sound); err != nil {
+		m.soundNote = "Not saved: " + err.Error()
+	}
+}
+
+// presetPos is the Preset row's position: the preset the sound is, or for
+// a custom sound the preset at its octave.
+func presetPos(s harp.Sound) int {
+	if i := s.Preset(); i >= 0 {
+		return i
+	}
+	return min(max(s.Octave, 0), len(harp.Presets)-1)
+}
+
+func (m *model) nudgeSound(row soundRow, dir int) {
+	s := m.sound
+	switch row {
+	case rowPreset:
+		s = harp.Presets[min(max(presetPos(s)+dir, 0), len(harp.Presets)-1)].Sound
+	case rowOctave:
+		s.Octave += dir
+	case rowTone:
+		s.Tone += dir * toneStep
+	}
+	m.setSound(s)
+}
+
+func (m *model) soundFraction(row soundRow) float64 {
+	switch row {
+	case rowPreset:
+		return float64(presetPos(m.sound)) / float64(len(harp.Presets)-1)
+	case rowOctave:
+		return float64(m.sound.Octave-harp.MinOctave) / float64(harp.MaxOctave-harp.MinOctave)
+	}
+	return float64(m.sound.Tone) / 100
+}
+
+func (m *model) setSoundFraction(row soundRow, f float64) {
+	s := m.sound
+	switch row {
+	case rowPreset:
+		s = harp.Presets[int(math.Round(f*float64(len(harp.Presets)-1)))].Sound
+	case rowOctave:
+		s.Octave = harp.MinOctave + int(math.Round(f*float64(harp.MaxOctave-harp.MinOctave)))
+	case rowTone:
+		s.Tone = int(math.Round(f*100/toneStep)) * toneStep
+	}
+	m.setSound(s)
+}
+
+func (m *model) soundText(row soundRow) string {
+	switch row {
+	case rowPreset:
+		return m.sound.Name()
+	case rowOctave:
+		return fmt.Sprintf("%+d oct", m.sound.Octave)
+	}
+	return fmt.Sprintf("%3d%%", m.sound.Tone)
+}
+
+// toggleRecord starts a take, or ends the one being recorded.
+func (m *model) toggleRecord() {
+	if m.eng.Status().Recording {
+		m.eng.StopRecording()
+		return
+	}
+	m.eng.Record()
+	m.note.set(false)
+}
+
+// togglePlay plays the take back, or stops it.
+func (m *model) togglePlay() {
+	if m.eng.Status().Playback {
+		m.eng.StopPlaying()
+		return
+	}
+	if !m.eng.Play() {
+		m.note.set(false, "Nothing recorded yet.", "ctrl+r records a take.")
+	}
+}
+
+// save writes the take as MIDI and WAV in takesDir, off the UI loop.
+func (m *model) save() {
+	m.eng.StopRecording()
+	t := m.eng.Take()
+	if t == nil {
+		m.note.set(false, "Nothing recorded yet.", "ctrl+r records a take.")
+		return
+	}
+	if _, saving := m.note.get(); saving {
+		return
+	}
+	name := "chordharp-" + m.now().Format("20060102-150405")
+	dir, params := m.takesDir, m.params()
+	where := ".mid and .wav"
+	if dir != "." {
+		where += " in " + dir
+	}
+	m.note.set(true, "Saving "+name+"…", where)
+	m.run(func() {
+		if err := exportTake(t, params, filepath.Join(dir, name)); err != nil {
+			m.note.set(false, "Not saved:", err.Error())
+			return
+		}
+		m.note.set(false, "Saved "+name, where)
+	})
+}
+
+// exportTake writes base.mid and base.wav.
+func exportTake(t *harp.Take, p harp.Params, base string) error {
+	if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
+		return err
+	}
+	mid, err := os.Create(base + ".mid")
+	if err != nil {
+		return err
+	}
+	defer mid.Close()
+	wav, err := os.Create(base + ".wav")
+	if err != nil {
+		return err
+	}
+	defer wav.Close()
+	if err := t.Export(p, wav, mid); err != nil {
+		return err
+	}
+	if err := mid.Close(); err != nil {
+		return err
+	}
+	return wav.Close()
+}
+
+// clock formats seconds as m:ss.
+func clock(seconds float64) string {
+	s := int(seconds)
+	return fmt.Sprintf("%d:%02d", s/60, s%60)
 }
 
 // hold holds a chord. A key that is held down repeats, so the keyboard
@@ -145,7 +385,7 @@ func (m *model) release() {
 
 // pluck sounds one zone of the strumplate after delay.
 func (m *model) pluck(zone int, delay time.Duration) {
-	m.eng.Pluck(harp.StrumNotes(m.chord)[zone], delay.Seconds())
+	m.eng.Pluck(zone, delay.Seconds())
 	m.plucked[zone] = m.now().Add(delay)
 }
 
@@ -179,7 +419,21 @@ func (m *model) fraction(c control) float64 {
 	return (m.values[c] - s.min) / (s.max - s.min)
 }
 
+// stopTake ends playback, reporting whether there was any. The rhythm
+// keys stop a take first: what they would start or stop is the take's
+// rhythm on screen, not the instrument's.
+func (m *model) stopTake() bool {
+	if !m.eng.Status().Playback {
+		return false
+	}
+	m.eng.StopPlaying()
+	return true
+}
+
 func (m *model) toggleRhythm() {
+	if m.stopTake() {
+		return
+	}
 	m.playing = !m.playing
 	m.apply()
 }
@@ -187,6 +441,9 @@ func (m *model) toggleRhythm() {
 // startRhythm starts the rhythm, or takes it back to the downbeat when it
 // is already running.
 func (m *model) startRhythm() {
+	if m.stopTake() {
+		return
+	}
 	if m.playing {
 		m.eng.Restart()
 		return
@@ -196,11 +453,15 @@ func (m *model) startRhythm() {
 }
 
 func (m *model) stopRhythm() {
+	if m.stopTake() {
+		return
+	}
 	m.playing = false
 	m.apply()
 }
 
 func (m *model) choosePattern(i int) {
+	m.stopTake()
 	m.pattern = (i + len(harp.Patterns)) % len(harp.Patterns)
 	m.apply()
 }
@@ -220,7 +481,69 @@ const (
 	runeEnter     = -1
 	runeEscape    = -2
 	runeBackspace = -3
+	runeRecord    = -4
+	runePlay      = -5
+	runeSave      = -6
 )
+
+// ctrlKey handles Ctrl+R, Ctrl+P and Ctrl+E, which record, play and save
+// a take. They toggle, so a held key acts once.
+func (m *model) ctrlKey(k input.Key) bool {
+	if k.Code != input.KeyRune || k.Mods != input.ModCtrl {
+		return false
+	}
+	var r rune
+	switch unicode.ToLower(k.Rune) {
+	case 'r':
+		r = runeRecord
+	case 'p':
+		r = runePlay
+	case 'e':
+		r = runeSave
+	default:
+		return false
+	}
+	if m.repeated(k, r) {
+		return true
+	}
+	switch r {
+	case runeRecord:
+		m.toggleRecord()
+	case runePlay:
+		m.togglePlay()
+	case runeSave:
+		m.save()
+	}
+	return true
+}
+
+// arrow moves through the rows of the page on show and changes them.
+func (m *model) arrow(code input.KeyCode) {
+	switch m.page {
+	case pageMix:
+		switch code {
+		case input.KeyUp:
+			m.selected = (m.selected + controls - 1) % controls
+		case input.KeyDown:
+			m.selected = (m.selected + 1) % controls
+		case input.KeyLeft:
+			m.nudge(m.selected, -1)
+		case input.KeyRight:
+			m.nudge(m.selected, 1)
+		}
+	case pageSound:
+		switch code {
+		case input.KeyUp:
+			m.soundSel = (m.soundSel + soundRows - 1) % soundRows
+		case input.KeyDown:
+			m.soundSel = (m.soundSel + 1) % soundRows
+		case input.KeyLeft:
+			m.nudgeSound(m.soundSel, -1)
+		case input.KeyRight:
+			m.nudgeSound(m.soundSel, 1)
+		}
+	}
+}
 
 // repeated records a key and reports whether it is auto-repeat of a held
 // key. A terminal with the kitty protocol's event types says so. Legacy
@@ -241,6 +564,9 @@ func (m *model) repeated(k input.Key, r rune) bool {
 
 // key handles every key; the instrument has no focusable widgets.
 func (m *model) key(k input.Key) bool {
+	if m.ctrlKey(k) {
+		return true
+	}
 	if k.Mods&(input.ModCtrl|input.ModAlt|input.ModSuper) != 0 {
 		return false
 	}
@@ -274,17 +600,15 @@ func (m *model) key(k input.Key) bool {
 	case input.KeyBackspace:
 		m.stopRhythm()
 		return true
-	case input.KeyUp:
-		m.selected = (m.selected + controls - 1) % controls
+	case input.KeyUp, input.KeyDown, input.KeyLeft, input.KeyRight:
+		m.arrow(k.Code)
 		return true
-	case input.KeyDown:
-		m.selected = (m.selected + 1) % controls
-		return true
-	case input.KeyLeft:
-		m.nudge(m.selected, -1)
-		return true
-	case input.KeyRight:
-		m.nudge(m.selected, 1)
+	case input.KeyTab:
+		if k.Mods&input.ModShift != 0 {
+			m.page = (m.page + pages - 1) % pages
+		} else {
+			m.page = (m.page + 1) % pages
+		}
 		return true
 	case input.KeyEnter:
 		// Unguarded on legacy terminals: a held Enter keeps the rhythm at
@@ -367,12 +691,10 @@ func (m *model) screen(w, h int) view.Element {
 	if w < minWidth || h < minHeight {
 		return m.tooSmall(w, h)
 	}
+	m.shown = m.display()
 	d := densityFor(h)
 	plateTitle := "Strumplate · drag across it or press 1 to = · / glides"
-	mixTitle := "Mix · ↑↓ choose · ←→ change"
-	if w < 72 {
-		mixTitle = "Mix · ↑↓ ←→"
-	}
+	pageTitle := m.pageTitle(w)
 	if d == dense {
 		return widget.Column(
 			m.header(),
@@ -380,7 +702,7 @@ func (m *model) screen(w, h int) view.Element {
 			widget.Grow(1, widget.Column(view.E(rule{plateTitle}), widget.Grow(1, m.plate()))),
 			view.E(widget.Flex{Dir: widget.Horizontal, Gap: 2},
 				widget.Grow(1, widget.Column(view.E(rule{"Rhythm"}), m.rhythmPanel(w/2))),
-				widget.Grow(1, widget.Column(view.E(rule{mixTitle}), m.mixPanel())),
+				widget.Grow(1, widget.Column(view.E(rule{pageTitle}), m.pagePanel())),
 			),
 			m.footer(w),
 		)
@@ -391,9 +713,116 @@ func (m *model) screen(w, h int) view.Element {
 		widget.Grow(1, widget.Panel(plateTitle, m.plate())),
 		widget.Row(
 			widget.Grow(1, widget.Panel("Rhythm", m.rhythmPanel(w/2-2))),
-			widget.Grow(1, widget.Panel(mixTitle, m.mixPanel())),
+			widget.Grow(1, widget.Panel(pageTitle, m.pagePanel())),
 		),
 		m.footer(w),
+	)
+}
+
+// pageTitle names the page on show, the keys that work it, and the page
+// Tab goes to, as far as the width allows.
+func (m *model) pageTitle(w int) string {
+	name, next := pageNames[m.page], pageNames[(m.page+1)%pages]
+	keys := " · ↑↓ choose · ←→ change"
+	if m.page == pageTake {
+		keys = " · ctrl+r ctrl+p ctrl+e"
+	}
+	switch {
+	case w >= 100:
+		return name + keys + " · tab: " + next
+	case w >= 72:
+		return name + " · tab: " + next
+	}
+	return name + " · tab"
+}
+
+// pagePanel is the page on show. Every page is as tall as Mix, so Tab
+// never moves the rest of the screen.
+func (m *model) pagePanel() view.Element {
+	switch m.page {
+	case pageSound:
+		return m.soundPanel()
+	case pageTake:
+		return m.takePanel()
+	}
+	return m.mixPanel()
+}
+
+func (m *model) soundPanel() view.Element {
+	rows := make([]view.Element, 0, controls)
+	for r := range soundRows {
+		rows = append(rows, view.E(slider{
+			Label: soundNames[r], Value: m.soundFraction(r), Text: m.soundText(r),
+			Selected: r == m.soundSel,
+			OnSelect: func() { m.soundSel = r },
+			OnSet:    func(f float64) { m.setSoundFraction(r, f) },
+			OnNudge:  func(dir int) { m.nudgeSound(r, dir) },
+		}).WithKey(soundNames[r]))
+	}
+	notes := m.sound.StrumNotes(m.shown.chord)
+	rows = append(rows,
+		widget.Label(""),
+		view.E(widget.Text{Spans: []widget.Span{{Text: "Strumplate " + harp.NoteName(notes[0]) + " to " + harp.NoteName(notes[harp.Zones-1]), Style: styleMuted}}, Ellipsis: true}),
+	)
+	last := "Kept for the next run"
+	switch {
+	case m.soundNote != "":
+		last = m.soundNote
+	case m.settings == "":
+		last = "Not kept: no settings folder"
+	}
+	rows = append(rows, view.E(widget.Text{Spans: []widget.Span{{Text: last, Style: styleMuted}}, Ellipsis: true}))
+	return widget.Column(rows...)
+}
+
+var (
+	recOn   = cell.Style{Fg: cell.BrightWhite, Bg: cell.Red, Attrs: cell.Bold}
+	recMark = cell.Style{Fg: cell.BrightRed, Attrs: cell.Bold}
+)
+
+func (m *model) takePanel() view.Element {
+	st := m.shown.status
+	rec, recStyle := " ● Rec ", playOff
+	if st.Recording {
+		rec, recStyle = " ■ Stop ", recOn
+	}
+	play, playStyle := " ▶ Play ", playOff
+	if st.Playback {
+		play, playStyle = " ■ Stop ", playOn
+	}
+	buttons := view.E(widget.Flex{Dir: widget.Horizontal, Gap: 1},
+		view.E(pad{Label: rec, Style: recStyle, Lit: recStyle, HoverStyle: recOn, OnPress: m.toggleRecord}).WithKey("record"),
+		view.E(pad{Label: play, Style: playStyle, Lit: playStyle, HoverStyle: playOn, OnPress: m.togglePlay}).WithKey("play"),
+		view.E(pad{Label: " Save ", Style: playOff, Lit: playOff, HoverStyle: playOn, OnPress: m.save}).WithKey("save"),
+	)
+	var state widget.Span
+	switch {
+	case st.Recording:
+		state = widget.Span{Text: "● Recording " + clock(st.Position) + " of " + clock(harp.MaxTakeSeconds) + " max", Style: recMark}
+	case st.Playback:
+		state = widget.Span{Text: "▶ " + clock(st.Position) + " of " + clock(st.Length), Style: beatOn}
+	case st.HasTake:
+		state = widget.Span{Text: "Take " + clock(st.Length) + " · ctrl+p plays it", Style: cell.Style{}}
+	default:
+		state = widget.Span{Text: "No take yet · ctrl+r records", Style: styleMuted}
+	}
+	lines, _ := m.note.get()
+	line := func(s string, st cell.Style) view.Element {
+		return view.E(widget.Text{Spans: []widget.Span{{Text: s, Style: st}}, Ellipsis: true})
+	}
+	var keys []widget.Span
+	for i, h := range [][2]string{{"ctrl+r", "record"}, {"ctrl+p", "play"}, {"ctrl+e", "save"}} {
+		if i > 0 {
+			keys = append(keys, widget.Span{Text: "  "})
+		}
+		keys = append(keys, widget.Span{Text: h[0], Style: widget.Theme.Accent}, widget.Span{Text: " " + h[1], Style: widget.Theme.Muted})
+	}
+	return widget.Column(
+		buttons,
+		view.E(widget.Text{Spans: []widget.Span{state}, Ellipsis: true}),
+		line(lines[0], cell.Style{}),
+		line(lines[1], styleMuted),
+		widget.Limit(0, 2, view.E(widget.Text{Spans: keys, Wrap: true})),
 	)
 }
 
@@ -412,19 +841,27 @@ func (m *model) tooSmall(w, h int) view.Element {
 }
 
 func (m *model) header() view.Element {
+	d := m.shown
 	spans := []widget.Span{{Text: " chordharp ", Style: styleBadge}, {Text: "  "}}
+	// The take's state goes first, so a narrow screen cuts the rest.
+	switch st := d.status; {
+	case st.Recording:
+		spans = append(spans, widget.Span{Text: "● REC " + clock(st.Position), Style: recMark}, widget.Span{Text: "  "})
+	case st.Playback:
+		spans = append(spans, widget.Span{Text: "▶ take " + clock(st.Position) + " / " + clock(st.Length), Style: beatOn}, widget.Span{Text: "  "})
+	}
 	switch {
-	case m.held:
-		spans = append(spans, widget.Span{Text: m.chord.Long(), Style: styleChord},
-			widget.Span{Text: "  " + m.chord.Tones(), Style: styleMuted})
-	case !m.played:
+	case d.held:
+		spans = append(spans, widget.Span{Text: d.chord.Long(), Style: styleChord},
+			widget.Span{Text: "  " + d.chord.Tones(), Style: styleMuted})
+	case !m.played && !d.status.Playback:
 		spans = append(spans, widget.Span{Text: "Pick a chord, then strum", Style: styleAccent})
 	default:
-		spans = append(spans, widget.Span{Text: "no chord held · plate tuned to " + m.chord.String(), Style: styleMuted})
+		spans = append(spans, widget.Span{Text: "no chord held · plate tuned to " + d.chord.String(), Style: styleMuted})
 	}
 	rhythm := "rhythm off"
-	if m.playing {
-		rhythm = fmt.Sprintf("%s %0.f bpm", strings.ToLower(harp.Patterns[m.pattern].Name), m.values[ctlTempo])
+	if d.playing {
+		rhythm = fmt.Sprintf("%s %0.f bpm", strings.ToLower(harp.Patterns[d.pattern].Name), d.tempo)
 	}
 	spans = append(spans, widget.Span{Text: " · " + rhythm})
 	// The audio state stays whole at the right, so a silent instrument
@@ -458,7 +895,7 @@ func (m *model) chordGrid(d density) view.Element {
 			cells = append(cells, widget.Grow(1, view.E(pad{
 				Label: c.String(), Hint: string(keys[i]), Inline: inline, Height: height,
 				Style: padIdle, Lit: litStyle(harp.Kind(kind)), HoverStyle: padHover, HintStyle: padHint,
-				On:      m.held && m.chord == c,
+				On:      m.shown.held && m.shown.chord == c,
 				OnPress: func() { m.click(c) },
 			}).WithKey(c.String())))
 		}
@@ -469,7 +906,16 @@ func (m *model) chordGrid(d density) view.Element {
 
 func (m *model) plate() view.Element {
 	now := m.now()
-	p := plate{Notes: harp.StrumNotes(m.chord), OnZone: func(z int) { m.pluck(z, 0) }}
+	p := plate{Notes: m.sound.StrumNotes(m.shown.chord), OnZone: func(z int) { m.pluck(z, 0) }}
+	if m.shown.status.Playback {
+		// The take's plucks, timed by the engine.
+		for z, since := range m.shown.status.Since {
+			if age := time.Duration(since * float64(time.Second)); age >= 0 && age < glowFor {
+				p.Glow[z] = 1 - float64(age)/float64(glowFor)
+			}
+		}
+		return view.E(p).WithKey("plate")
+	}
 	for z, at := range m.plucked {
 		if at.IsZero() {
 			continue
@@ -483,14 +929,14 @@ func (m *model) plate() view.Element {
 
 func (m *model) rhythmPanel(width int) view.Element {
 	label, style := " ▶ Start ", playOff
-	if m.playing {
+	if m.shown.playing {
 		label, style = " ■ Stop ", playOn
 	}
 	start := view.E(pad{Label: label, Style: style, Lit: style, HoverStyle: playOn, OnPress: m.toggleRhythm}).WithKey("start")
 
 	// The beat in play is a diamond, the others dots, so the count reads
 	// without color too.
-	pat := harp.Patterns[m.pattern]
+	pat := harp.Patterns[m.shown.pattern]
 	beat := -1
 	if step := m.eng.Step(); step >= 0 {
 		beat = step / pat.PerBeat
@@ -512,7 +958,7 @@ func (m *model) rhythmPanel(width int) view.Element {
 	var names []view.Element
 	for i, p := range harp.Patterns {
 		st, mark := patternIdle, "○ "
-		if i == m.pattern {
+		if i == m.shown.pattern {
 			st, mark = patternOn, "● "
 		}
 		names = append(names, view.E(pad{Label: mark + p.Name, Style: st, Lit: st, HoverStyle: padHover, OnPress: func() { m.choosePattern(i) }}).WithKey(p.Name))
@@ -607,7 +1053,7 @@ func (m *model) footer(width int) view.Element {
 	right := hintSpans([2]string{"?", "help"}, [2]string{"ctrl+c", "quit"})
 	room := width - spansWidth(right)
 	var left []widget.Span
-	for _, h := range [][2]string{{"q-o a-l z-.", "chords"}, {"1-=", "strum"}, {"esc", "release"}, {"space", "rhythm"}, {"/", "glide"}} {
+	for _, h := range [][2]string{{"q-o a-l z-.", "chords"}, {"1-=", "strum"}, {"esc", "release"}, {"space", "rhythm"}, {"tab", "sound, take"}, {"/", "glide"}} {
 		spans := hintSpans(h)
 		if spansWidth(left)+spansWidth(spans) > room {
 			break
@@ -632,6 +1078,11 @@ var helpEntries = [][2]string{
 	{"p", "Next rhythm pattern; or click one"},
 	{"[ and ]", "Slower and faster"},
 	{"↑ ↓ and ← →", "Choose a mix control, then change it. Click a name to choose it; click, drag or scroll its bar to set it."},
+	{"Tab", "Switch the panel beside the rhythm between Mix, Sound and Take. Shift+Tab goes back."},
+	{"Sound page", "Choose a preset (Classic, Bright, High) or set the octave and tone. The sound is kept for the next run."},
+	{"Ctrl+R", "Start recording a take, or stop. A take stops itself at 5 minutes."},
+	{"Ctrl+P", "Play the take back, or stop. Playing a chord, strumming or a rhythm key also stops it."},
+	{"Ctrl+E", "Save the take as a MIDI file and a WAV file, named for the time."},
 	{"?", "This help. ↑ ↓ and PgUp PgDn scroll it; Esc or Enter closes it."},
 	{"Ctrl+C", "Quit"},
 }

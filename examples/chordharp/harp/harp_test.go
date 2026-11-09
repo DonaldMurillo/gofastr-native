@@ -11,7 +11,7 @@ func TestStrumNotesAreChordTonesAscending(t *testing.T) {
 	for _, root := range Roots {
 		for kind := Major; kind <= Seventh; kind++ {
 			c := Chord{Root: root, Kind: kind}
-			notes := StrumNotes(c)
+			notes := Classic.StrumNotes(c)
 			for i, n := range notes {
 				if !c.has(n % 12) {
 					t.Fatalf("%v zone %d: %s is not in the chord", c, i, NoteName(n))
@@ -26,7 +26,7 @@ func TestStrumNotesAreChordTonesAscending(t *testing.T) {
 		}
 	}
 	// C major from G3: G C E, four times over.
-	got := StrumNotes(Chord{Root: 0, Kind: Major})
+	got := Classic.StrumNotes(Chord{Root: 0, Kind: Major})
 	want := [Zones]int{55, 60, 64, 67, 72, 76, 79, 84, 88, 91, 96, 100}
 	if got != want {
 		t.Fatalf("C major plate %v, want %v", got, want)
@@ -34,7 +34,7 @@ func TestStrumNotesAreChordTonesAscending(t *testing.T) {
 }
 
 func TestBassAndTones(t *testing.T) {
-	if got := BassNote(Chord{Root: 9, Kind: Minor}, '3'); got%12 != 0 {
+	if got := Classic.BassNote(Chord{Root: 9, Kind: Minor}, '3'); got%12 != 0 {
 		t.Errorf("A minor third is %s, want C", NoteName(got))
 	}
 	if got := (Chord{Root: 10, Kind: Major}).Tones(); got != "Bb D F" {
@@ -108,7 +108,7 @@ func TestPluckDecaysWithSustain(t *testing.T) {
 		p := e.Params()
 		p.Sustain = sustain
 		e.Set(p)
-		e.Pluck(60, 0)
+		e.Pluck(1, 0) // C4 on the C major plate
 		// Plucks drop at -80 dB, a third past the -60 dB sustain time.
 		s := render(e, sustain*1.4)
 		checkSamples(t, s)
@@ -126,7 +126,7 @@ func TestPluckDecaysWithSustain(t *testing.T) {
 
 func TestPluckDelayIsSampleAccurate(t *testing.T) {
 	e := NewEngine(rate)
-	e.Pluck(72, 0.1)
+	e.Pluck(4, 0.1)
 	s := render(e, 0.2)
 	first := -1
 	for i, v := range s {
@@ -171,7 +171,7 @@ func TestEngineStaysInRangeUnderLoad(t *testing.T) {
 	e.Set(p)
 	e.SetChord(Chord{Root: 7, Kind: Seventh}, true)
 	for i := range 100 {
-		e.Pluck(StrumNotes(Chord{Root: 7, Kind: Seventh})[i%Zones], float64(i)*0.005)
+		e.Pluck(i%Zones, float64(i)*0.005)
 	}
 	checkSamples(t, render(e, 1))
 	if v := e.Voices(); v > maxPlucks {

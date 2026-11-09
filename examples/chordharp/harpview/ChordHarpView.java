@@ -2,7 +2,9 @@ package dev.gofastr.nativeui;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.ClipData;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
@@ -11,6 +13,7 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
@@ -21,10 +24,15 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.ScrollView;
+import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import chordharp.Chordharp;
 
@@ -39,9 +47,14 @@ import chordharp.Chordharp;
  * on, a tap holds the chord until the pad is tapped again. The strumplate's
  * twelve zones run low at the bottom to high at the top; dragging across
  * it plucks every zone passed.
+ *
+ * Below the transport, Rec records a take, Play plays it back, Share
+ * exports it as MIDI and WAV to the share sheet, and Sound opens a panel
+ * over the grid with the presets, the octave and the tone.
  */
 final class ChordHarpView extends View {
     private static final int BODY = 0xff16151a, PANEL = 0xff221f27, LINE = 0xff3a3542, INK = 0xfff3efe6, MUTED = 0xffa59fae;
+    private static final int ACCENT = 0xfff0a64a, REC = 0xffe5484d;
     private static final int[] ROW = {0xffffc857, 0xff5bc0eb, 0xffe36bae}; // major, minor, seventh
     private static final int ZONES = 12;
 
@@ -49,7 +62,7 @@ final class ChordHarpView extends View {
     private final float density;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), text = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private String[] kinds = new String[0], patterns = new String[0];
+    private String[] kinds = new String[0], patterns = new String[0], presets = new String[0];
     private String[][] chords = new String[0][];
     private JSONObject state = new JSONObject();
 
@@ -57,7 +70,15 @@ final class ChordHarpView extends View {
     private final RectF grid = new RectF(), plate = new RectF();
     private boolean portrait;
     private final List<Control> controls = new ArrayList<>();
-    private RectF beatsRect, chordRect, patternRect, tempoRect;
+    private RectF beatsRect, chordRect, patternRect, tempoRect, takeRect;
+
+    // The Sound panel, drawn over the grid while it is open.
+    private boolean soundOpen;
+    private final List<Control> soundControls = new ArrayList<>();
+    private RectF soundTitle, octaveLabel, octaveValue, toneLabel, toneValue;
+
+    // An export for the share sheet is running on a worker.
+    private volatile boolean sharing;
 
     // Pointers: which pad, zone or control each finger is on.
     private final SparseArray<int[]> padPointers = new SparseArray<>();
@@ -100,8 +121,10 @@ final class ChordHarpView extends View {
         JSONArray k = payload.optJSONArray("kinds"), c = payload.optJSONArray("chords"), p = payload.optJSONArray("patterns");
         kinds = strings(k);
         patterns = strings(p);
+        presets = strings(payload.optJSONArray("presets"));
         chords = new String[c == null ? 0 : c.length()][];
         for (int i = 0; i < chords.length; i++) chords[i] = strings(c.optJSONArray(i));
+        if (getWidth() > 0) place(getWidth(), getHeight());
         refresh();
     }
 
@@ -112,14 +135,33 @@ final class ChordHarpView extends View {
     }
 
     private void refresh() {
+        readState();
+        invalidate();
+    }
+
+    private void readState() {
         try { state = new JSONObject(Chordharp.state()); } catch (Exception e) { state = new JSONObject(); }
         JSONArray zones = state.optJSONArray("zones");
         String chord = state.optString("chord");
+        // No running clock here: a description that changes every second
+        // would be read out again and again.
+        String take = state.optBoolean("recording") ? " Recording a take."
+            : state.optBoolean("playback") ? " Playing the take back."
+            : state.optBoolean("hasTake") ? " A take of " + clock(state.optDouble("length")) + " is recorded." : "";
         setContentDescription("Chord harp. " + (state.optBoolean("held") ? chord + " held, " + state.optString("tones") : "No chord held")
             + ". Rhythm " + (state.optBoolean("playing") ? "playing" : "stopped") + ", " + pattern() + " at " + state.optInt("tempo") + " beats per minute."
-            + (zones != null ? " Strumplate from " + zones.optString(0) + " to " + zones.optString(zones.length() - 1) + "." : ""));
-        invalidate();
+            + (zones != null ? " Strumplate from " + zones.optString(0) + " to " + zones.optString(zones.length() - 1) + "." : "")
+            + " Sound " + state.optString("sound") + "." + take);
     }
+
+    /** The take's clock: seconds as m:ss. */
+    private static String clock(double seconds) {
+        int s = (int) Math.max(seconds, 0);
+        return String.format(Locale.ROOT, "%d:%02d", s / 60, s % 60);
+    }
+
+    /** A take is recording or playing, so the state changes without a touch. */
+    private boolean live() { return state.optBoolean("recording") || state.optBoolean("playback"); }
 
     private String pattern() {
         int i = state.optInt("pattern");
@@ -155,13 +197,18 @@ final class ChordHarpView extends View {
     // rotation changes it: measure again after the scroller's layout.
     private final OnLayoutChangeListener resize = (v, l, t, r, b, ol, ot, or, ob) -> { if (b - t != ob - ot) post(this::requestLayout); };
 
-    @Override protected void onSizeChanged(int w, int h, int ow, int oh) {
+    @Override protected void onSizeChanged(int w, int h, int ow, int oh) { place(w, h); }
+
+    private void place(int w, int h) {
         float pad = dp(10), gap = dp(10);
         portrait = h > w;
         controls.clear();
         float barTop = pad, row = dp(48);
+        // A narrow screen splits the transport over two rows. The take's
+        // row goes under it either way.
         boolean twoRows = w < dp(600);
-        float barBottom = barTop + row * (twoRows ? 2 : 1) + (twoRows ? dp(6) : 0);
+        int rows = twoRows ? 3 : 2;
+        float barBottom = barTop + row * rows + dp(6) * (rows - 1);
         // Row one: transport and pattern.
         float x = pad, y = barTop;
         controls.add(new Control("toggle", new RectF(x, y, x + dp(92), y + row)));
@@ -192,49 +239,158 @@ final class ChordHarpView extends View {
             x += dp(76) + gap;
         }
         chordRect = new RectF(x, y, w - pad, y + row);
+        // The take: four buttons, and its state where there is room.
+        y += row + dp(6);
+        x = pad;
+        float button = Math.min(dp(104), (w - 2 * pad - 3 * gap) / 4f);
+        for (String id : new String[]{"rec", "play", "share", "sound"}) {
+            controls.add(new Control(id, new RectF(x, y, x + button, y + row)));
+            x += button + gap;
+        }
+        takeRect = new RectF(x, y, w - pad, y + row);
 
         float top = barBottom + gap, bottom = h - pad;
         float plateWidth = Math.max(dp(110), (w - 2 * pad) * (portrait ? 0.32f : 0.3f));
         plate.set(w - pad - plateWidth, top, w - pad, bottom);
         grid.set(pad, top, plate.left - gap, bottom);
+        placeSound();
+    }
+
+    /** Lays the Sound panel over the grid: a title, the presets, then octave and tone steppers. */
+    private void placeSound() {
+        soundControls.clear();
+        float gap = dp(8), inner = dp(10);
+        RectF g = new RectF(grid.left + inner, grid.top + inner, grid.right - inner, grid.bottom - inner);
+        float row = Math.max(dp(32), Math.min(dp(48), (g.height() - 3 * gap) / 4f));
+        float y = g.top;
+        float done = Math.min(dp(84), g.width() / 3f);
+        soundTitle = new RectF(g.left, y, g.right - done - gap, y + row);
+        soundControls.add(new Control("done", new RectF(g.right - done, y, g.right, y + row)));
+        y += row + gap;
+        int n = Math.max(presets.length, 1);
+        float pw = (g.width() - (n - 1) * gap) / n;
+        for (int i = 0; i < presets.length; i++) {
+            float x = g.left + i * (pw + gap);
+            soundControls.add(new Control("preset" + i, new RectF(x, y, x + pw, y + row)));
+        }
+        y += row + gap;
+        float step = Math.min(dp(56), g.width() / 5f), name = Math.min(dp(96), g.width() / 3f);
+        RectF[] labels = new RectF[2], values = new RectF[2];
+        String[] ids = {"octave", "tone"};
+        for (int i = 0; i < 2; i++) {
+            labels[i] = new RectF(g.left, y, g.left + name, y + row);
+            soundControls.add(new Control(ids[i] + "-", new RectF(g.left + name, y, g.left + name + step, y + row)));
+            values[i] = new RectF(g.left + name + step, y, g.right - step, y + row);
+            soundControls.add(new Control(ids[i] + "+", new RectF(g.right - step, y, g.right, y + row)));
+            y += row + gap;
+        }
+        octaveLabel = labels[0];
+        octaveValue = values[0];
+        toneLabel = labels[1];
+        toneValue = values[1];
     }
 
     // ---- drawing -------------------------------------------------------
 
     @Override protected void onDraw(Canvas canvas) {
         long now = SystemClock.uptimeMillis();
+        // While a take records or plays, the chord, rhythm and clock move
+        // on their own: read them every frame until it ends.
+        boolean live = live();
+        if (live) readState();
         fill.setColor(BODY);
         canvas.drawRoundRect(0, 0, getWidth(), getHeight(), dp(16), dp(16), fill);
         drawBar(canvas);
         drawGrid(canvas);
+        if (soundOpen) drawSound(canvas);
         boolean glowing = drawPlate(canvas, now);
-        if (glowing || state.optBoolean("playing")) postInvalidateOnAnimation();
+        if (glowing || live || live() || state.optBoolean("playing")) postInvalidateOnAnimation();
     }
 
     private void drawBar(Canvas canvas) {
-        boolean playing = state.optBoolean("playing"), latch = state.optBoolean("latch");
-        for (Control c : controls) {
-            boolean pressed = controlPointers.indexOfValue(c) >= 0;
-            boolean on = c.id.equals("toggle") && playing || c.id.equals("latch") && latch;
-            fill.setColor(on ? 0xfff0a64a : pressed ? LINE : PANEL);
-            canvas.drawRoundRect(inset(c.rect, dp(3)), dp(10), dp(10), fill);
-            String label;
-            switch (c.id) {
-                case "toggle": label = playing ? "■ Stop" : "▶ Start"; break;
-                case "pattern-": label = "‹"; break;
-                case "pattern+": label = "›"; break;
-                case "tempo-": label = "−"; break;
-                case "tempo+": label = "+"; break;
-                default: label = "Latch";
-            }
-            label(canvas, label, c.rect, on ? BODY : INK, c.id.endsWith("-") || c.id.endsWith("+") ? 22 : 15);
-        }
         label(canvas, pattern(), patternRect, INK, 15);
+        for (Control c : controls) drawControl(canvas, c);
         label(canvas, state.optInt("tempo") + " bpm", tempoRect, INK, 15);
         drawBeats(canvas);
         text.setTextAlign(Paint.Align.RIGHT);
         label(canvas, chordReadout(), chordRect, state.optBoolean("held") ? INK : MUTED, 15);
+        if (takeRect.width() > dp(72)) label(canvas, ellipsize(takeReadout(), takeRect.width() - dp(4), 14), takeRect, live() ? INK : MUTED, 14);
         text.setTextAlign(Paint.Align.CENTER);
+    }
+
+    private void drawControl(Canvas canvas, Control c) {
+        boolean pressed = controlPointers.indexOfValue(c) >= 0;
+        int on = onColor(c);
+        // The Sound panel is PANEL colored, so its buttons sit darker on it.
+        int base = soundControls.contains(c) ? BODY : PANEL;
+        fill.setColor(on != 0 ? on : pressed ? LINE : base);
+        canvas.drawRoundRect(inset(c.rect, dp(3)), dp(10), dp(10), fill);
+        boolean idle = (c.id.equals("play") || c.id.equals("share")) && !state.optBoolean("hasTake");
+        float sp = c.id.endsWith("-") || c.id.endsWith("+") ? 22 : 15;
+        label(canvas, ellipsize(controlLabel(c), c.rect.width() - dp(8), sp), c.rect, on != 0 ? BODY : idle ? MUTED : INK, sp);
+    }
+
+    /** The color of a control that is on, or 0. */
+    private int onColor(Control c) {
+        switch (c.id) {
+            case "toggle": return state.optBoolean("playing") ? ACCENT : 0;
+            case "latch": return state.optBoolean("latch") ? ACCENT : 0;
+            case "rec": return state.optBoolean("recording") ? REC : 0;
+            case "play": return state.optBoolean("playback") ? ACCENT : 0;
+            case "sound": return soundOpen ? ACCENT : 0;
+        }
+        if (c.id.startsWith("preset")) return state.optInt("preset", -1) == presetIndex(c) ? ACCENT : 0;
+        return 0;
+    }
+
+    private static int presetIndex(Control c) { return Integer.parseInt(c.id.substring("preset".length())); }
+
+    private String controlLabel(Control c) {
+        switch (c.id) {
+            case "toggle": return state.optBoolean("playing") ? "■ Stop" : "▶ Start";
+            case "pattern-": return "‹";
+            case "pattern+": return "›";
+            case "tempo-": case "octave-": case "tone-": return "−";
+            case "tempo+": case "octave+": case "tone+": return "+";
+            case "latch": return "Latch";
+            case "rec": return state.optBoolean("recording") ? "■ " + clock(state.optDouble("position")) : "● Rec";
+            case "play": return state.optBoolean("playback") ? "■ " + clock(state.optDouble("position")) : "▶ Play";
+            case "share": return sharing ? "Saving…" : "Share";
+            case "sound": return "Sound";
+            case "done": return "Done";
+        }
+        int i = presetIndex(c);
+        return i < presets.length ? presets[i] : "";
+    }
+
+    /** The take's state, for the space beside its buttons. */
+    private String takeReadout() {
+        double length = state.optDouble("length");
+        if (state.optBoolean("recording")) return "Recording " + clock(state.optDouble("position")) + " of 5:00";
+        if (state.optBoolean("playback")) return "Take " + clock(state.optDouble("position")) + " / " + clock(length);
+        if (state.optBoolean("hasTake")) return "Take " + clock(length);
+        return "Nothing recorded";
+    }
+
+    private void drawSound(Canvas canvas) {
+        fill.setColor(BODY);
+        canvas.drawRoundRect(grid, dp(14), dp(14), fill);
+        fill.setColor(PANEL);
+        canvas.drawRoundRect(inset(grid, dp(2)), dp(14), dp(14), fill);
+        text.setTextAlign(Paint.Align.LEFT);
+        text.setTextSize(17 * density);
+        text.setColor(INK);
+        String title = ellipsize("Sound · " + state.optString("sound"), soundTitle.width(), 17);
+        canvas.drawText(title, soundTitle.left + dp(4), soundTitle.centerY() - (text.descent() + text.ascent()) / 2, text);
+        text.setTextSize(15 * density);
+        text.setColor(MUTED);
+        canvas.drawText("Octave", octaveLabel.left + dp(4), octaveLabel.centerY() - (text.descent() + text.ascent()) / 2, text);
+        canvas.drawText("Tone", toneLabel.left + dp(4), toneLabel.centerY() - (text.descent() + text.ascent()) / 2, text);
+        text.setTextAlign(Paint.Align.CENTER);
+        int octave = state.optInt("octave");
+        label(canvas, (octave > 0 ? "+" : "") + octave, octaveValue, INK, 17);
+        label(canvas, state.optInt("tone") + "%", toneValue, INK, 17);
+        for (Control c : soundControls) drawControl(canvas, c);
     }
 
     private void drawBeats(Canvas canvas) {
@@ -287,10 +443,12 @@ final class ChordHarpView extends View {
         JSONArray zones = state.optJSONArray("zones");
         float h = plate.height() / ZONES;
         boolean glowing = false;
+        // A take playing back lights the zones it plucks.
+        JSONArray since = state.optBoolean("playback") ? state.optJSONArray("since") : null;
         for (int z = 0; z < ZONES; z++) {
             float bottom = plate.bottom - z * h, top = bottom - h;
-            float age = (now - glow[z]) / 600f;
-            boolean lit = glow[z] > 0 && age < 1;
+            float age = since != null ? (float) (since.optDouble(z, 60) / 0.6) : (now - glow[z]) / 600f;
+            boolean lit = (since != null || glow[z] > 0) && age >= 0 && age < 1;
             if (lit) {
                 glowing = true;
                 fill.setColor(blend(color, PANEL, 0.85f * (1 - age)));
@@ -378,6 +536,17 @@ final class ChordHarpView extends View {
     }
 
     private void down(int id, float x, float y) {
+        if (soundOpen && grid.contains(x, y)) {
+            // The panel covers the grid: its buttons work, the pads under it do not.
+            for (Control c : soundControls) {
+                if (c.rect.contains(x, y)) {
+                    controlPointers.put(id, c);
+                    invalidate();
+                    return;
+                }
+            }
+            return;
+        }
         int[] pad = padAt(x, y);
         if (pad != null) {
             boolean latch = state.optBoolean("latch");
@@ -465,9 +634,75 @@ final class ChordHarpView extends View {
                 Chordharp.setLatch(on);
                 if (!on && padOrder.isEmpty()) Chordharp.release();
                 break;
+            case "rec": Chordharp.record(); break;
+            case "play":
+                if (state.optBoolean("hasTake")) Chordharp.playTake();
+                else tell("Nothing recorded yet. Rec records a take.");
+                break;
+            case "share": share(); break;
+            case "sound": soundOpen = !soundOpen; break;
+            case "done": soundOpen = false; break;
+            case "octave-": Chordharp.nudgeOctave(-1); break;
+            case "octave+": Chordharp.nudgeOctave(1); break;
+            case "tone-": Chordharp.nudgeTone(-1); break;
+            case "tone+": Chordharp.nudgeTone(1); break;
+            default:
+                if (c.id.startsWith("preset")) Chordharp.setPreset(presetIndex(c));
         }
         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
         refresh();
+    }
+
+    private void tell(String message) { Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show(); }
+
+    /**
+     * Exports the take as MIDI and WAV into the private transfer folder on
+     * a worker, then offers both to the share sheet. A five-minute take is
+     * about 27 MB of WAV and takes a few seconds.
+     */
+    private void share() {
+        if (sharing) return;
+        if (!state.optBoolean("hasTake")) {
+            tell("Nothing recorded yet. Rec records a take.");
+            return;
+        }
+        sharing = true;
+        String name = "chordharp-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
+        host.workers.execute(() -> {
+            File mid = null, wav = null;
+            try {
+                mid = TransferProvider.create(host, name + ".mid");
+                wav = TransferProvider.create(host, name + ".wav");
+                Chordharp.export(mid.getPath(), wav.getPath());
+                ArrayList<Uri> uris = new ArrayList<>();
+                uris.add(TransferProvider.uri(host, mid));
+                uris.add(TransferProvider.uri(host, wav));
+                Intent send = new Intent(Intent.ACTION_SEND_MULTIPLE).setType("audio/*");
+                send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+                send.putExtra(Intent.EXTRA_SUBJECT, name);
+                ClipData clip = ClipData.newRawUri(name, uris.get(0));
+                clip.addItem(new ClipData.Item(uris.get(1)));
+                send.setClipData(clip);
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                post(() -> {
+                    sharing = false;
+                    invalidate();
+                    try { host.startActivity(Intent.createChooser(send, "Share take")); }
+                    catch (Exception e) { tell("No app here can take the files."); }
+                });
+            } catch (Exception e) {
+                TransferProvider.remove(mid);
+                TransferProvider.remove(wav);
+                android.util.Log.w("gofastr-native", "chord harp export failed", e);
+                String why = e.getMessage();
+                post(() -> {
+                    sharing = false;
+                    invalidate();
+                    tell("The take was not saved: " + why);
+                });
+            }
+        });
+        invalidate();
     }
 
     private void pluck(int zone, double delay) {

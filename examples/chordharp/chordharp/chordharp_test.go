@@ -3,7 +3,11 @@ package chordharp
 import (
 	"encoding/binary"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
 )
 
 func decode(t *testing.T) state {
@@ -34,7 +38,7 @@ func TestPlaying(t *testing.T) {
 	}
 	Hold(1, 6) // A minor
 	s := decode(t)
-	if !s.Held || s.Chord != "A minor" || s.Tones != "A C E" || s.Short != "Am" || s.Zones[0] != "A3" {
+	if !s.Held || s.Chord != "A minor" || s.Tones != "A C E" || s.Short != "Am" || s.Zones[0] != "A4" || s.Sound != "Bright" {
 		t.Fatalf("after Hold: %+v", s)
 	}
 	Pluck(0, 0)
@@ -112,4 +116,104 @@ func TestScreenRenders(t *testing.T) {
 	if screen.Title != "Chord Harp" || len(screen.Components) != 1 || screen.Components[0].Name != "dev.gofastr.chordharp/v1" {
 		t.Fatalf("screen %s", out)
 	}
+}
+
+func TestSoundSettingsAreKept(t *testing.T) {
+	dir := t.TempDir()
+	if err := Start(dir); err != nil {
+		t.Fatal(err)
+	}
+	Open(44100)
+	if s := decode(t); s.Sound != "Bright" || s.Preset != 1 || s.Octave != 1 || s.Tone != 60 {
+		t.Fatalf("first start: %+v", s)
+	}
+	SetPreset(0)
+	if s := decode(t); s.Sound != "Classic" || s.Zones[0] == "" || s.Octave != 0 {
+		t.Fatalf("Classic: %+v", s)
+	}
+	SetPreset(9)
+	for range 5 {
+		NudgeOctave(-1)
+		NudgeTone(1)
+	}
+	if s := decode(t); s.Octave != harp.MinOctave || s.Tone != 80 || s.Sound != "Custom" || s.Preset != -1 {
+		t.Fatalf("after nudges: %+v", s)
+	}
+	for range 20 {
+		NudgeTone(1)
+	}
+	if decode(t).Tone != 100 {
+		t.Fatal("tone above 100")
+	}
+	Stop()
+
+	// The next start reads the saved sound.
+	play.params.Sound = harp.DefaultSound()
+	if err := Start(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		Stop()
+		play.Lock()
+		play.settings = ""
+		play.Unlock()
+		SetPreset(1)
+	}()
+	if s := decode(t); s.Octave != harp.MinOctave || s.Tone != 100 {
+		t.Fatalf("after restart: %+v", s)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "chordharp", "settings.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRecordPlayAndExport(t *testing.T) {
+	Open(44100)
+	Release()
+	if s := decode(t); s.Recording || s.Playback {
+		t.Fatalf("idle: %+v", s)
+	}
+	Record()
+	Hold(0, 3) // C major
+	Fill(4410)
+	Pluck(4, 0)
+	Fill(4410)
+	if s := decode(t); !s.Recording || s.Position < 0.19 {
+		t.Fatalf("recording: %+v", s)
+	}
+	// A new engine, as after a pause, ends the recording and keeps it.
+	Open(48000)
+	if s := decode(t); s.Recording || !s.HasTake || s.Length < 0.19 {
+		t.Fatalf("after Open: %+v", s)
+	}
+
+	Hold(1, 6) // A minor, live
+	PlayTake()
+	Fill(2400)
+	s := decode(t)
+	if !s.Playback || s.Short != "C" || s.Column != 3 || len(s.Since) != harp.Zones {
+		t.Fatalf("playing back: %+v", s)
+	}
+	Fill(9600)
+	if s := decode(t); s.Playback || s.Short != "Am" {
+		t.Fatalf("after the take: %+v", s)
+	}
+	PlayTake()
+	PlayTake()
+	if decode(t).Playback {
+		t.Fatal("PlayTake did not stop playback")
+	}
+
+	dir := t.TempDir()
+	mid, wav := filepath.Join(dir, "take.mid"), filepath.Join(dir, "take.wav")
+	if err := Export(mid, wav); err != nil {
+		t.Fatal(err)
+	}
+	for path, magic := range map[string]string{mid: "MThd", wav: "RIFF"} {
+		b, err := os.ReadFile(path)
+		if err != nil || len(b) < 100 || string(b[:4]) != magic {
+			t.Fatalf("%s: %d bytes, %v", filepath.Base(path), len(b), err)
+		}
+	}
+	Release()
 }

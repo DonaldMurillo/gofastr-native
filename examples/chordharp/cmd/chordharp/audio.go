@@ -116,11 +116,54 @@ func (p *pipeOutput) Close() error {
 	return nil
 }
 
-// silent is the output when audio is off or unavailable.
-type silent struct{ reason string }
+// silent is the output when audio is off or unavailable. It still runs
+// the engine in real time, so the rhythm, a recording and playback move
+// on as they would with sound.
+type silent struct {
+	reason string
+	done   chan struct{}
+	once   sync.Once
+}
 
-func (s silent) Name() string { return s.reason }
-func (silent) Close() error   { return nil }
+func openSilent(e *harp.Engine, reason string) *silent {
+	s := &silent{reason: reason, done: make(chan struct{})}
+	if e != nil {
+		go s.clock(e)
+	}
+	return s
+}
+
+func (s *silent) clock(e *harp.Engine) {
+	samples := make([]float32, 1024)
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	start := time.Now()
+	var rendered int64
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-tick.C:
+		}
+		due := int64(time.Since(start) * sampleRate / time.Second)
+		if due-rendered > sampleRate {
+			// Fell behind (the machine slept): skip ahead.
+			rendered = due - sampleRate/10
+		}
+		for rendered < due {
+			n := min(int64(len(samples)), due-rendered)
+			e.Render(samples[:n])
+			rendered += n
+		}
+	}
+}
+
+func (s *silent) Name() string { return s.reason }
+
+func (s *silent) Close() error {
+	s.once.Do(func() { close(s.done) })
+	return nil
+}
 
 // openAudio opens the native output if there is one, then a player.
 func openAudio(e *harp.Engine) (output, error) {

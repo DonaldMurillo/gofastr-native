@@ -573,7 +573,7 @@ func TestHelpScrollsByKeyboard(t *testing.T) {
 		if !s.shows("PgDn scroll ·") {
 			t.Fatalf("no scroll hint:\n%s", s.text())
 		}
-		for range 30 {
+		for range 60 {
 			s.send(input.Key{Code: k})
 		}
 		if !s.shows("Ctrl+C") || !s.m.help {

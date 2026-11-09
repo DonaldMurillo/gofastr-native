@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
@@ -19,21 +20,35 @@ import (
 
 func main() {
 	quiet := flag.Bool("silent", false, "run without sound")
+	takes := flag.String("takes", ".", "the folder Ctrl+E saves takes in")
 	flag.Parse()
 
 	eng := harp.NewEngine(sampleRate)
-	var out output = silent{reason: "off (-silent)"}
-	if !*quiet {
+	var out output
+	if *quiet {
+		out = openSilent(eng, "off (-silent)")
+	} else {
 		o, err := openAudio(eng)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "chordharp: no sound:", err)
-			o = silent{reason: "none"}
+			o = openSilent(eng, "none")
 		}
 		out = o
 	}
 	defer out.Close()
 
 	m := newModel(eng, out.Name(), time.Now)
+	m.takesDir = *takes
+	// The sound is kept in the user's config folder, when there is one.
+	if dir, err := os.UserConfigDir(); err == nil {
+		m.settings = filepath.Join(dir, "chordharp", "settings.json")
+		sound, err := harp.LoadSound(m.settings)
+		if err != nil {
+			m.soundNote = "Settings unreadable, using " + sound.Name()
+		}
+		m.sound = sound
+		m.apply()
+	}
 	err := app.Run(func(*app.App) view.Element { return m.view() }, app.Options{
 		// Terminals with the kitty keyboard protocol mark a held key's
 		// repeats, so quick taps of Space are never mistaken for one.

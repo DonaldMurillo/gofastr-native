@@ -1,5 +1,6 @@
 // Package harpview is the chord harp's instrument component: the chord
-// grid, the strumplate and the rhythm bar, drawn by a compiled Android view.
+// grid, the strumplate, the rhythm and take bar, and the sound panel,
+// drawn by a compiled Android view.
 // The view plays sound by calling the bound chordharp package directly, so
 // touches reach the synthesizer without a screen render in between.
 package harpview
@@ -8,6 +9,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"slices"
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
@@ -18,13 +20,15 @@ import (
 // Name is the component's rendering capability.
 const Name = "dev.gofastr.chordharp/v1"
 
-// Content is the instrument's static layout: the grid's labels and the
-// rhythm names. Live state (the held chord, tempo) stays in Go and the
-// view reads it through the bound package.
+// Content is the instrument's static layout: the grid's labels, the
+// rhythm names and the sound presets. Live state (the held chord, tempo,
+// sound, take) stays in Go and the view reads it through the bound
+// package.
 type Content struct {
 	Kinds    []string   `json:"kinds"`    // row labels, major first
 	Chords   [][]string `json:"chords"`   // chord names by kind, then column
 	Patterns []string   `json:"patterns"` // rhythm names in menu order
+	Presets  []string   `json:"presets"`  // sound preset names in menu order
 }
 
 //go:embed gofastr-native.extension.json *.java ChordHarp.swift harp.js
@@ -45,6 +49,9 @@ func Layout() Content {
 	}
 	for _, p := range harp.Patterns {
 		c.Patterns = append(c.Patterns, p.Name)
+	}
+	for _, p := range harp.Presets {
+		c.Presets = append(c.Presets, p.Name)
 	}
 	return c
 }
@@ -83,6 +90,9 @@ func validate(component extension.Component) error {
 	if len(c.Kinds) != int(harp.Kinds) || len(c.Chords) != int(harp.Kinds) || len(c.Patterns) == 0 || len(c.Patterns) > 16 {
 		return errors.New("harpview: expected three chord rows and 1 to 16 patterns")
 	}
+	if len(c.Presets) == 0 || len(c.Presets) > 6 {
+		return errors.New("harpview: expected 1 to 6 sound presets")
+	}
 	for _, row := range c.Chords {
 		if len(row) != len(harp.Roots) {
 			return errors.New("harpview: every chord row needs one chord per root")
@@ -93,7 +103,7 @@ func validate(component extension.Component) error {
 			}
 		}
 	}
-	for _, name := range append(append([]string(nil), c.Kinds...), c.Patterns...) {
+	for _, name := range slices.Concat(c.Kinds, c.Patterns, c.Presets) {
 		if name == "" || len(name) > 24 {
 			return errors.New("harpview: invalid label")
 		}

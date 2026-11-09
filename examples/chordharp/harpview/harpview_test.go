@@ -2,6 +2,7 @@ package harpview
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/extension"
@@ -19,17 +20,18 @@ func TestBlockCarriesTheGrid(t *testing.T) {
 	if got := [3]string{c.Chords[0][3], c.Chords[1][0], c.Chords[2][8]}; got != [3]string{"C", "Ebm", "B7"} {
 		t.Fatalf("grid corners %v", got)
 	}
-	if c.Kinds[2] != "7th" || c.Patterns[0] != "Rock" {
-		t.Fatalf("labels %v %v", c.Kinds, c.Patterns)
+	if c.Kinds[2] != "7th" || c.Patterns[0] != "Rock" || len(c.Presets) != 3 || c.Presets[1] != "Bright" {
+		t.Fatalf("labels %v %v %v", c.Kinds, c.Patterns, c.Presets)
 	}
 }
 
 func TestValidateRejectsOtherShapes(t *testing.T) {
 	good, _ := Block("instrument")
 	for name, component := range map[string]extension.Component{
-		"navigates": {ID: good.ID, Name: Name, Payload: good.Payload, Destinations: map[string]string{"x": "/x"}},
-		"short row": {ID: good.ID, Name: Name, Payload: `{"kinds":["a","b","c"],"chords":[["C"],["C"],["C"]],"patterns":["Rock"]}`},
-		"bad id":    {ID: "has space", Name: Name, Payload: good.Payload},
+		"navigates":  {ID: good.ID, Name: Name, Payload: good.Payload, Destinations: map[string]string{"x": "/x"}},
+		"short row":  {ID: good.ID, Name: Name, Payload: `{"kinds":["a","b","c"],"chords":[["C"],["C"],["C"]],"patterns":["Rock"],"presets":["Bright"]}`},
+		"no presets": {ID: good.ID, Name: Name, Payload: strings.Replace(good.Payload, `"presets":["Classic","Bright","High"]`, `"presets":[]`, 1)},
+		"bad id":     {ID: "has space", Name: Name, Payload: good.Payload},
 	} {
 		if validate(component) == nil {
 			t.Errorf("%s: accepted", name)

@@ -1,7 +1,7 @@
 // Package chordharp is the gomobile bind surface of the chord harp app.
 // The native host calls Start, Stop, Root, Render, Dispatch and Command.
-// The instrument view calls the rest from its touch handlers and audio
-// thread, so playing never waits on a screen render.
+// The instrument view calls the rest from its touch handlers, its audio
+// thread and its export worker, so playing never waits on a screen render.
 package chordharp
 
 import (
@@ -10,6 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"os"
+	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/chordharp/harp"
@@ -24,7 +27,7 @@ var host struct {
 	runtime *nativeui.Runtime
 }
 
-// Start builds the app. dataDir is unused: the instrument keeps nothing.
+// Start builds the app. The sound settings are kept in dataDir.
 func Start(dataDir string) error {
 	host.Lock()
 	defer host.Unlock()
@@ -39,6 +42,7 @@ func Start(dataDir string) error {
 	if err != nil {
 		return err
 	}
+	loadSettings(dataDir)
 	host.app, host.runtime = app, runtime
 	return nil
 }
@@ -85,30 +89,60 @@ func Command(payload string) (string, error) {
 }
 
 // The instrument's state outlives the view, so a rebuilt view picks up
-// the held chord and the running rhythm.
+// the held chord, the running rhythm and the last take.
 var play = struct {
 	sync.Mutex
-	eng    *harp.Engine
-	params harp.Params
-	chord  harp.Chord
-	column int
-	held   bool
-	latch  bool
+	eng      *harp.Engine
+	params   harp.Params
+	chord    harp.Chord
+	column   int
+	held     bool
+	latch    bool
+	take     *harp.Take
+	settings string // the settings file; empty when there is nowhere to keep it
 }{params: harp.NewEngine(44100).Params(), chord: harp.Chord{Root: 0, Kind: harp.Major}, column: 3}
 
 const (
 	minTempo, maxTempo = 50, 200
+	toneStep           = 10
 )
 
+// loadSettings reads the saved sound from dataDir.
+func loadSettings(dataDir string) {
+	play.Lock()
+	defer play.Unlock()
+	play.settings = ""
+	if dataDir == "" {
+		return
+	}
+	play.settings = filepath.Join(dataDir, "chordharp", "settings.json")
+	sound, _ := harp.LoadSound(play.settings)
+	setParams(func(p *harp.Params) { p.Sound = sound })
+}
+
 // Open starts an engine at the device's output rate, keeping the mix,
-// rhythm and chord of any earlier one.
+// rhythm, chord and take of any earlier one. A recording in progress
+// ends there, and playback stops.
 func Open(rate int) {
 	play.Lock()
 	defer play.Unlock()
+	keepTake()
 	eng := harp.NewEngine(float64(min(max(rate, 8000), 192000)))
 	eng.Set(play.params)
 	eng.SetChord(play.chord, play.held)
+	eng.LoadTake(play.take)
 	play.eng = eng
+}
+
+// keepTake ends a recording on the current engine and keeps its take.
+func keepTake() {
+	if play.eng == nil {
+		return
+	}
+	play.eng.StopRecording()
+	if t := play.eng.Take(); t != nil {
+		play.take = t
+	}
 }
 
 // Fill renders frames of mono 16-bit little-endian PCM, silence before
@@ -171,7 +205,7 @@ func Pluck(zone int, delay float64) {
 	play.Lock()
 	defer play.Unlock()
 	if play.eng != nil {
-		play.eng.Pluck(harp.StrumNotes(play.chord)[zone], min(max(delay, 0), 1))
+		play.eng.Pluck(zone, min(max(delay, 0), 1))
 	}
 }
 
@@ -204,6 +238,92 @@ func NudgeTempo(delta int) {
 	setParams(func(p *harp.Params) { p.Tempo = min(max(p.Tempo+float64(delta), minTempo), maxTempo) })
 }
 
+// SetPreset chooses a sound from harp.Presets by index.
+func SetPreset(index int) {
+	if index < 0 || index >= len(harp.Presets) {
+		return
+	}
+	changeSound(func(s *harp.Sound) { *s = harp.Presets[index].Sound })
+}
+
+// NudgeOctave moves the sound up or down by delta octaves.
+func NudgeOctave(delta int) { changeSound(func(s *harp.Sound) { s.Octave += delta }) }
+
+// NudgeTone makes the sound brighter (positive delta) or darker, in steps
+// of 10%.
+func NudgeTone(delta int) { changeSound(func(s *harp.Sound) { s.Tone += delta * toneStep }) }
+
+func changeSound(change func(*harp.Sound)) {
+	play.Lock()
+	defer play.Unlock()
+	setParams(func(p *harp.Params) {
+		change(&p.Sound)
+		p.Sound = p.Sound.Clamp()
+	})
+	if play.settings != "" {
+		harp.SaveSound(play.settings, play.params.Sound)
+	}
+}
+
+// Record starts recording a take, or stops the one being recorded.
+func Record() {
+	play.Lock()
+	defer play.Unlock()
+	if play.eng == nil {
+		return
+	}
+	if play.eng.Status().Recording {
+		keepTake()
+		return
+	}
+	play.eng.Record()
+}
+
+// PlayTake plays the last take back, or stops it playing.
+func PlayTake() {
+	play.Lock()
+	defer play.Unlock()
+	if play.eng == nil {
+		return
+	}
+	if play.eng.Status().Playback {
+		play.eng.StopPlaying()
+		return
+	}
+	keepTake()
+	play.eng.Play()
+}
+
+// Export writes the last take to midPath as MIDI and to wavPath as WAV,
+// with the current mix and sound. A long take takes seconds, so the view
+// calls this off the UI thread.
+func Export(midPath, wavPath string) error {
+	play.Lock()
+	keepTake()
+	t, params := play.take, play.params
+	play.Unlock()
+	if t == nil {
+		return errors.New("chordharp: nothing recorded")
+	}
+	mid, err := os.Create(midPath)
+	if err != nil {
+		return err
+	}
+	defer mid.Close()
+	wav, err := os.Create(wavPath)
+	if err != nil {
+		return err
+	}
+	defer wav.Close()
+	if err := t.Export(params, wav, mid); err != nil {
+		return err
+	}
+	if err := mid.Close(); err != nil {
+		return err
+	}
+	return wav.Close()
+}
+
 // Step returns the rhythm step being played, or -1 when it is stopped.
 func Step() int {
 	play.Lock()
@@ -229,20 +349,52 @@ type state struct {
 	Tempo   int      `json:"tempo"`
 	Steps   int      `json:"steps"`
 	PerBeat int      `json:"perBeat"`
+
+	Sound  string `json:"sound"`  // the preset's name, or Custom
+	Preset int    `json:"preset"` // index in the payload's presets, -1 for Custom
+	Octave int    `json:"octave"`
+	Tone   int    `json:"tone"`
+
+	Recording bool      `json:"recording"`
+	Playback  bool      `json:"playback"` // a take is playing back
+	Position  float64   `json:"position"` // seconds recorded or played
+	Length    float64   `json:"length"`   // the take's length, 0 without one
+	HasTake   bool      `json:"hasTake"`
+	Since     []float64 `json:"since,omitempty"` // during playback, seconds since each zone sounded
 }
 
-// State returns what the view draws, as JSON.
+// State returns what the view draws, as JSON. While a take plays back,
+// the chord and the rhythm are the take's.
 func State() string {
 	play.Lock()
 	defer play.Unlock()
-	pattern := harp.Patterns[play.params.Pattern]
-	s := state{
-		Held: play.held, Kind: int(play.chord.Kind), Column: play.column, Latch: play.latch,
-		Chord: play.chord.Long(), Short: play.chord.String(), Tones: play.chord.Tones(),
-		Playing: play.params.Playing, Pattern: play.params.Pattern, Tempo: int(math.Round(play.params.Tempo)),
-		Steps: pattern.Steps, PerBeat: pattern.PerBeat,
+	chord, held, params, column := play.chord, play.held, play.params, play.column
+	s := state{Latch: play.latch, HasTake: play.take != nil}
+	if play.take != nil {
+		s.Length = play.take.Seconds()
 	}
-	for _, n := range harp.StrumNotes(play.chord) {
+	if play.eng != nil {
+		st := play.eng.Status()
+		s.Recording, s.Playback, s.Position = st.Recording, st.Playback, st.Position
+		if st.HasTake {
+			s.HasTake, s.Length = true, st.Length
+		}
+		if st.Playback {
+			chord, held = st.Chord, st.Held
+			params.Tempo, params.Pattern, params.Playing = st.Tempo, st.Pattern, st.Rhythm
+			column = slices.Index(harp.Roots[:], chord.Root)
+			for _, since := range st.Since {
+				s.Since = append(s.Since, min(since, 60))
+			}
+		}
+	}
+	pattern := harp.Patterns[params.Pattern]
+	s.Held, s.Kind, s.Column = held, int(chord.Kind), column
+	s.Chord, s.Short, s.Tones = chord.Long(), chord.String(), chord.Tones()
+	s.Playing, s.Pattern, s.Tempo = params.Playing, params.Pattern, int(math.Round(params.Tempo))
+	s.Steps, s.PerBeat = pattern.Steps, pattern.PerBeat
+	s.Sound, s.Preset, s.Octave, s.Tone = params.Sound.Name(), params.Sound.Preset(), params.Sound.Octave, params.Sound.Tone
+	for _, n := range params.Sound.StrumNotes(chord) {
 		s.Zones = append(s.Zones, harp.NoteName(n))
 	}
 	out, _ := json.Marshal(s)

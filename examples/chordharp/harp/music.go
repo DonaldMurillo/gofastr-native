@@ -3,7 +3,10 @@
 // accompaniment patterns, and an engine that renders mono samples.
 package harp
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // Kind is a chord quality: one row of the chord grid.
 type Kind int
@@ -78,65 +81,9 @@ func (c Chord) has(pc int) bool {
 	return false
 }
 
-// plateLow is the lowest note the strumplate can play (G3). Every chord's
-// zones start at the first chord tone from here, so the plate keeps one
-// register while the chord changes, as a harp's strings would.
-const plateLow = 55
-
-// StrumNotes returns the MIDI notes of the strumplate's zones for c: the
-// chord's tones in ascending order from plateLow.
-func StrumNotes(c Chord) [Zones]int {
-	var out [Zones]int
-	for i, n := 0, plateLow; i < Zones; n++ {
-		if c.has(n % 12) {
-			out[i] = n
-			i++
-		}
-	}
-	return out
-}
-
-// PadNotes returns the sustained chord voicing: root position, rooted
-// between F#2 and F3 so it stays under the strumplate.
-func PadNotes(c Chord) []int {
-	base := 48 + c.Root
-	if c.Root > 5 {
-		base -= 12
-	}
-	out := make([]int, 0, 4)
-	for _, iv := range intervals[c.Kind] {
-		out = append(out, base+iv)
-	}
-	return out
-}
-
-// BassNote returns the accompaniment's bass note for a scale degree of c:
-// 'R' root, '3' third, '5' fifth, '6' sixth, '8' octave.
-func BassNote(c Chord, degree byte) int {
-	root := 36 + c.Root
-	if c.Root > 4 {
-		root -= 12
-	}
-	third := 4
-	if c.Kind == Minor {
-		third = 3
-	}
-	switch degree {
-	case '3':
-		return root + third
-	case '5':
-		return root + 7
-	case '6':
-		return root + 9
-	case '8':
-		return root + 12
-	}
-	return root
-}
-
 // NoteName names a MIDI note with its octave, as in "G3".
 func NoteName(midi int) string {
-	return noteNames[midi%12] + string(rune('0'+midi/12-1))
+	return noteNames[midi%12] + strconv.Itoa(midi/12-1)
 }
 
 // Pattern is one accompaniment rhythm. Each track has one character per
