@@ -85,6 +85,7 @@ final class ChordHarpView: UIView {
     private var repeatTimers: [Finger: Timer] = [:]
     private var readout: (text: String, size: CGFloat) = ("", 15)
     private var shownStep = -1
+    private var glowShown = false
     private var glow = [CFTimeInterval](repeating: 0, count: ChordHarpView.zones)
     private var displayLink: CADisplayLink?
     private let haptics = UIImpactFeedbackGenerator(style: .light)
@@ -288,6 +289,7 @@ final class ChordHarpView: UIView {
         drawBar()
         drawGrid()
         let glowing = drawPlate(now)
+        glowShown = glowing
         animate(glowing || state.playing)
     }
 
@@ -424,7 +426,9 @@ final class ChordHarpView: UIView {
     }
 
     /// Runs a display link while a zone glows or the rhythm runs. It
-    /// redraws on a frame only when a glow is fading or the beat moved.
+    /// redraws on a frame only when the last drawing had a glow or the beat
+    /// moved. The frame after a glow ends clears it, and that draw stops
+    /// the link unless the rhythm is running.
     private func animate(_ on: Bool) {
         if on && displayLink == nil && window != nil && !disposed {
             let link = CADisplayLink(target: DisplayTarget(self), selector: #selector(DisplayTarget.tick))
@@ -437,8 +441,7 @@ final class ChordHarpView: UIView {
     }
 
     fileprivate func tick() {
-        let fading = glow.contains { $0 > 0 && CACurrentMediaTime() - $0 < 0.6 }
-        if fading || ChordharpStep() != shownStep { setNeedsDisplay() }
+        if glowShown || ChordharpStep() != shownStep { setNeedsDisplay() }
     }
 
     // MARK: - Touch
