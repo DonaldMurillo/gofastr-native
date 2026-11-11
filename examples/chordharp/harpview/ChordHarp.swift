@@ -1,10 +1,11 @@
 #if canImport(UIKit)
+import AudioToolbox
 import AVFoundation
 import Chordharp
 import UIKit
 
 // The chord harp: a chord grid, a strumplate and a rhythm bar drawn in one
-// view. Touches call the bound Go package directly and an audio engine
+// view. Touches call the bound Go package directly and an audio queue
 // pulls samples from it, so nothing waits on a screen render. The layout,
 // colors and touch rules follow ChordHarpView.java.
 enum ChordHarpComponent: MobileComponentExtensionFactory {
@@ -81,7 +82,9 @@ final class ChordHarpView: UIView {
     private var padOrder: [Finger] = []
     private var zoneFingers: [Finger: Int] = [:]
     private var controlFingers: [Finger: String] = [:]
-    private var repeatTimer: Timer?
+    private var repeatTimers: [Finger: Timer] = [:]
+    private var readout: (text: String, size: CGFloat) = ("", 15)
+    private var shownStep = -1
     private var glow = [CFTimeInterval](repeating: 0, count: ChordHarpView.zones)
     private var displayLink: CADisplayLink?
     private let haptics = UIImpactFeedbackGenerator(style: .light)
@@ -107,10 +110,8 @@ final class ChordHarpView: UIView {
         standalone.priority = .defaultLow
         standalone.isActive = true
         heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
-        isAccessibilityElement = true
-        // VoiceOver passes touches straight through, so the harp can be played.
-        accessibilityTraits = .allowsDirectInteraction
         accessibilityIdentifier = "chordharp.instrument"
+        accessibilityElements = voiceOver.all
         let center = NotificationCenter.default
         observers = [
             center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.pauseAudio() },
@@ -134,7 +135,7 @@ final class ChordHarpView: UIView {
     deinit {
         observers.forEach(NotificationCenter.default.removeObserver)
         displayLink?.invalidate()
-        repeatTimer?.invalidate()
+        repeatTimers.values.forEach { $0.invalidate() }
         audio?.stop()
     }
 
@@ -150,7 +151,7 @@ final class ChordHarpView: UIView {
     func dispose() {
         disposed = true
         pauseAudio()
-        cancelRepeat()
+        cancelRepeats()
         displayLink?.invalidate()
         displayLink = nil
         releaseScroll()
@@ -160,10 +161,8 @@ final class ChordHarpView: UIView {
 
     private func refresh() {
         state = HarpState.read()
-        let held = state.held ? "\(state.chord) held, \(state.tones)" : "No chord held"
-        var label = "Chord harp. \(held). Rhythm \(state.playing ? "playing" : "stopped"), \(pattern()) at \(state.tempo) beats per minute."
-        if let zones = state.zones, let low = zones.first, let high = zones.last { label += " Strumplate from \(low) to \(high)." }
-        accessibilityLabel = label
+        readout = chordReadout()
+        voiceOver.update(state, pattern: pattern())
         setNeedsDisplay()
     }
 
@@ -178,7 +177,7 @@ final class ChordHarpView: UIView {
         if window == nil {
             releaseScroll()
             pauseAudio()
-            cancelRepeat()
+            cancelRepeats()
             displayLink?.invalidate()
             displayLink = nil
         } else if !disposed {
@@ -274,6 +273,9 @@ final class ChordHarpView: UIView {
         let plateWidth = max(110, (w - 2 * pad) * (portrait ? 0.32 : 0.3))
         plate = CGRect(x: w - pad - plateWidth, y: top, width: plateWidth, height: max(0, bottom - top))
         grid = CGRect(x: pad, y: top, width: max(0, plate.minX - gap - pad), height: max(0, bottom - top))
+        readout = chordReadout()
+        voiceOver.place(controls: Dictionary(uniqueKeysWithValues: controls.map { ($0.id, $0.rect) }),
+                        pattern: patternRect, tempo: tempoRect, readout: chordRect, surface: grid.union(plate))
         setNeedsDisplay()
     }
 
@@ -310,13 +312,13 @@ final class ChordHarpView: UIView {
         draw(pattern(), in: patternRect, color: Self.ink, size: 15)
         draw("\(state.tempo) bpm", in: tempoRect, color: Self.ink, size: 15)
         drawBeats()
-        let readout = chordReadout()
         draw(readout.text, in: chordRect, color: state.held ? Self.ink : Self.muted, size: readout.size, right: true)
     }
 
     private func drawBeats() {
         let steps = max(state.steps, 1), perBeat = max(state.perBeat, 1), beats = steps / perBeat
         let step = ChordharpStep(), beat = step < 0 ? -1 : step / perBeat
+        shownStep = step
         let r: CGFloat = 5, spacing = min(16, beatsRect.width / CGFloat(max(beats, 1)))
         let x = beatsRect.midX - spacing * CGFloat(beats - 1) / 2, y = beatsRect.midY
         for i in 0..<max(beats, 0) {
@@ -394,8 +396,13 @@ final class ChordHarpView: UIView {
         (s as NSString).draw(at: CGPoint(x: x, y: r.midY - measured.height / 2), withAttributes: attributes)
     }
 
+    private static var fonts: [CGFloat: UIFont] = [:]
+
     private static func attributes(_ size: CGFloat, _ color: UIColor) -> [NSAttributedString.Key: Any] {
-        [.font: UIFont.systemFont(ofSize: max(size, 1), weight: .bold), .foregroundColor: color]
+        let size = max(size, 1)
+        let font = fonts[size] ?? UIFont.systemFont(ofSize: size, weight: .bold)
+        fonts[size] = font
+        return [.font: font, .foregroundColor: color]
     }
 
     /// The held chord, as long as the bar has room for: "C major · C E G"
@@ -416,7 +423,8 @@ final class ChordHarpView: UIView {
         return (s + "…", 13)
     }
 
-    /// Redraws every frame while a zone glows or the rhythm runs.
+    /// Runs a display link while a zone glows or the rhythm runs. It
+    /// redraws on a frame only when a glow is fading or the beat moved.
     private func animate(_ on: Bool) {
         if on && displayLink == nil && window != nil && !disposed {
             let link = CADisplayLink(target: DisplayTarget(self), selector: #selector(DisplayTarget.tick))
@@ -428,7 +436,10 @@ final class ChordHarpView: UIView {
         }
     }
 
-    fileprivate func tick() { setNeedsDisplay() }
+    fileprivate func tick() {
+        let fading = glow.contains { $0 > 0 && CACurrentMediaTime() - $0 < 0.6 }
+        if fading || ChordharpStep() != shownStep { setNeedsDisplay() }
+    }
 
     // MARK: - Touch
 
@@ -471,7 +482,7 @@ final class ChordHarpView: UIView {
             controlFingers[finger] = c.id
             if c.repeats {
                 press(c.id)
-                scheduleRepeat(c.id)
+                scheduleRepeat(c.id, for: finger)
             }
             setNeedsDisplay()
         }
@@ -501,7 +512,7 @@ final class ChordHarpView: UIView {
     private func up(_ finger: Finger, _ point: CGPoint?, cancel: Bool) {
         zoneFingers[finger] = nil
         if let id = controlFingers.removeValue(forKey: finger) {
-            cancelRepeat()
+            cancelRepeat(finger)
             if !cancel, let point, let c = controls.first(where: { $0.id == id }), !c.repeats, c.rect.contains(point) { press(id) }
             setNeedsDisplay()
         }
@@ -534,18 +545,23 @@ final class ChordHarpView: UIView {
     }
 
     /// Tempo buttons repeat while held: after 450 ms, then every 90 ms.
-    private func scheduleRepeat(_ id: String) {
-        cancelRepeat()
-        repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
-            guard let self else { return }
+    /// Each finger has its own repeat, so lifting one leaves the others.
+    private func scheduleRepeat(_ id: String, for finger: Finger) {
+        cancelRepeat(finger)
+        repeatTimers[finger] = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+            guard let self, self.repeatTimers[finger] != nil else { return }
             self.press(id)
-            self.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.09, repeats: true) { [weak self] _ in self?.press(id) }
+            self.repeatTimers[finger] = Timer.scheduledTimer(withTimeInterval: 0.09, repeats: true) { [weak self] _ in self?.press(id) }
         }
     }
 
-    private func cancelRepeat() {
-        repeatTimer?.invalidate()
-        repeatTimer = nil
+    private func cancelRepeat(_ finger: Finger) {
+        repeatTimers.removeValue(forKey: finger)?.invalidate()
+    }
+
+    private func cancelRepeats() {
+        repeatTimers.values.forEach { $0.invalidate() }
+        repeatTimers.removeAll()
     }
 
     private func tap() {
@@ -577,7 +593,7 @@ final class ChordHarpView: UIView {
 
     private func startAudioIfShown() {
         guard !disposed, window != nil, audio == nil, UIApplication.shared.applicationState != .background else { return }
-        let next = ChordHarpAudio { [weak self] in self?.restartAudio() }
+        let next = ChordHarpAudio()
         do {
             try next.start()
             audio = next
@@ -592,11 +608,13 @@ final class ChordHarpView: UIView {
         audio = nil
     }
 
-    /// A route change or a media server reset stops the engine: build a new one.
+    /// A media server reset kills the queue: build a new one.
     private func restartAudio() {
         pauseAudio()
         startAudioIfShown()
     }
+
+    private lazy var voiceOver = ChordHarpAccessibility(container: self) { [weak self] id in self?.press(id) }
 
     private struct Pad: Equatable { let kind: Int, column: Int }
 
@@ -614,14 +632,86 @@ private final class DisplayTarget {
     @objc func tick() { view?.tick() }
 }
 
-/// Pulls 16-bit mono PCM from Go on the audio thread and hands it to an
-/// engine at the session's sample rate with a 5 ms buffer.
-final class ChordHarpAudio {
-    private let engine = AVAudioEngine()
-    private var watch: NSObjectProtocol?
-    private let changed: () -> Void
+/// VoiceOver's view of the harp: the bar's buttons by name, the rhythm and
+/// tempo as adjustable values, the chord readout, and the grid and
+/// strumplate as one surface that passes touches straight through, so the
+/// harp can be played with VoiceOver on.
+final class ChordHarpAccessibility {
+    private let toggle: ChordHarpElement, rhythm: ChordHarpElement, tempo: ChordHarpElement
+    private let latch: ChordHarpElement, readout: UIAccessibilityElement, surface: UIAccessibilityElement
+    let all: [UIAccessibilityElement]
 
-    init(changed: @escaping () -> Void) { self.changed = changed }
+    init(container: UIView, press: @escaping (String) -> Void) {
+        toggle = ChordHarpElement(container, "chordharp.toggle", activate: { press("toggle") })
+        rhythm = ChordHarpElement(container, "chordharp.rhythm", up: { press("pattern+") }, down: { press("pattern-") })
+        tempo = ChordHarpElement(container, "chordharp.tempo", up: { press("tempo+") }, down: { press("tempo-") })
+        latch = ChordHarpElement(container, "chordharp.latch", activate: { press("latch") })
+        readout = UIAccessibilityElement(accessibilityContainer: container)
+        readout.accessibilityTraits = .staticText
+        readout.accessibilityIdentifier = "chordharp.chord"
+        surface = UIAccessibilityElement(accessibilityContainer: container)
+        surface.accessibilityTraits = .allowsDirectInteraction
+        surface.accessibilityIdentifier = "chordharp.surface"
+        surface.accessibilityHint = "Chord pads on the left, strumplate on the right, low notes at the bottom."
+        rhythm.accessibilityLabel = "Rhythm"
+        tempo.accessibilityLabel = "Tempo"
+        latch.accessibilityLabel = "Latch"
+        all = [toggle, rhythm, tempo, latch, readout, surface]
+    }
+
+    fileprivate func update(_ state: HarpState, pattern: String) {
+        toggle.accessibilityLabel = state.playing ? "Stop rhythm" : "Start rhythm"
+        rhythm.accessibilityValue = pattern
+        tempo.accessibilityValue = "\(state.tempo) beats per minute"
+        latch.accessibilityTraits = state.latch ? [.button, .selected] : .button
+        readout.accessibilityLabel = state.held ? "\(state.chord) held, \(state.tones)" : "No chord held"
+        var label = "Chord pads and strumplate"
+        if let zones = state.zones, let low = zones.first, let high = zones.last { label += ", strumplate from \(low) to \(high)" }
+        surface.accessibilityLabel = label
+    }
+
+    func place(controls: [String: CGRect], pattern: CGRect, tempo tempoRect: CGRect, readout chord: CGRect, surface area: CGRect) {
+        let frame = { (id: String) in controls[id] ?? .zero }
+        toggle.accessibilityFrameInContainerSpace = frame("toggle")
+        rhythm.accessibilityFrameInContainerSpace = frame("pattern-").union(pattern).union(frame("pattern+"))
+        tempo.accessibilityFrameInContainerSpace = frame("tempo-").union(tempoRect).union(frame("tempo+"))
+        latch.accessibilityFrameInContainerSpace = frame("latch")
+        readout.accessibilityFrameInContainerSpace = chord
+        surface.accessibilityFrameInContainerSpace = area
+    }
+}
+
+/// A bar button, or an adjustable value when up and down are given.
+final class ChordHarpElement: UIAccessibilityElement {
+    private let activate: (() -> Void)?, up: (() -> Void)?, down: (() -> Void)?
+
+    init(_ container: UIView, _ identifier: String, activate: (() -> Void)? = nil, up: (() -> Void)? = nil, down: (() -> Void)? = nil) {
+        self.activate = activate
+        self.up = up
+        self.down = down
+        super.init(accessibilityContainer: container)
+        accessibilityIdentifier = identifier
+        accessibilityTraits = up == nil ? .button : .adjustable
+    }
+
+    override func accessibilityActivate() -> Bool {
+        guard let activate else { return false }
+        activate()
+        return true
+    }
+
+    override func accessibilityIncrement() { up?() }
+    override func accessibilityDecrement() { down?() }
+}
+
+/// Plays 16-bit mono PCM from Go through an audio queue: three 256-frame
+/// buffers, about 16 ms at 48 kHz, as the terminal app does on macOS. The
+/// queue calls Fill on its own thread, not the real-time I/O thread, and
+/// the buffers queued ahead cover a short stall in Go. The queue follows
+/// output route changes by itself.
+final class ChordHarpAudio {
+    private static let frames = 256, buffers = 3
+    private var queue: AudioQueueRef?
 
     func start() throws {
         let session = AVAudioSession.sharedInstance()
@@ -630,37 +720,49 @@ final class ChordHarpAudio {
         try session.setActive(true)
         let rate = session.sampleRate > 0 ? session.sampleRate : 48000
         ChordharpOpen(Int(rate.rounded()))
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1) else {
-            throw NSError(domain: "ChordHarp", code: 1, userInfo: [NSLocalizedDescriptionKey: "no mono format at \(rate) Hz"])
+        var format = AudioStreamBasicDescription(
+            mSampleRate: rate, mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked,
+            mBytesPerPacket: 2, mFramesPerPacket: 1, mBytesPerFrame: 2, mChannelsPerFrame: 1,
+            mBitsPerChannel: 16, mReserved: 0)
+        var created: AudioQueueRef?
+        try check(AudioQueueNewOutput(&format, chordHarpRefill, nil, nil, nil, 0, &created), "create the queue")
+        guard let created else { throw failure("create the queue", -1) }
+        queue = created
+        for _ in 0..<Self.buffers {
+            var buffer: AudioQueueBufferRef?
+            try check(AudioQueueAllocateBuffer(created, UInt32(Self.frames * 2), &buffer), "allocate a buffer")
+            if let buffer { chordHarpRefill(nil, created, buffer) }
         }
-        let source = AVAudioSourceNode(format: format) { _, _, count, buffers in
-            let frames = Int(count)
-            let pcm = ChordharpFill(frames) ?? Data()
-            pcm.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-                let samples = raw.bindMemory(to: Int16.self)
-                for buffer in UnsafeMutableAudioBufferListPointer(buffers) {
-                    guard let out = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-                    let n = min(frames, samples.count, Int(buffer.mDataByteSize) / MemoryLayout<Float>.size)
-                    for i in 0..<n { out[i] = Float(Int16(littleEndian: samples[i])) / 32767 }
-                    for i in n..<(Int(buffer.mDataByteSize) / MemoryLayout<Float>.size) { out[i] = 0 }
-                }
-            }
-            return noErr
-        }
-        engine.attach(source)
-        engine.connect(source, to: engine.mainMixerNode, format: format)
-        watch = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            self?.changed()
-        }
-        engine.prepare()
-        try engine.start()
+        try check(AudioQueueStart(created, nil), "start the queue")
     }
 
     func stop() {
-        if let watch { NotificationCenter.default.removeObserver(watch) }
-        watch = nil
-        engine.stop()
+        guard let queue else { return }
+        self.queue = nil
+        AudioQueueStop(queue, true)
+        AudioQueueDispose(queue, true)
     }
+
+    private func check(_ status: OSStatus, _ step: String) throws {
+        if status != noErr { throw failure(step, status) }
+    }
+
+    private func failure(_ step: String, _ status: OSStatus) -> NSError {
+        NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "could not \(step) (\(status))"])
+    }
+}
+
+/// Fills one queue buffer from Go and queues it again.
+private func chordHarpRefill(_: UnsafeMutableRawPointer?, _ queue: AudioQueueRef, _ buffer: AudioQueueBufferRef) {
+    let bytes = Int(buffer.pointee.mAudioDataBytesCapacity) & ~1
+    let pcm = ChordharpFill(bytes / 2) ?? Data()
+    let out = buffer.pointee.mAudioData.assumingMemoryBound(to: UInt8.self)
+    let copied = min(pcm.count, bytes)
+    pcm.copyBytes(to: out, count: copied)
+    if copied < bytes { (out + copied).initialize(repeating: 0, count: bytes - copied) }
+    buffer.pointee.mAudioDataByteSize = UInt32(bytes)
+    AudioQueueEnqueueBuffer(queue, buffer, 0, nil)
 }
 
 private func rgb(_ value: UInt32) -> UIColor {

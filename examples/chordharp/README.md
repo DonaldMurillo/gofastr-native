@@ -129,18 +129,23 @@ without the window ever losing focus, and before the hook that left the
 app silent while the screen still responded. If the audio track fails, the
 thread logs it and opens a new one.
 
-On iOS an `AVAudioEngine` source node calls `Fill` from the render thread
-and converts the samples to float at the audio session's rate. The session
-uses the playback category, mixed with other apps' audio, and asks for a
-5 ms I/O buffer. Sound stops when the view leaves the window or the app
-goes to the background, and a new engine starts when the app is active
-again, after an interruption such as a call ends, when the output route
-changes, or when the media server resets. The view sizes itself to the
+On iOS an audio queue plays the samples at the audio session's rate, from
+three 256-frame buffers (about 16 ms at 48 kHz), as the terminal app does
+on macOS. The queue calls `Fill` on its own thread rather than the
+real-time I/O thread, where Go's allocation and locking could make the
+output underrun, and the buffers queued ahead cover a short stall in Go.
+The session uses the playback category, mixed with other apps' audio. The
+queue follows output route changes by itself. Sound stops when the view
+leaves the window or the app goes to the background, and a new queue
+starts when the app is active again, after an interruption such as a call
+ends, or when the media server resets. The view sizes itself to the
 host's scroll view and turns that scroll view's scrolling and touch delay
 off while it is on screen, so a strum is never taken for a scroll and
-touches arrive without the 150 ms scroll-detection delay. VoiceOver reads
-the held chord, rhythm and tempo, and the view allows direct interaction,
-so the harp can be played with VoiceOver on.
+touches arrive without the 150 ms scroll-detection delay. VoiceOver
+reaches Start/Stop and Latch as buttons, the rhythm and tempo as
+adjustable values (swipe up or down), and the held chord as text. The
+pads and strumplate are one element that allows direct interaction, so
+the harp can be played with VoiceOver on.
 
 `ChordHarpView.java` imports the bound package's Java class
 (`chordharp.Chordharp`) and `ChordHarp.swift` imports its framework
@@ -161,7 +166,8 @@ before `Open`, a pluck that sounds, range checks, tempo limits, pattern
 wrapping, state kept across `Open`), the component's payload checks and
 the screen.
 
-The Java and Swift views have no automated tests. It was checked on an API 35 emulator
+The Java and Swift views have no automated tests. The Java view was
+checked on an API 35 emulator
 in portrait and landscape: latch, chord holding, strum glow, the rhythm and
 its beat lights, and sound carrying on across a pause and resume. Emulator
 audio is not a fair test of the sound itself: on a loaded Mac the
@@ -173,11 +179,15 @@ The Swift view was checked on the iOS 26.5 simulator (iPhone 17 Pro) in
 portrait: the instrument fills the screen under the title on every launch,
 Latch holds and a second tap releases, a tap without Latch plays and lets
 go, a strum lights the zones it crossed, Start lights the beats, a held +
-repeats, the pattern arrows step through the rhythms, and the audio engine
-stops in the background and starts again on return. Landscape, multi-touch
-and listening to the output were NOT RUN on iOS: the simulator automation
-has no rotation or multi-finger drag, and the checks were made without
-listening. It has not run on a physical iPhone.
+repeats, the pattern arrows step through the rhythms, the VoiceOver
+elements cover the controls they name, and activating the Latch element
+turns Latch on. A temporary counter in the queue callback showed it
+pulling 48,000 frames a second, stopping in the background and pulling
+again within about 2 s of returning. Landscape, multi-touch, VoiceOver
+itself and listening to the output were NOT RUN on iOS: the simulator
+automation has no rotation or multi-finger drag, the elements were read
+through the accessibility tree with VoiceOver off, and the checks were
+made without listening. It has not run on a physical iPhone.
 
 Windows has been compiled and vetted, not run. On Windows,
 `CHORDHARP_AUDIO_TEST=1 go test ./cmd/chordharp` opens the WinMM output,
