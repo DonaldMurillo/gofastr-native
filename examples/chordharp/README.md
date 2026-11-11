@@ -1,8 +1,8 @@
 # Chord harp
 
 A chord harp in two forms that share one engine: a terminal app built on
-the `tui` module, and an Android app built with the native renderer. Both
-are laid out like the electronic autoharps of the early 1980s: a grid of 27
+the `tui` module, and a phone app for Android and iOS built with the
+native renderer. Both are laid out like the electronic autoharps of the early 1980s: a grid of 27
 chords, a strumplate, and a rhythm box. `harp` holds the music and the
 synthesizer.
 
@@ -67,22 +67,27 @@ or `ffplay` on `PATH`, staying 30 ms ahead of the clock. The tests drive the eng
 through a real tree. `CHORDHARP_AUDIO_TEST=1` also opens the sound device,
 with nothing playing, and checks that it pulls samples at 44.1 kHz.
 
-## Android
+## Phone
 
-The Android app is a native view that calls the same engine directly.
+The phone app is a native view, an Android `View` or a UIKit `UIView`,
+that calls the same engine directly.
 
 ```sh
 cd examples/chordharp
 GOWORK=off go run github.com/DonaldMurillo/gofastr-native/cmd/gofastr-native run \
   --platform android-emu --renderer native --pkg ./chordharp \
   --name "Chord Harp" --id dev.gofastr.chordharp --device <avd>
+GOWORK=off go run github.com/DonaldMurillo/gofastr-native/cmd/gofastr-native run \
+  --platform ios-sim --renderer native --pkg ./chordharp \
+  --name "Chord Harp" --id dev.gofastr.chordharp
 ```
 
 Run it from this directory: the example is its own module, so it can
 require the tui module (through `replace`) without the root module
-depending on it. `adb install` the APK it builds to put it on a phone.
+depending on it. `adb install` the APK it builds to put it on an Android
+phone.
 
-### Playing on Android
+### Playing on a phone
 
 - The grid has 27 chords: major, minor and seventh, rooted from E flat to B
   in fifths. In portrait the chord kinds are columns. In landscape they are
@@ -106,11 +111,15 @@ depending on it. `adb install` the APK it builds to put it on a phone.
 | `harp/` | The music and the synthesizer: chord spelling, the strumplate's notes, the accompaniment patterns, and an engine that renders mono samples. Both apps use it. |
 | `cmd/chordharp/` | The terminal app and its sound output for macOS, Windows and other systems. |
 | `chordharp/` | The gomobile bind package. `Start`, `Stop`, `Root`, `Render`, `Dispatch` and `Command` serve the one `nativeui` screen. The instrument view calls `Open`, `Fill`, `Hold`, `Release`, `Pluck`, `Toggle`, `NextPattern`, `NudgeTempo`, `SetLatch`, `Step` and `State`. |
-| `harpview/` | The `dev.gofastr.chordharp/v1` rendering component. Go sends the grid labels and pattern names. `ChordHarpView.java` draws the instrument on a canvas, tracks each pointer, and runs the audio thread. |
+| `harpview/` | The `dev.gofastr.chordharp/v1` rendering component. Go sends the grid labels and pattern names. `ChordHarpView.java` and `ChordHarp.swift` each draw the instrument, track each finger, and run the audio output. |
 | `screens/` | The screen: a title and the component. |
 
 Touches never wait on a screen render. The view calls the bound Go
-functions on the UI thread, and a separate thread at urgent-audio priority
+functions on the UI thread, and audio is pulled from `Fill` on a thread
+of its own. The chord, latch and rhythm live in Go, so a rebuilt view
+comes back where the old one left off.
+
+On Android a separate thread at urgent-audio priority
 pulls 16-bit mono PCM from `Fill` into an `AudioTrack` at the device's
 native rate. The track asks for low-latency mode on Android 8 and later.
 Sound stops when the window is hidden or the host suspends the screen, and
@@ -118,13 +127,26 @@ starts again when the activity resumes or the window comes back. The
 resume hook matters: a relaunch intent pauses and resumes the activity
 without the window ever losing focus, and before the hook that left the
 app silent while the screen still responded. If the audio track fails, the
-thread logs it and opens a new one. The chord, latch and rhythm
-live in Go, so a rebuilt view comes back where the old one left off.
+thread logs it and opens a new one.
+
+On iOS an `AVAudioEngine` source node calls `Fill` from the render thread
+and converts the samples to float at the audio session's rate. The session
+uses the playback category, mixed with other apps' audio, and asks for a
+5 ms I/O buffer. Sound stops when the view leaves the window or the app
+goes to the background, and a new engine starts when the app is active
+again, after an interruption such as a call ends, when the output route
+changes, or when the media server resets. The view sizes itself to the
+host's scroll view and turns that scroll view's scrolling and touch delay
+off while it is on screen, so a strum is never taken for a scroll and
+touches arrive without the 150 ms scroll-detection delay. VoiceOver reads
+the held chord, rhythm and tempo, and the view allows direct interaction,
+so the harp can be played with VoiceOver on.
 
 `ChordHarpView.java` imports the bound package's Java class
-(`chordharp.Chordharp`), so the component only builds with this app's bind
-package. The iOS and WebView adapters are placeholders that say the
-instrument is Android-only. The manifest requires all three.
+(`chordharp.Chordharp`) and `ChordHarp.swift` imports its framework
+(`Chordharp`), so the component only builds with this app's bind package.
+The WebView adapter is a placeholder that says the instrument plays in
+the native renderers. The manifest requires all three.
 
 ## Tests
 
@@ -139,13 +161,23 @@ before `Open`, a pluck that sounds, range checks, tempo limits, pattern
 wrapping, state kept across `Open`), the component's payload checks and
 the screen.
 
-The Java view has no automated tests. It was checked on an API 35 emulator
+The Java and Swift views have no automated tests. It was checked on an API 35 emulator
 in portrait and landscape: latch, chord holding, strum glow, the rhythm and
 its beat lights, and sound carrying on across a pause and resume. Emulator
 audio is not a fair test of the sound itself: on a loaded Mac the
 emulator's virtual sound card crackles and then fails with I/O errors while
 the app's track keeps running. It has not been played on a physical phone,
 where latency and multi-touch matter most.
+
+The Swift view was checked on the iOS 26.5 simulator (iPhone 17 Pro) in
+portrait: the instrument fills the screen under the title on every launch,
+Latch holds and a second tap releases, a tap without Latch plays and lets
+go, a strum lights the zones it crossed, Start lights the beats, a held +
+repeats, the pattern arrows step through the rhythms, and the audio engine
+stops in the background and starts again on return. Landscape, multi-touch
+and listening to the output were NOT RUN on iOS: the simulator automation
+has no rotation or multi-finger drag, and the checks were made without
+listening. It has not run on a physical iPhone.
 
 Windows has been compiled and vetted, not run. On Windows,
 `CHORDHARP_AUDIO_TEST=1 go test ./cmd/chordharp` opens the WinMM output,

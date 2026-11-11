@@ -42,7 +42,10 @@ func TestDefinitionParses(t *testing.T) {
 	if d.Manifest.Name != Name || d.Manifest.Android == nil || d.Manifest.Android.Factory != "ChordHarpComponent" {
 		t.Fatalf("manifest %+v", d.Manifest)
 	}
-	for _, source := range d.Manifest.Android.Sources {
+	if d.Manifest.IOS.Factory != "ChordHarpComponent" {
+		t.Fatalf("manifest %+v", d.Manifest)
+	}
+	for _, source := range append(append([]string(nil), d.Manifest.Android.Sources...), d.Manifest.IOS.Sources...) {
 		if _, err := assets.ReadFile(source); err != nil {
 			t.Fatal(err)
 		}

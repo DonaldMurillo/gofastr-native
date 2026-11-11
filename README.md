@@ -63,7 +63,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | [`examples/notes`](examples/notes) | The main phone example: one Notes app with native and WebView renderers, files, photos, reminders, sharing, widgets, and terminal and web presentations of the same service. |
 | [`examples/gallery`](examples/gallery) | Every screen contract `nativeui` supports, one at a time. |
 | [`examples/devicefeatures`](examples/devicefeatures) | Incoming shares, secure storage and widgets through their opt-in APIs. |
-| [`examples/chordharp`](examples/chordharp) | A chord harp with sound, as a terminal app and as an Android app that share one Go synthesizer. |
+| [`examples/chordharp`](examples/chordharp) | A chord harp with sound, as a terminal app and as an Android and iOS app that share one Go synthesizer. |
 
 ## Layout
 
