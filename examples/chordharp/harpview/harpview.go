@@ -1,7 +1,8 @@
 // Package harpview is the chord harp's instrument component: the chord
-// grid, the strumplate and the rhythm bar, drawn by a compiled Android view.
-// The view plays sound by calling the bound chordharp package directly, so
-// touches reach the synthesizer without a screen render in between.
+// grid, the strumplate and the rhythm bar, drawn by a compiled Android or
+// UIKit view. The view plays sound by calling the bound chordharp package
+// directly, so touches reach the synthesizer without a screen render in
+// between.
 package harpview
 
 import (

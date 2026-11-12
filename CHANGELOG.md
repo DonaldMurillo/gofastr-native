@@ -7,6 +7,19 @@ This repository holds two Go modules, tagged separately:
 
 Both are experimental. Until 1.0, any minor or patch release can change the API.
 
+## Unreleased
+
+### Phone apps (`gofastr-native`)
+
+- `examples/chordharp` plays on iOS. The UIKit view draws the same grid,
+  strumplate and rhythm bar as the Android view, follows the same touch
+  rules (momentary pads, Latch, strums that pluck every zone crossed,
+  repeating tempo buttons), and plays the Go synthesizer through an audio
+  queue. VoiceOver reaches the bar's controls by name and can play the
+  pads and strumplate directly. Checked on the iOS 26.5 simulator in
+  portrait with one finger. Not yet checked: landscape, multi-touch,
+  VoiceOver itself, the sound by ear, and a physical iPhone.
+
 ## v0.0.1 (2026-11-08)
 
 The first tagged release of both modules.

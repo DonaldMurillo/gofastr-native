@@ -1,4 +1,4 @@
-// The chord harp's Android app. It is its own module because it shares the
+// The chord harp's phone app. It is its own module because it shares the
 // synthesizer with the terminal app in the tui module, which the root module
 // does not depend on.
 module github.com/DonaldMurillo/gofastr-native/examples/chordharp
