@@ -30,7 +30,7 @@ func TestMicrophonePurposeIsExplicitAndEscaped(t *testing.T) {
 	}
 }
 
-func TestMicrophonePurposeRejectsUnsafeOrUnsupportedBuilds(t *testing.T) {
+func TestMicrophonePurposeRejectsUnsafeBuilds(t *testing.T) {
 	for _, purpose := range []string{strings.Repeat("x", 513), "bad\x00purpose", "bad\npurpose", string([]byte{0xff})} {
 		var stdout, stderr bytes.Buffer
 		code := run(context.Background(), []string{"build", "--platform", "ios-sim", "--pkg", "./examples/notes/notesnative", "--microphone-usage", purpose, "--dry-run"}, &stdout, &stderr)
@@ -38,9 +38,10 @@ func TestMicrophonePurposeRejectsUnsafeOrUnsupportedBuilds(t *testing.T) {
 			t.Fatalf("unsafe microphone purpose reached a build: %d %s %s", code, &stdout, &stderr)
 		}
 	}
+	// The Android WebView shell grants the microphone to the app's pages.
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{"build", "--platform", "android-emu", "--pkg", notesPkg, "--microphone-usage", "Record voice notes.", "--dry-run"}, &stdout, &stderr)
-	if code != 2 || !strings.Contains(stderr.String(), "--microphone-usage") || stdout.Len() != 0 {
-		t.Fatalf("unsupported microphone build reached Android tooling: %d %s %s", code, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Android WebView microphone build refused: %d %s", code, &stderr)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -163,6 +164,11 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 		if err != nil {
 			return "", err
 		}
+	} else {
+		a.WebViewFeatures, err = discoverWebViewFeatures(r, a.PkgPath)
+		if err != nil {
+			return "", err
+		}
 	}
 	work := filepath.Join(out, "work")
 	bin := filepath.Join(work, "bin")
@@ -181,14 +187,18 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 		binder.dir = compatibilityDir
 		binder.env = append(append([]string(nil), r.env...), "GOWORK=off")
 	}
-	bindArgs := append([]string{"bind", gomobileAndroidTarget(a.ABIs)}, goLDFlags(o.release(), true)...)
+	linkname, err := androidLinknameFlags(&binder, a.androidBindPackages())
+	if err != nil {
+		return "", err
+	}
+	bindArgs := append([]string{"bind", gomobileAndroidTarget(a.ABIs)}, goLDFlags(o.release(), true, linkname...)...)
 	bindArgs = append(bindArgs, traceFlags...)
 	if o.release() {
 		bindArgs = append(bindArgs, "-tags="+releaseTag)
 	}
 	if err := binder.run("bind the Go app as an Android library",
 		filepath.Join(bin, executableName("gomobile")), append(bindArgs,
-			"-androidapi", strconv.Itoa(a.MinSDK), "-o", aar, a.PkgPath)...); err != nil {
+			append([]string{"-androidapi", strconv.Itoa(a.MinSDK), "-o", aar}, a.androidBindPackages()...)...)...); err != nil {
 		return "", err
 	}
 	r.step = binder.step
@@ -695,4 +705,30 @@ func isDir(p string) bool {
 func fileExists(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && !st.IsDir()
+}
+
+// linknameExempt lists packages that must reach into the standard library
+// with //go:linkname on Android. github.com/wlynxg/anet, which pion's
+// WebRTC stack uses, replaces net.Interfaces: Android 11+ forbids the
+// netlink socket the standard library opens. Go 1.23+ refuses such links
+// unless the linker gets -checklinkname=0.
+var linknameExempt = []string{"github.com/wlynxg/anet"}
+
+// androidLinknameFlags returns -checklinkname=0 only when the bound
+// packages depend on an exempt package, so other apps keep the check.
+func androidLinknameFlags(r *runner, packages []string) ([]string, error) {
+	probe := *r
+	probe.env = append(append([]string(nil), r.env...), "GOOS=android", "GOARCH=arm64", "CGO_ENABLED=1")
+	output, err := probe.outputBytes("check dependencies that need linker exemptions", nil, "go",
+		append([]string{"list", "-deps", "-f", "{{.ImportPath}}"}, packages...)...)
+	r.step = probe.step
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range strings.Fields(string(output)) {
+		if slices.Contains(linknameExempt, strings.TrimSpace(line)) {
+			return []string{"-checklinkname=0"}, nil
+		}
+	}
+	return nil, nil
 }

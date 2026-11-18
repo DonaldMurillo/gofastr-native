@@ -6,7 +6,10 @@ is downloaded as executable presentation code, and GoFastr core is unchanged.
 
 There are now two explicit contracts: **bounded file acquisition** and **keyed
 rendering components**. The photo library exercises acquisition; the media
-library owns Notes attachment rendering on UIKit and WebView. See
+library owns Notes attachment rendering on UIKit and WebView. The
+[capture library](capture.md) omits `ios`. Its `android` adapter adds bound Go
+packages, permissions and a foreground service (see [Android](android.md)),
+and its `webview` adapter declares the browser permissions it needs. See
 [rendering extensions](rendering-extensions.md) for the component API and
 [extension tooling](extension-tooling.md) for authoring and checks. Arbitrary
 service results, desktop/TUI rendering, a marketplace and a stable binary ABI
@@ -134,6 +137,12 @@ An adapter registers exactly one entry in
 `window.__gofastr_file_extension_definitions` with its manifest name,
 `capabilities()`, and `prepare(typedPayload)`. Registration and capability keys
 are checked against the manifest.
+
+A `webview` entry may list `permissions`, the browser features its script
+uses: `camera`, `geolocation`, or both. Android WebView builds add the
+matching Android permissions to the manifest, and the shell answers the page's
+requests for them once Android grants the app. The microphone is not listed
+here; `--microphone-usage` turns it on for any renderer.
 
 `prepare` validates the request and returns bounded chooser presentation metadata:
 `kind`, `title`, `hint`, `label`, input `attributes` (`accept`/`capture`),

@@ -333,8 +333,57 @@
       root.dataset.gfwEditor = JSON.stringify(reply.editor);
       if (reply.editor.unknown) status(root, 'A previous save may have succeeded. Keep this draft and inspect the saved notes before trying again.', true);
     }
-    if (live && state.config.list && !state.hasEditor && typeof AbortController === 'function') startCollection(root, state);
+    if (live && !state.hasEditor && typeof AbortController === 'function') {
+      if (state.config.list) startCollection(root, state);
+      else if (reply.screen?.live) startScreenWatch(root, state);
+    }
   };
+
+  // A live screen without a collection has no rows to patch. A data change
+  // reads the screen's markup again and swaps it into the same root and form,
+  // keeping the mounted component containers, so scan() retains their
+  // adapters and only updates them. Focus and scroll stay where they were.
+  const startScreenWatch = (root, state) => {
+    const allowed = () => current(state) && root.isConnected && !state.busy && !modalOpen() && !state.uncertain && !state.composing.size && !state.hasEditor;
+    const identity = () => JSON.stringify([state.instance, state.revision, state.config.route]);
+    state.live = live.create({ root, version: state.dataVersion, allowed, identity,
+      watch: (dataVersion, signal) => command(root, state, 'watch', { dataVersion, values: queryValues(state) }, { signal }),
+      refresh: async (signal, options = {}) => {
+        const route = local(state.config, options.route || state.config.route);
+        if (!route || route !== local(state.config, state.config.route)) {
+          navigate(root, state, options.route || state.config.route, { replace: options.replace !== false, force: true });
+          return state.dataVersion;
+        }
+        const answer = await fetch(route, { signal, credentials: 'same-origin', headers: { Accept: 'text/html' } });
+        if (!answer.ok) throw new Error('The screen could not be read again.');
+        const next = new DOMParser().parseFromString(await answer.text(), 'text/html').querySelector('[data-gfw-screen]');
+        let config;
+        try { config = JSON.parse(next?.dataset.gfwConfig); } catch (_) {}
+        const form = next?.querySelector('[data-gfw-form]');
+        if (signal.aborted || !current(state) || !root.isConnected) return state.dataVersion;
+        if (!config || !form || local(config, config.route) !== route) {
+          navigate(root, state, route, { replace: true, force: true });
+          return state.dataVersion;
+        }
+        const focused = root.contains(document.activeElement) && document.activeElement !== root ? focusKey(document.activeElement) : '';
+        const scroll = { x: window.scrollX, y: window.scrollY };
+        const group = root.querySelector('[data-gfw-components]');
+        const placeholder = next.querySelector('[data-gfw-components]');
+        if (group && placeholder) placeholder.replaceWith(group);
+        for (const name of state.form.getAttributeNames()) if (!form.hasAttribute(name)) state.form.removeAttribute(name);
+        for (const name of form.getAttributeNames()) state.form.setAttribute(name, form.getAttribute(name));
+        state.form.replaceChildren(...form.childNodes);
+        form.replaceWith(state.form);
+        root.replaceChildren(...next.childNodes);
+        root.dataset.gfwConfig = next.dataset.gfwConfig;
+        if (focused) Array.from(root.querySelectorAll('button, a, input, select, textarea')).find(item => focusKey(item) === focused)?.focus({ preventScroll: true });
+        window.scrollTo?.({ left: scroll.x, top: scroll.y, behavior: 'instant' });
+        return state.dataVersion;
+      },
+    });
+  };
+  const focusKey = element => JSON.stringify([element.tagName, element.getAttribute('name'), element.getAttribute('value'),
+    element.getAttribute('href'), element.getAttribute('aria-label'), element.dataset?.gfwField, element.textContent.trim().slice(0, 80)]);
 
   const startCollection = (root, state) => {
     const allowed = () => current(state) && root.isConnected && !state.busy && !modalOpen() && !state.uncertain && !state.composing.size && !state.hasEditor;

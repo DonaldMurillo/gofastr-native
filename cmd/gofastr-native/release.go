@@ -435,7 +435,7 @@ func gomobileAndroidTarget(abis []string) string {
 }
 
 // goLDFlags keeps today's Android page-size flag and, for release, strips symbol and DWARF tables from release binaries.
-func goLDFlags(release bool, android bool) []string {
+func goLDFlags(release bool, android bool, extra ...string) []string {
 	var flags []string
 	ld := ""
 	if release {
@@ -443,6 +443,9 @@ func goLDFlags(release bool, android bool) []string {
 	}
 	if android {
 		ld = strings.TrimSpace(ld + " -extldflags=-Wl,-z,max-page-size=16384")
+	}
+	for _, flag := range extra {
+		ld = strings.TrimSpace(ld + " " + flag)
 	}
 	if ld != "" {
 		flags = append(flags, "-ldflags="+ld)

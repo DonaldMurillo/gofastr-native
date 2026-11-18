@@ -35,6 +35,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Secure storage](secure-storage.md)
 - [Share-in](share-in.md)
 - [Widgets](widgets.md)
+- [Video capture](capture.md): Android camera recording and WHIP streaming with GPS and camera direction, on the native and WebView renderers. Covers segmented and loop recording, impact locks and the dash cam example.
 - [iOS physical-device acceptance](ios-device-acceptance.md): what a simulator cannot check.
 
 ## Extensions
