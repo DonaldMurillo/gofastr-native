@@ -22,6 +22,18 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
+func captureStatus() any {
+	if session := capture.Current(); session != nil {
+		status := session.Status()
+		return struct {
+			State                  capture.State
+			Reason                 string
+			Frames, Bytes, Dropped int64
+		}{status.State, status.Reason, status.Frames, status.Bytes, status.Dropped}
+	}
+	return "no current session"
+}
+
 // TestCaptureWebViewRecords drives the capture app's WebView adapter in
 // Chromium with its synthetic camera and microphone. The capture screen has
 // no collection, so its live refresh must swap the markup in place: the
@@ -48,6 +60,15 @@ func TestCaptureWebViewRecords(t *testing.T) {
 	})
 	ctx, traffic := mobileScreensBrowser(t, host, true,
 		chromedp.Flag("use-fake-ui-for-media-stream", true), chromedp.Flag("use-fake-device-for-media-stream", true))
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		traffic.mu.Lock()
+		defer traffic.mu.Unlock()
+		paths := traffic.paths[max(0, len(traffic.paths)-12):]
+		t.Logf("bridge notes: %q\nlast requests: %q\nstatus: %+v", traffic.errs, paths, captureStatus())
+	})
 	check := deviceBrowserCheck(t, ctx)
 	check(browser.SetPermission(&browser.PermissionDescriptor{Name: "geolocation"}, browser.PermissionSettingGranted).WithOrigin(origin),
 		emulation.SetGeolocationOverride().WithLatitude(48.8584).WithLongitude(2.2945).WithAccuracy(4),

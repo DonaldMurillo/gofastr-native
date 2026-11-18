@@ -9,6 +9,10 @@
   const path = '/_capture/device';
   const flushEvery = 100; // ms between reports while capturing
   const backlogLimit = 4 << 20; // unsent bytes before frames are dropped
+  // A report Go never answers would block every later one, the stop
+  // directive and the stopped event included, so it counts as failed.
+  const reportTimeout = 10000; // ms
+  const flushTimeout = 2000; // ms an encoder gets to drain when capture stops
 
   const supported = () => window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function' &&
     typeof window.VideoEncoder === 'function' && typeof window.MediaStreamTrackProcessor === 'function';
@@ -33,7 +37,9 @@
         body.set(header, 4);
         let offset = 4 + header.length;
         for (const part of parts) { body.set(part, offset); offset += part.length; }
-        const response = await send(path, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body });
+        const response = await send(path, {
+          method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body, signal: AbortSignal.timeout?.(reportTimeout),
+        });
         onDirectives(response.ok ? await response.text() : 'stop');
       } catch (_) {
         onDirectives('stop');
@@ -172,7 +178,11 @@
       for (const [target, type, listener] of state.listeners) target.removeEventListener(type, listener);
       if (state.watch !== null) navigator.geolocation.clearWatch(state.watch);
       for (const encoder of [state.video, state.audio]) {
-        if (encoder?.state === 'configured') await encoder.flush().catch(() => {});
+        // The stopped event waits on this, so a flush that never settles
+        // must not keep the session stopping.
+        if (encoder?.state === 'configured') {
+          await Promise.race([encoder.flush().catch(() => {}), new Promise(resolve => setTimeout(resolve, flushTimeout))]);
+        }
         if (encoder && encoder.state !== 'closed') encoder.close();
       }
       report.event(failed ? 'failed' : 'stopped', { reason, message: message || '' });

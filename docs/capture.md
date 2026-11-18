@@ -246,6 +246,9 @@ How it differs from the Android adapter:
   cannot encode H.264 fails the session with reason `unsupported`.
 - A page reload during a session ends it as `Stopped` with reason
   `interrupted`.
+- A report that Go does not answer within 10 s counts as failed, and the page
+  stops capture. When capture stops, each encoder gets 2 s to drain before the
+  page reports that it stopped.
 - A host that shuts down its WebView calls `capture.WebViewClosed()`. The
   page cannot report that it stopped, so the session ends there as `Stopped`
   with reason `closed`, keeping what Go recorded. `examples/capture` calls it
