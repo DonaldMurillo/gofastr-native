@@ -90,3 +90,34 @@ func TestManifestCannotDisagreeWithEmbeddedRegistration(t *testing.T) {
 		t.Fatal("trailing manifest content accepted")
 	}
 }
+
+func TestAndroidOnlyManifestFields(t *testing.T) {
+	const base = `{"name":"example.camera/v1","kind":"component","capabilities":["example.camera/v1"],"android":{"factory":"Camera","sources":["Camera.java"]%s}}`
+	cases := []struct {
+		name, extra string
+		ok          bool
+	}{
+		{"android only", ``, true},
+		{"bind, permissions and services", `,"bind":["camerabind"],"permissions":["android.permission.CAMERA"],"services":[{"class":"CameraService","foregroundServiceType":"camera|location"}]`, true},
+		{"background service", `,"services":[{"class":"CameraService"}]`, true},
+		{"bind outside the package", `,"bind":["../other"]`, false},
+		{"bind with a path separator style", `,"bind":["Camera/Bind"]`, false},
+		{"permission outside android", `,"permissions":["com.example.SECRET"]`, false},
+		{"duplicate permission", `,"permissions":["android.permission.CAMERA","android.permission.CAMERA"]`, false},
+		{"service class with a package", `,"services":[{"class":"com.example.Service"}]`, false},
+		{"unknown service type", `,"services":[{"class":"CameraService","foregroundServiceType":"camera|phoneCall"}]`, false},
+	}
+	for _, c := range cases {
+		manifest, err := extension.ParseManifest([]byte(strings.Replace(base, "%s", c.extra, 1)))
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err = %v, want ok %v", c.name, err, c.ok)
+			continue
+		}
+		if c.ok && (manifest.HasIOS() || manifest.HasWebView()) {
+			t.Errorf("%s: an Android-only manifest reports other adapters", c.name)
+		}
+	}
+	if _, err := extension.ParseManifest([]byte(`{"name":"example.none/v1","capabilities":["example.none/v1"]}`)); err == nil {
+		t.Error("a manifest without any adapter was accepted")
+	}
+}

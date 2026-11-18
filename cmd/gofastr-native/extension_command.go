@@ -85,7 +85,10 @@ func printExtensionReport(output io.Writer, definitions []compiledExtension) {
 			kind = extension.FileKind
 		}
 		fmt.Fprintf(output, "extension %s kind=%s\n", manifest.Name, kind)
-		fmt.Fprintf(output, "  manifest %s/%s\n  factory %s\n", definition.directory, extension.ManifestName, manifest.IOS.Factory)
+		fmt.Fprintf(output, "  manifest %s/%s\n", definition.directory, extension.ManifestName)
+		if manifest.HasIOS() {
+			fmt.Fprintf(output, "  factory %s\n", manifest.IOS.Factory)
+		}
 		capabilities := append([]string(nil), manifest.Capabilities...)
 		sort.Strings(capabilities)
 		for _, capability := range capabilities {
@@ -100,7 +103,9 @@ func printExtensionReport(output io.Writer, definitions []compiledExtension) {
 				fmt.Fprintf(output, "  java %s\n", source)
 			}
 		}
-		fmt.Fprintf(output, "  webview %s\n", manifest.WebView.Script)
+		if manifest.HasWebView() {
+			fmt.Fprintf(output, "  webview %s\n", manifest.WebView.Script)
+		}
 	}
 	fmt.Fprintf(output, "PASS: %d compiled extensions; manifests/assets valid, no identity/capability/factory collisions\n", len(definitions))
 	fmt.Fprintln(output, "NOT CHECKED: adapter behavior, runtime availability, static webassets publication and per-app selection; build/test the consuming app")

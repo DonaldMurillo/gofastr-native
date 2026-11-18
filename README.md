@@ -39,7 +39,7 @@ go tool gofastr-native dev --platform android-emu --renderer native --pkg ./hell
 for whatever is missing. `init` creates a module with Go screens, a private
 item store, durable drafts, tests, and the CLI pinned as a `go tool`. It
 never writes into an existing directory. Run from this checkout, the new
-`go.mod` uses it through a `replace`; pass `--native v0.0.1` to require the
+`go.mod` uses it through a `replace`; pass `--native v0.1.0` to require the
 release instead. `dev`
 rebuilds, reinstalls and restarts the app after each change; it is not hot
 reload. Use `--platform ios-sim` for the iOS simulator.
@@ -64,6 +64,8 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | [`examples/gallery`](examples/gallery) | Every screen contract `nativeui` supports, one at a time. |
 | [`examples/devicefeatures`](examples/devicefeatures) | Incoming shares, secure storage and widgets through their opt-in APIs. |
 | [`examples/chordharp`](examples/chordharp) | A chord harp with sound, as a terminal app and as an Android and iOS app that share one Go synthesizer. |
+| [`examples/capture`](examples/capture) | Android video capture with GPS, camera direction, recordings and live WHIP streaming, on the native renderer (keeps running in the background) and the WebView renderer. |
+| [`examples/dashcam`](examples/dashcam) | A dash cam on Android: loop recording in short files, locks on impact or by hand, and a list of locked clips. |
 
 ## Layout
 

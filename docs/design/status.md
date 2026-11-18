@@ -37,6 +37,22 @@ watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go
 protocol and screens. See [Windows and Android builds and acceptance](../android.md).
 
+[Video capture](../capture.md) records and streams Android camera video with GPS
+and camera direction. Under the native renderer it keeps running in the
+background through a foreground service. Under the WebView renderer the page
+captures with WebCodecs and pauses in the background. Live streaming uses WHIP.
+Recordings are split into segment files, with loop recording under a storage
+budget and locks by hand or on an impact. A killed process loses only the
+segment being written, which without segments is the whole recording.
+`examples/capture` exercises both renderers, and
+`examples/dashcam` is a dash cam on the native renderer. All have run on one
+Android 14 emulator only. The WebView adapter has not recorded microphone
+audio or cut segments on Android. There is no iOS adapter.
+
+The WebView renderer live-refreshes screens without a collection too: a data
+change reads the screen's markup again and swaps it into place, keeping
+mounted components, focus and scroll.
+
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
@@ -121,7 +137,8 @@ and recovers retired live reads without replaying writes or replacing inputs.
 ## Not verified yet
 
 - Android beyond one Android 14 x86-64 emulator: ARM64 devices, other API
-  levels, TalkBack, and physical camera and microphone. The emulator runs
+  levels, TalkBack, and physical camera and microphone. That includes video
+  capture and WHIP streaming over the public internet. The emulator runs
   that did happen are in [Android builds and acceptance](../android.md).
 - A physical iPhone. `--platform ios-device` builds a signed app (see
   [release builds](../release.md)), but install and launch on a registered

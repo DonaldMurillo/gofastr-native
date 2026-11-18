@@ -131,10 +131,6 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	if strings.TrimSpace(*f.microphoneUsage) != "" && *f.platform == "android-emu" && *f.renderer != "native" {
-		fmt.Fprintln(stderr, "--microphone-usage on Android requires --renderer native")
-		return 2
-	}
 	if *f.hostTemplate != "" {
 		resolved, err := filepath.Abs(*f.hostTemplate)
 		if err != nil {

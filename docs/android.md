@@ -84,6 +84,14 @@ an Android adapter fails packaging. Optional manifest `android` metadata supplie
 `dev.gofastr.nativeui` package. The media and photo packages own their adapters.
 `extension init` creates Android scaffolds alongside Swift and WebView assets.
 
+A library can also declare `bind`, Go packages gomobile binds beside the app so
+the library's Java can call its Go, plus `permissions` and `services` that are
+merged into the generated manifest. Services may set `foregroundServiceType`
+to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
+`connectedDevice`, joined with `|`. A library may ship only an Android adapter.
+The [capture library](capture.md) uses all of these for background video
+capture, location and camera direction, with live WHIP streaming.
+
 ## Build compatibility
 
 The pinned dependencies exposed two failures inside a real Android app sandbox:
@@ -169,3 +177,9 @@ TalkBack, hardware IME/composition, and recipient delivery require separate devi
 testing. Native Android does not implement PDF/Office rendering or cloud sync.
 The WebView keeps its existing disclosed browser fallbacks. Its Android shell
 now opens system file choosers; it does not advertise native Android services.
+A library whose `webview` adapter lists `permissions` (`camera`,
+`geolocation`) adds those Android permissions to a WebView build, and the
+shell answers the page's matching requests once Android grants them.
+`--microphone-usage` now works for WebView builds too: it adds `RECORD_AUDIO`
+and lets the page open the microphone. The [capture library](capture.md) uses
+both.

@@ -275,9 +275,14 @@ public abstract class GofastrActivity extends Activity {
             frame.routeDialog.show();if(frame.routeDialog.getWindow()!=null){frame.routeDialog.getWindow().setGravity(Gravity.BOTTOM);frame.routeDialog.getWindow().setLayout(-1,(int)(getResources().getDisplayMetrics().heightPixels*.86));}
             toolbar();frame.scroll.post(()->{frame.scroll.scrollTo(0,frame.scrollY);frame.restoreFocus();});return;
         }
-        viewport.removeAllViews();
-        if(frame.scroll.getParent()!=null) ((ViewGroup)frame.scroll.getParent()).removeView(frame.scroll);
-        viewport.addView(frame.scroll); frame.scroll.post(() -> {frame.scroll.scrollTo(0,frame.scrollY);frame.restoreFocus();});
+        // A refresh of the screen already on display keeps its views attached:
+        // detaching them would destroy a camera or video surface every update.
+        if(viewport.getChildCount()!=1 || viewport.getChildAt(0)!=frame.scroll) {
+            viewport.removeAllViews();
+            if(frame.scroll.getParent()!=null) ((ViewGroup)frame.scroll.getParent()).removeView(frame.scroll);
+            viewport.addView(frame.scroll);
+        }
+        frame.scroll.post(() -> {frame.scroll.scrollTo(0,frame.scrollY);frame.restoreFocus();});
         toolbar(); if(foreground && !frame.busy) watch(frame);
     }
     private void toolbar() {
@@ -805,5 +810,22 @@ public abstract class GofastrActivity extends Activity {
     public boolean canUseMicrophone(){return microphoneEnabled();}
     public Services deviceServices(){return services;}
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){super.onActivityResult(requestCode,resultCode,data);services.activityResult(requestCode,resultCode,data);}
-    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){super.onRequestPermissionsResult(requestCode,permissions,results);services.permissionsResult(requestCode,results);}
+    /** Static, because Android gives the answer to the activity that replaced the one that asked. Main thread only. */
+    private static final Map<Integer,Consumer<Map<String,Boolean>>> extensionPermissions=new HashMap<>();
+    private static int nextExtensionPermission=0x4700;
+    /** Asks for runtime permissions for a compiled extension, after an explicit user action. Grants arrive on main. */
+    public void requestExtensionPermissions(String[] names,Consumer<Map<String,Boolean>> done){
+        Map<String,Boolean> granted=new LinkedHashMap<>();List<String> missing=new ArrayList<>();
+        for(String name:names){boolean has=android.os.Build.VERSION.SDK_INT<23 || checkSelfPermission(name)==android.content.pm.PackageManager.PERMISSION_GRANTED;granted.put(name,has);if(!has)missing.add(name);}
+        if(missing.isEmpty() || destroyed){done.accept(granted);return;}
+        int code=nextExtensionPermission++;if(nextExtensionPermission>0x47ff)nextExtensionPermission=0x4700;
+        extensionPermissions.put(code,results->{granted.putAll(results);done.accept(granted);});
+        requestPermissions(missing.toArray(new String[0]),code);
+    }
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
+        super.onRequestPermissionsResult(requestCode,permissions,results);
+        Consumer<Map<String,Boolean>> extension=extensionPermissions.remove(requestCode);
+        if(extension!=null){Map<String,Boolean> granted=new LinkedHashMap<>();for(int i=0;i<permissions.length;i++)granted.put(permissions[i],i<results.length && results[i]==android.content.pm.PackageManager.PERMISSION_GRANTED);extension.accept(granted);return;}
+        services.permissionsResult(requestCode,results);
+    }
 }
