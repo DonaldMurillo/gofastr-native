@@ -68,8 +68,8 @@ The app's `README.md` names the checkout and says how to switch to a
 published version:
 `go mod edit -dropreplace github.com/DonaldMurillo/gofastr-native`, then
 `go get github.com/DonaldMurillo/gofastr-native@<version>`. `--native` takes
-either a checkout directory or a version such as `v0.0.1`, and a CLI run
-from a release (`go run github.com/DonaldMurillo/gofastr-native/cmd/gofastr-native@v0.0.1 init ...`)
+either a checkout directory or a version such as `v0.1.0`, and a CLI run
+from a release (`go run github.com/DonaldMurillo/gofastr-native/cmd/gofastr-native@v0.1.0 init ...`)
 requires its own version with no `replace`.
 
 The `go.mod` also pins the CLI, `gomobile`, and `gobind` with `tool`
