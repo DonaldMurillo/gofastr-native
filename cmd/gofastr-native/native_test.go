@@ -19,7 +19,7 @@ import (
 
 func nativeApp(t *testing.T) app {
 	t.Helper()
-	application, err := newApp("github.com/DonaldMurillo/gofastr-native/examples/notes/notesnative", "notesnative", "dev.gofastr.notesnative", "Native Notes", "")
+	application, err := newApp(nativePkg, "notesnative", "dev.gofastr.notesnative", "Native Notes", "")
 	if err != nil {
 		t.Fatal(err)
 	}

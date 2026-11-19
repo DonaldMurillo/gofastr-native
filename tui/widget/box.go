@@ -109,10 +109,11 @@ func (b Box) Draw(n *view.Node, c *view.Canvas) {
 	}
 }
 
-// surfaceBox clears its rectangle even when the theme uses default colors.
-type surfaceBox struct{ Box }
+// SurfaceBox clears its rectangle even when the theme uses default colors,
+// for dialogs and toasts layered over other content.
+type SurfaceBox struct{ Box }
 
-func (b surfaceBox) Draw(n *view.Node, c *view.Canvas) {
+func (b SurfaceBox) Draw(n *view.Node, c *view.Canvas) {
 	c.Fill(layout.Rect{W: c.Size().W, H: c.Size().H}, b.Style)
 	b.Box.Draw(n, c)
 }

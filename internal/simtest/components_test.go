@@ -15,7 +15,6 @@ import (
 
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
@@ -29,22 +28,7 @@ func TestMobileComponentsWebView(t *testing.T) {
 }
 
 func runMobileComponents(t *testing.T, platform mobileui.Platform) {
-	t.Cleanup(func() { owner.SetExtractor(nil) })
-	directory := t.TempDir()
-	app, host, err := notesapp.BuildScreensWithPlatform(directory, origin, platform)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := host.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := host.Stop(ctx); err != nil {
-			t.Error(err)
-		}
-	})
+	app, directory, host := screensHost(t, platform)
 	user, err := localapp.LoadOrMint(directory)
 	if err != nil {
 		t.Fatal(err)

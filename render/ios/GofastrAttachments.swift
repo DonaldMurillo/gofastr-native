@@ -49,13 +49,7 @@ final class MobileAttachmentList: UIStackView {
         items.reconcile(attachments.map(\.id)) { _ in MobileAttachmentItem() }
         for file in attachments { items[file.id]?.update(file, open: open) }
         let children: [UIView] = attachments.isEmpty ? [] : [heading] + items.resources
-        if arrangedSubviews.count != children.count || zip(arrangedSubviews, children).contains(where: { $0 !== $1 }) {
-            for child in arrangedSubviews {
-                removeArrangedSubview(child)
-                child.removeFromSuperview()
-            }
-            children.forEach(addArrangedSubview)
-        }
+        replaceArrangedSubviews(children)
     }
 
     func stop() { players.forEach { $0.stop() } }
@@ -125,13 +119,7 @@ private final class MobileAttachmentItem: UIStackView {
         row.addAction(action, for: .touchUpInside)
         playback.update(file.audio) { audio in MobileAudioPreview(audio, identifier: file.id) }
         let children: [UIView] = [row] + (player.map { [$0] } ?? [])
-        if arrangedSubviews.count != children.count || zip(arrangedSubviews, children).contains(where: { $0 !== $1 }) {
-            for child in arrangedSubviews {
-                removeArrangedSubview(child)
-                child.removeFromSuperview()
-            }
-            children.forEach(addArrangedSubview)
-        }
+        replaceArrangedSubviews(children)
     }
 
     func stop() { player?.stop() }

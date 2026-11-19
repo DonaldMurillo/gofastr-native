@@ -8,7 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"unicode"
-	"unicode/utf8"
+
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 const (
@@ -66,12 +67,12 @@ func (request Request) Validate() error {
 }
 
 func (snapshot Snapshot) Validate() error {
-	if !text(snapshot.Title, 200, false) || snapshot.Title == "" || !text(snapshot.Text, 2048, true) || !localRoute(snapshot.Route) || len(snapshot.Items) > MaxItems {
+	if !uitext.Plain(snapshot.Title, 200) || snapshot.Title == "" || !uitext.Multiline(snapshot.Text, 2048) || !localRoute(snapshot.Route) || len(snapshot.Items) > MaxItems {
 		return errors.New("widgets: invalid snapshot text, route, or item count")
 	}
 	seen := map[string]bool{}
 	for _, item := range snapshot.Items {
-		if item.ID == "" || !token(item.ID) || seen[item.ID] || item.Title == "" || !text(item.Title, 200, false) || !text(item.Subtitle, 512, true) {
+		if item.ID == "" || !uitext.Token(item.ID, 64) || seen[item.ID] || item.Title == "" || !uitext.Plain(item.Title, 200) || !uitext.Multiline(item.Subtitle, 512) {
 			return errors.New("widgets: invalid or duplicate item")
 		}
 		seen[item.ID] = true
@@ -94,27 +95,15 @@ func (request Request) Accept(state State) error {
 	return nil
 }
 
-func text(value string, maximum int, multiline bool) bool {
-	return utf8.ValidString(value) && len(value) <= maximum && !strings.ContainsFunc(value, func(r rune) bool {
-		return unicode.IsControl(r) && !(multiline && (r == '\n' || r == '\t'))
-	})
-}
-
-func token(value string) bool {
-	return len(value) <= 64 && !strings.ContainsFunc(value, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._:-", r))
-	})
-}
-
 func localRoute(route string) bool {
 	parsed, err := url.ParseRequestURI(route)
-	if err != nil || !text(route, 2048, false) || strings.ContainsFunc(route, unicode.IsSpace) || !strings.HasPrefix(route, "/") || strings.HasPrefix(route, "//") || strings.ContainsAny(route, "#\\") || parsed.IsAbs() || parsed.Host != "" {
+	if err != nil || !uitext.Plain(route, 2048) || strings.ContainsFunc(route, unicode.IsSpace) || !strings.HasPrefix(route, "/") || strings.HasPrefix(route, "//") || strings.ContainsAny(route, "#\\") || parsed.IsAbs() || parsed.Host != "" {
 		return false
 	}
 	// A single decoded path must not introduce authority, backslashes, controls,
 	// or traversal that changes the destination after native URL parsing.
 	decoded, decodeErr := url.PathUnescape(route)
-	if decodeErr != nil || strings.Contains(strings.ToLower(parsed.RawPath), "%2f") || strings.Contains(parsed.Path, "//") || strings.ContainsAny(parsed.Path, "\\?#") || !text(decoded, 2048, false) {
+	if decodeErr != nil || strings.Contains(strings.ToLower(parsed.RawPath), "%2f") || strings.Contains(parsed.Path, "//") || strings.ContainsAny(parsed.Path, "\\?#") || !uitext.Plain(decoded, 2048) {
 		return false
 	}
 	for _, part := range strings.Split(parsed.Path, "/") {

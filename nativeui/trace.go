@@ -195,14 +195,7 @@ func (runtime *Runtime) captureSession(scratch *traceScratch, session *runtimeSe
 		scratch.action = "undeclared"
 	}
 	scratch.keys = declaredKeys(session.screen)
-	switch {
-	case session.presentation != nil:
-		scratch.foreground = "presentation"
-	case session.files != nil:
-		scratch.foreground = "files"
-	case session.service != nil:
-		scratch.foreground = "service"
-	}
+	scratch.foreground = session.foreground()
 }
 
 func declaredKeys(screen Screen) map[string]bool {

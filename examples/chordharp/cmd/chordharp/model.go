@@ -685,7 +685,7 @@ func (m *model) helpDialog(w, h int) view.Element {
 		widget.Grow(1, view.E(widget.Text{Spans: []widget.Span{{Text: "  " + hint, Style: widget.Theme.Muted}}, Wrap: true})),
 	)
 	body := widget.Limit(0, max(min(lines, h-helpChrome), 1), widget.Scrolling(view.E(helpBody{onClose: closeHelp}, widget.Column(rows...))))
-	box := view.E(surface{widget.Box{Border: widget.BorderRounded, Title: "How to play", Padding: layout.Symmetric(0, 1), Style: widget.Theme.Text}},
+	box := view.E(widget.SurfaceBox{Box: widget.Box{Border: widget.BorderRounded, Title: "How to play", Padding: layout.Symmetric(0, 1), Style: widget.Theme.Text}},
 		widget.Column(body, widget.Label(""), closeRow))
 	return view.E(widget.Modal{OnClose: closeHelp}, widget.Limit(helpWidth, 0, box))
 }
@@ -693,14 +693,6 @@ func (m *model) helpDialog(w, h int) view.Element {
 // helpChrome is the help dialog's height besides its entries: the border,
 // the gap above the close row and the close row.
 const helpChrome = 4
-
-// surface is a box that clears what is under it, for a dialog.
-type surface struct{ widget.Box }
-
-func (b surface) Draw(n *view.Node, c *view.Canvas) {
-	c.Fill(layout.Rect{W: c.Size().W, H: c.Size().H}, b.Style)
-	b.Box.Draw(n, c)
-}
 
 // helpBody holds focus inside the help dialog. Enter closes it; the
 // navigation keys bubble to the scroller around it.

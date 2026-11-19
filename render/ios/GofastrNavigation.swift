@@ -198,7 +198,7 @@ final class MobileTabController: UITabBarController, UITabBarControllerDelegate,
                 source.setNavigationInFlight(false)
                 self.switching = false
                 guard source.navigationStillSafe else {
-                    if case .success(let reply) = result, let instance = reply.instance { self.host.command(["kind": "close", "instance": instance]) { _ in } }
+                    self.host.closeStale(result)
                     return
                 }
                 guard case .success(let reply) = result, reply.error == nil, let screen = reply.screen else {

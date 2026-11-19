@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -268,10 +266,7 @@ func commandKinds(t *testing.T, log string) map[string]int {
 }
 
 func runInspect(t *testing.T, args ...string) (int, string, string) {
-	t.Helper()
-	var stdout, stderr bytes.Buffer
-	code := inspectCommand(context.Background(), args, &stdout, &stderr)
-	return code, stdout.String(), stderr.String()
+	return runCommand(t, inspectCommand, args...)
 }
 
 func decodeReport(t *testing.T, stdout string) inspectReport {

@@ -22,12 +22,7 @@
     } catch (_) { return null; }
   };
 
-  const element = (tag, text, attributes = {}) => {
-    const node = document.createElement(tag);
-    if (text) node.textContent = text;
-    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
-    return node;
-  };
+  const element = (tag, text, attributes) => window.__gofastr_components.element(tag, text, attributes);
   const controls = (view) => Array.from(view.dialog.querySelectorAll('button, input')).filter((control) => !control.disabled && !control.hidden);
   const focus = (view) => (controls(view)[0] || view.heading).focus({ preventScroll: true });
   const revoke = (view) => {
@@ -65,11 +60,9 @@
   const mediaType = (value) => typeof value === 'string' && value.length <= 128 &&
     /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+(?:\s*;[^\r\n\u0000-\u001f]*)?$/i.test(value);
   const decode = (data) => {
-    if (typeof data !== 'string' || data.length > 4 * Math.ceil(maximum / 3) ||
-        data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new Error('Invalid file data.');
-    const binary = atob(data);
-    if (binary.length > maximum || btoa(binary) !== data) throw new Error('Invalid or oversized file data.');
-    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const bytes = window.__gofastr_components.decodeBase64(data, maximum, 'Invalid file data.');
+    if (bytes.length > maximum || window.__gofastr_components.encodeBase64(bytes) !== data) throw new Error('Invalid or oversized file data.');
+    return bytes;
   };
   const outcome = (error) => ({ status: error?.name === 'AbortError' ? 'cancelled' :
     ['NotAllowedError', 'SecurityError'].includes(error?.name) ? 'denied' : error?.name === 'NotSupportedError' ? 'unsupported' : 'failed' });
@@ -168,9 +161,7 @@
         const bytes = new Uint8Array(await file.slice(0, policy.maxBytes + 1).arrayBuffer());
         if (bytes.length > policy.maxBytes || bytes.length !== file.size) result = { status: 'denied' };
         else {
-          let binary = '';
-          for (let offset = 0; offset < bytes.length; offset += 32768) binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
-          result = { status: 'completed', file: { name: file.name, mediaType: mediaType(file.type) ? file.type : 'application/octet-stream', data: btoa(binary) } };
+          result = { status: 'completed', file: { name: file.name, mediaType: mediaType(file.type) ? file.type : 'application/octet-stream', data: window.__gofastr_components.encodeBase64(bytes) } };
         }
       }
     } catch (error) { result = outcome(error); }

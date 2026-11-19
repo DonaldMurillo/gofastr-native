@@ -264,13 +264,7 @@ final class MobileComponentViews: UIStackView {
                 message.accessibilityIdentifier = "native.component.error.\(issue.id)"
                 return message
             }
-            if arrangedSubviews.count != views.count || zip(arrangedSubviews, views).contains(where: { $0 !== $1 }) {
-                for child in arrangedSubviews {
-                    removeArrangedSubview(child)
-                    child.removeFromSuperview()
-                }
-                views.forEach(addArrangedSubview)
-            }
+            replaceArrangedSubviews(views)
             isHidden = views.isEmpty
         } catch {
             clear()

@@ -1,5 +1,21 @@
 (() => {
   'use strict';
+  const element = (tag, text, attributes = {}) => {
+    const node = document.createElement(tag);
+    if (text) node.textContent = text;
+    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+    return node;
+  };
+  const decodeBase64 = (data, maxBytes, label) => {
+    if (typeof data !== 'string' || data.length > 4 * Math.ceil(maxBytes / 3) || data.length % 4 !== 0 ||
+        !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new Error(label);
+    return Uint8Array.from(atob(data), character => character.charCodeAt(0));
+  };
+  const encodeBase64 = (bytes) => {
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 32768) binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+    return btoa(binary);
+  };
   const fileIcon = (document, kind) => {
     const paths = {
       file: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm0 0v6h6M8 13h8M8 17h6',
@@ -53,6 +69,13 @@
     Array.from(fields).filter(field => !visibleOnly || field.type !== 'hidden')
       .map(field => [field.dataset[marker], fieldValue(field, defaults)]));
 
+  const matchRoutePath = (routePath, segments) => {
+    const expected = routePath.split('/');
+    return expected.length === segments.length && expected.every((segment, index) =>
+      segment.startsWith('{') && segment.endsWith('}') ? segments[index] !== '' : segment === segments[index]);
+  };
+  const actionTarget = (route, actionId, rowId) => '/_mobile/actions?' + new URLSearchParams(
+    rowId === undefined ? { route, action: actionId } : { route, action: actionId, row: rowId });
   const localRoute = (config, destination, base) => {
     if (typeof destination !== 'string' || destination.length > 4096 || !destination.startsWith('/') ||
         destination.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(destination)) return null;
@@ -63,11 +86,7 @@
     const parsed = new URL(destination, base);
     const origin = new URL(base);
     if (parsed.origin !== origin.origin) return null;
-    const matched = path === '/' || config.routes.some(route => {
-      const expected = route.path.split('/');
-      return expected.length === segments.length && expected.every((segment, index) =>
-        segment.startsWith('{') && segment.endsWith('}') ? segments[index] !== '' : segment === segments[index]);
-    });
+    const matched = path === '/' || config.routes.some(route => matchRoutePath(route.path, segments));
     return matched ? parsed.pathname + parsed.search : null;
   };
 
@@ -155,8 +174,9 @@
     return side.length ? { kind: 'menu', side: gesture.side } : { kind: 'cancel' };
   };
 
-  const api = { fileIcon, matchedParts, fieldValue, setField, serialize, localRoute, reconcile, queryRoute, listValues, collectionIdentity, tabSignature,
-    emptyMetadata, restoreMetadata, metadataKey, gestureStart, gestureMove, gestureEnd };
+  const api = { element, decodeBase64, encodeBase64, matchRoutePath, actionTarget, fileIcon, matchedParts, fieldValue, setField, serialize, localRoute,
+    reconcile, queryRoute, listValues, collectionIdentity, tabSignature, emptyMetadata, restoreMetadata, metadataKey,
+    gestureStart, gestureMove, gestureEnd };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else {
     window.__gofastr_components = api;

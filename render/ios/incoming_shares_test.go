@@ -4,40 +4,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
 func TestIncomingSharesExecutableInbox(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("executable Foundation inbox checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("Xcode toolchain unavailable")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	source, err := Sources.ReadFile("GofastrIncomingShares.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	library := filepath.Join(directory, "GofastrIncomingShares.swift")
-	if err := os.WriteFile(library, source, 0600); err != nil {
-		t.Fatal(err)
-	}
-	checks := filepath.Join(directory, "IncomingShareChecks.swift")
-	if err := os.WriteFile(checks, []byte(incomingShareChecks), 0600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "incoming-share-checks")
-	if output, err := exec.Command("xcrun", "--sdk", "macosx", "swiftc", "-parse-as-library", library, checks, "-o", executable).CombinedOutput(); err != nil {
-		t.Fatalf("Swift inbox compile: %v\n%s", err, output)
-	}
+	library := swiftSources(t, directory, Sources, "GofastrIncomingShares.swift")[0]
+	executable := compileRunChecks(t, directory, "incoming-share-checks", incomingShareChecks, "Swift inbox compile", "", []string{library}, nil)
 	for _, name := range []string{"direct", "symlink-parent"} {
 		t.Run(name, func(t *testing.T) {
 			inbox := filepath.Join(directory, name, "inbox")
 			if name == "symlink-parent" {
 				target := filepath.Join(directory, "target")
-				if err := os.Mkdir(target, 0700); err != nil {
+				if err := os.Mkdir(target, 0o700); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.Symlink(target, filepath.Dir(inbox)); err != nil {

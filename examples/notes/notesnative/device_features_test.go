@@ -18,24 +18,16 @@ import (
 
 func devicesHello(t *testing.T) string {
 	t.Helper()
-	reply := showcaseCommand(t, nativeui.Command{Kind: "hello", Hello: &nativeui.Hello{Minimum: 1, Maximum: 1, Renderer: "android", Capabilities: map[nativeui.Capability]nativeui.Support{
-		nativeui.CapabilityNavigation: nativeui.SupportAvailable, nativeui.CapabilityEditor: nativeui.SupportAvailable, nativeui.CapabilityDrafts: nativeui.SupportAvailable,
-		nativeui.CapabilityPresentation: nativeui.SupportAvailable, nativeui.CapabilityFiles: nativeui.SupportAvailable, nativeui.CapabilityLive: nativeui.SupportAvailable,
-		nativeui.CapabilityIncomingShares: nativeui.SupportAvailable, nativeui.CapabilitySecureStorage: nativeui.SupportAvailable, nativeui.CapabilityWidgets: nativeui.SupportAvailable, nativeui.CapabilityPrivacy: nativeui.SupportAvailable,
-		"gofastr.media/v1": nativeui.SupportAvailable,
-	}}})
-	if reply.Error != nil {
-		t.Fatal(reply.Error)
-	}
-	return reply.Connection
+	return hello(t, "android", map[nativeui.Capability]nativeui.Support{
+		nativeui.CapabilityDrafts: nativeui.SupportAvailable, nativeui.CapabilityFiles: nativeui.SupportAvailable,
+		nativeui.CapabilityLive: nativeui.SupportAvailable, nativeui.CapabilityIncomingShares: nativeui.SupportAvailable,
+		nativeui.CapabilitySecureStorage: nativeui.SupportAvailable, nativeui.CapabilityWidgets: nativeui.SupportAvailable,
+		nativeui.CapabilityPrivacy: nativeui.SupportAvailable,
+	})
 }
 
 func TestNotesSharesSaveOnceAcrossAckFailureAndRestart(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	connection := devicesHello(t)
 	opened := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/inbox"})
 	shown := filesAction(t, nativeui.Command{Connection: connection, Instance: opened.Instance, RequestID: "read", Action: "read"})
@@ -89,11 +81,7 @@ func TestNotesSharesSaveOnceAcrossAckFailureAndRestart(t *testing.T) {
 }
 
 func TestProtectedNotesBindSaveToAuthenticatedBytesAndLockWithoutDrafts(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	connection := devicesHello(t)
 	collection := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/protected"})
 	created := filesAction(t, nativeui.Command{Connection: connection, Instance: collection.Instance, RequestID: "new", Action: "new"})
@@ -174,10 +162,7 @@ func TestProtectedNotesBindSaveToAuthenticatedBytesAndLockWithoutDrafts(t *testi
 }
 
 func TestWidgetRequiresExplicitSelectionAndTracksSavedNote(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	note, err := Save("", "Widget title", "Saved widget text")
 	if err != nil {
 		t.Fatal(err)

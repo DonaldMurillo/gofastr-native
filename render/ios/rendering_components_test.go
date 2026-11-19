@@ -2,33 +2,14 @@ package ios
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestRenderingComponentsSwiftLifecycleAndEvents(test *testing.T) {
-	if runtime.GOOS != "darwin" {
-		test.Skip("executable Swift Foundation checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		test.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(test)
 	directory := test.TempDir()
-	arguments := []string{"--sdk", "macosx", "swiftc", "-O", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache")}
-	for _, name := range []string{"GofastrComponents.swift", "GofastrComponentExtensions.swift", "GofastrActions.swift", "GofastrFiles.swift", "GofastrPresentation.swift", "GofastrImages.swift", "GofastrAttachments.swift", "GofastrServices.swift", "GofastrIncomingShares.swift", "GofastrSecureStorage.swift", "GofastrWidgets.swift"} {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			test.Fatal(err)
-		}
-		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			test.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
 	media, err := os.ReadFile("../../extension/media/GofastrMedia.swift")
 	if err != nil {
 		test.Fatal(err)
@@ -37,62 +18,16 @@ func TestRenderingComponentsSwiftLifecycleAndEvents(test *testing.T) {
 	if err := os.WriteFile(mediaPath, media, 0o600); err != nil {
 		test.Fatal(err)
 	}
-	native, err := Sources.ReadFile("GofastrNative.swift")
-	if err != nil {
-		test.Fatal(err)
-	}
-	start := strings.Index(string(native), "struct MobileDraft:")
-	end := strings.Index(string(native), "final class MobileHost {")
-	if start < 0 || end <= start {
-		test.Fatal("missing actual renderer wire DTOs")
-	}
-	checks := filepath.Join(directory, "RenderingChecks.swift")
-	if err := os.WriteFile(checks, []byte("import Foundation\n"+string(native[start:end])+renderingComponentChecks), 0o600); err != nil {
-		test.Fatal(err)
-	}
-	executable := filepath.Join(directory, "rendering-checks")
-	arguments = append(arguments, mediaPath, checks, "-o", executable)
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		test.Fatalf("rendering component executable does not compile: %v\n%s", err, output)
-	}
-	if output, err := exec.Command(executable).CombinedOutput(); err != nil {
-		test.Fatalf("component bounds, keyed retention, event allowlist, or disposal regression: %v\n%s", err, output)
-	}
+	arguments := append([]string{"-O"}, swiftSources(test, directory, Sources, rendererSourceFiles...)...)
+	arguments = append(arguments, mediaPath)
+	compileRunChecks(test, directory, "rendering-checks", "import Foundation\n"+draftDTOs(test)+renderingComponentChecks,
+		"rendering component executable does not compile", "component bounds, keyed retention, event allowlist, or disposal regression", arguments, nil)
 }
 
 func TestRenderingComponentsMediaUIKitOptimizedCompiles(test *testing.T) {
-	if runtime.GOOS != "darwin" {
-		test.Skip("UIKit compilation requires Xcode on macOS")
-	}
-	sdk, err := exec.Command("xcrun", "--sdk", "iphonesimulator", "--show-sdk-path").Output()
-	if err != nil {
-		test.Skipf("no iOS simulator SDK: %v", err)
-	}
-	architecture := runtime.GOARCH
-	if architecture == "amd64" {
-		architecture = "x86_64"
-	}
 	directory := test.TempDir()
-	arguments := []string{"--sdk", "iphonesimulator", "swiftc", "-O", "-parse-as-library", "-emit-library", "-module-name", "GofastrMediaChecks",
-		"-target", architecture + "-apple-ios16.0-simulator", "-sdk", strings.TrimSpace(string(sdk)), "-module-cache-path", filepath.Join(directory, "module-cache")}
-	entries, err := Sources.ReadDir(".")
-	if err != nil {
-		test.Fatal(err)
-	}
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".swift") {
-			continue
-		}
-		source, err := Sources.ReadFile(entry.Name())
-		if err != nil {
-			test.Fatal(err)
-		}
-		path := filepath.Join(directory, entry.Name())
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			test.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
+	arguments := uikitSimulatorArguments(test, directory, "-O", "-parse-as-library", "-emit-library", "-module-name", "GofastrMediaChecks")
+	arguments = append(arguments, swiftDirectorySources(test, directory, Sources)...)
 	media, err := os.ReadFile("../../extension/media/GofastrMedia.swift")
 	if err != nil {
 		test.Fatal(err)
@@ -114,13 +49,11 @@ func installGeneratedMediaCatalog() {
 		test.Fatal(err)
 	}
 	arguments = append(arguments, mediaPath, catalog, "-o", filepath.Join(directory, "libGofastrMediaChecks.dylib"))
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		test.Fatalf("optimized media-enabled UIKit library/catalog must compile and link: %v\n%s", err, output)
-	}
+	requireXcrun(test, "optimized media-enabled UIKit library/catalog must compile and link", arguments...)
 }
 
 func TestRenderingComponentsHostContracts(test *testing.T) {
-	checks := map[string][]string{
+	requireTokenMap(test, map[string][]string{
 		"GofastrNative.swift": {
 			`var components: [MobileComponent]?`, `MobileComponentExtensions.capabilities()`, `componentViews?.activate(screen.components ?? [])`,
 			`self.screen.components = model.components`, `self.componentViews?.reconcile(model.components ?? [])`,
@@ -135,27 +68,13 @@ func TestRenderingComponentsHostContracts(test *testing.T) {
 		},
 		"GofastrImages.swift":      {`MobileKeyedResources<MobileImageControl>`, `if preview?.data != next.data`, `let action = UIAction { _ in open?(destination) }`},
 		"GofastrAttachments.swift": {`MobileKeyedResources<MobileAttachmentItem>`, `MobileRetainedResource<MobileAudioDocument, MobileAudioPreview>`, `playback.update(file.audio)`},
-	}
-	for name, tokens := range checks {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			test.Fatal(err)
-		}
-		for _, token := range tokens {
-			if !strings.Contains(string(source), token) {
-				test.Errorf("%s lost rendering component contract: %s", name, token)
-			}
-		}
-	}
+	}, "%s lost rendering component contract")
 	media, err := os.ReadFile("../../extension/media/GofastrMedia.swift")
 	if err != nil {
 		test.Fatal(err)
 	}
-	for _, required := range []string{`func update(payload: String, emit: @escaping (String) -> Void) throws`, `guard self?.generation == current`, `gallery.open = callback`, `attachments.open = callback`} {
-		if !strings.Contains(string(media), required) {
-			test.Errorf("media library lost retained update or queued-callback fencing: %s", required)
-		}
-	}
+	requireTokens(test, string(media), "media library lost retained update or queued-callback fencing",
+		`func update(payload: String, emit: @escaping (String) -> Void) throws`, `guard self?.generation == current`, `gallery.open = callback`, `attachments.open = callback`)
 	for _, forbidden := range []string{"pushViewController", "openDestination", "UIApplication.shared.open", "host.", "notes/", "send(\""} {
 		if strings.Contains(string(media), forbidden) {
 			test.Errorf("media library bypasses generic navigation or owns app-specific behavior: %s", forbidden)

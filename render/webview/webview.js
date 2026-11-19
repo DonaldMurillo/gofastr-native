@@ -426,7 +426,7 @@
         const button = document.createElement('button');
         button.textContent = action.label;
         for (const [key, value] of Object.entries({ type: 'submit', form: 'gfw-form', name: 'action', value: action.id,
-          formaction: '/_mobile/actions?' + new URLSearchParams({ route: screen.route || state.config.route, action: action.id }) })) button.setAttribute(key, value);
+          formaction: components.actionTarget(screen.route || state.config.route, action.id) })) button.setAttribute(key, value);
         controls.push(button);
       }
       toolbar.replaceChildren(...controls);
@@ -1173,6 +1173,10 @@
     catch (error) { state.uncertain = true; throw error; }
   };
 
+  const refocusOpener = (root, state, opener) => {
+    if (current(state) && !modalOpen() && root.isConnected && opener?.isConnected && !opener.disabled) opener.focus({ preventScroll: true });
+  };
+
   const respond = async (root, state, presentationId, choice, selected, opener) => {
     if (state.busy || !root.isConnected) return;
     const finish = beginResponse(state);
@@ -1194,80 +1198,74 @@
       throw error;
     } finally {
       finish();
-      if (current(state) && !modalOpen() && root.isConnected && opener?.isConnected && !opener.disabled) opener.focus({ preventScroll: true });
+      refocusOpener(root, state, opener);
     }
+  };
+
+  const settleModalResult = async (root, state, kind, payload, opener, plan) => {
+    const requestId = crypto.randomUUID();
+    const run = async (readOnly = false) => {
+      const finish = beginResponse(state);
+      clearTimeout(state.checkpointTimer);
+      let observed = false;
+      try {
+        const reply = readOnly ? await readCompletion(root, state, requestId) :
+          await completeResponse(root, state, kind, requestId, payload);
+        if (plan.stale()) return;
+        if (!reply.response && plan.unconfirmed(reply)) throw new Error(reply.error?.message || plan.unconfirmedMessage);
+        observed = true;
+        observe(root, state, reply);
+        if (reply.error) {
+          showFields(state, reply.editor?.fields || reply.error.fields);
+          plan.reject(reply);
+        }
+        plan.close();
+        await applyResponse(root, state, requestId, reply, opener);
+        plan.settled?.();
+      } catch (error) {
+        if (!observed) error.complete = () => run(true);
+        if (current(state)) status(root, error.message || plan.uncertainMessage, true);
+        throw error;
+      } finally {
+        finish();
+        refocusOpener(root, state, opener);
+      }
+    };
+    await run();
   };
 
   const respondFile = async (root, state, fileId, fileResult, opener) => {
     if (state.busy || !root.isConnected) throw Object.assign(new Error('Wait for the pending action.'), { fileRetryable: true });
-    const requestId = crypto.randomUUID();
-    const run = async (readOnly = false) => {
-      const finish = beginResponse(state);
-      clearTimeout(state.checkpointTimer);
-      let observed = false;
-      try {
-        const reply = readOnly ? await readCompletion(root, state, requestId) :
-          await completeResponse(root, state, 'file-result', requestId, { fileId, fileResult });
-        if (!current(state)) return;
-        if (!reply.response && (!reply.error || !reply.writeRejected || reply.error.code === 'pending')) {
-          throw new Error(reply.error?.message || 'The file result has not been observed. It was not retried.');
-        }
-        observed = true;
-        observe(root, state, reply);
-        if (reply.error) {
-          const retryable = reply.writeRejected && !reply.response && ['invalid_request', 'validation'].includes(reply.error.code);
-          if (!retryable) files.close(root, false);
-          showFields(state, reply.editor?.fields || reply.error.fields);
-          throw Object.assign(new Error(reply.error.message), { fileRetryable: retryable });
-        }
-        files.close(root, false);
-        await applyResponse(root, state, requestId, reply, opener);
+    await settleModalResult(root, state, 'file-result', { fileId, fileResult }, opener, {
+      stale: () => !current(state),
+      unconfirmed: reply => !reply.error || !reply.writeRejected || reply.error.code === 'pending',
+      unconfirmedMessage: 'The file result has not been observed. It was not retried.',
+      reject: reply => {
+        const retryable = reply.writeRejected && !reply.response && ['invalid_request', 'validation'].includes(reply.error.code);
+        if (!retryable) files.close(root, false);
+        throw Object.assign(new Error(reply.error.message), { fileRetryable: retryable });
+      },
+      close: () => files.close(root, false),
+      settled: () => {
         if (fileResult.status === 'completed' && !fileResult.file) {
           const message = root.querySelector('[data-gfw-status]')?.textContent || '';
           status(root, 'Download initiated. This WebView cannot confirm an external disk save. ' + message);
         }
-      } catch (error) {
-        if (!observed) error.complete = () => run(true);
-        if (current(state)) status(root, error.message || 'The file result is uncertain. It was not retried.', true);
-        throw error;
-      } finally {
-        finish();
-        if (current(state) && !modalOpen() && root.isConnected && opener?.isConnected && !opener.disabled) opener.focus({ preventScroll: true });
-      }
-    };
-    await run();
+      },
+      uncertainMessage: 'The file result is uncertain. It was not retried.',
+    });
   };
 
   const respondService = async (root, state, serviceId, serviceResult, opener) => {
     if (state.busy || !current(state) || !root.isConnected) throw new Error('The service screen is no longer ready. No operation was repeated.');
-    const requestId = crypto.randomUUID();
-    const run = async (readOnly = false) => {
-      const finish = beginResponse(state);
-      clearTimeout(state.checkpointTimer);
-      let observed = false;
-      try {
-        const reply = readOnly ? await readCompletion(root, state, requestId) :
-          await completeResponse(root, state, 'service-result', requestId, { serviceId, serviceResult });
-        if (!current(state) || !root.isConnected) return;
-        if (!reply.response && (!reply.writeRejected || ['pending', 'unknown'].includes(reply.error?.code))) throw new Error(reply.error?.message || 'The service result has not been observed. Only completion can be checked.');
-        observed = true;
-        observe(root, state, reply);
-        if (reply.error) {
-          showFields(state, reply.editor?.fields || reply.error.fields);
-          throw new Error(reply.error.message);
-        }
-        services.close(root, false);
-        await applyResponse(root, state, requestId, reply, opener);
-      } catch (error) {
-        if (!observed) error.complete = () => run(true);
-        if (current(state)) status(root, error.message || 'The service result is uncertain. It was not retried.', true);
-        throw error;
-      } finally {
-        finish();
-        if (current(state) && !modalOpen() && root.isConnected && opener?.isConnected && !opener.disabled) opener.focus({ preventScroll: true });
-      }
-    };
-    await run();
+    await settleModalResult(root, state, 'service-result', { serviceId, serviceResult }, opener, {
+      stale: () => !current(state) || !root.isConnected,
+      unconfirmed: reply => !reply.writeRejected || ['pending', 'unknown'].includes(reply.error?.code),
+      unconfirmedMessage: 'The service result has not been observed. Only completion can be checked.',
+      reject: reply => { throw new Error(reply.error.message); },
+      close: () => services.close(root, false),
+      uncertainMessage: 'The service result is uncertain. It was not retried.',
+    });
   };
 
   const applyResponse = async (root, state, requestId, reply, opener) => {
@@ -1384,11 +1382,8 @@
     }
     if (form !== state.form || state.busy || state.leaving || historyBarrier?.pending || state.queryPending || state.uncertain || state.composing.size) return;
     const action = event.submitter?.value || '';
-    const route = state.config.routes.find((item) => {
-      const expected = item.path.split('/');
-      const actual = state.config.route.split('?')[0].split('/').map(decodeURIComponent);
-      return expected.length === actual.length && expected.every((segment, index) => segment.startsWith('{') && segment.endsWith('}') ? actual[index] !== '' : segment === actual[index]);
-    });
+    const route = state.config.routes.find((item) => components.matchRoutePath(item.path,
+      state.config.route.split('?')[0].split('/').map(decodeURIComponent)));
     if (!route?.actions.includes(action)) {
       status(root, 'Choose an available action.', true);
       return;

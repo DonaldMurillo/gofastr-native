@@ -18,39 +18,42 @@ final class MobileForegroundCoordinator {
         finish(active.identifier, restoreFocus: false) {}
     }
 
+    /// Prepares presentation of a foreground task: refuses while another task
+    /// is active, for an empty identifier, or over a presented controller, and
+    /// returns the retained focus to build the task with.
+    private func begin(_ identifier: String, source: UIViewController) -> MobileForegroundFocus? {
+        guard active == nil, !identifier.isEmpty, source.presentedViewController == nil else { return nil }
+        return self.focus ?? MobileForegroundFocus(source)
+    }
+
     @discardableResult
-    func show(_ model: MobilePresentation, identifier: String, from source: UIViewController,
-              respond: @escaping (String, [String]) -> Void) -> Bool {
-        guard active == nil, !identifier.isEmpty,
-              ["alert", "confirmation", "menu", "dialog", "sheet"].contains(model.kind),
-              source.presentedViewController == nil else { return false }
-        let focus = self.focus ?? MobileForegroundFocus(source)
+    private func present(_ task: MobileForegroundTask, focus: MobileForegroundFocus) -> Bool {
         self.focus = focus
-        let task = MobilePresentationTask(model, identifier: identifier, source: source, focus: focus, respond: respond)
         active = task
         task.show()
         return true
     }
 
     @discardableResult
+    func show(_ model: MobilePresentation, identifier: String, from source: UIViewController,
+              respond: @escaping (String, [String]) -> Void) -> Bool {
+        guard ["alert", "confirmation", "menu", "dialog", "sheet"].contains(model.kind),
+              let focus = begin(identifier, source: source) else { return false }
+        return present(MobilePresentationTask(model, identifier: identifier, source: source, focus: focus, respond: respond), focus: focus)
+    }
+
+    @discardableResult
     func show(_ model: MobileFiles, identifier: String, from source: UIViewController,
               respond: @escaping (MobileFileResult) -> Void) -> Bool {
-        guard active == nil, !identifier.isEmpty, source.presentedViewController == nil else { return false }
-        let focus = self.focus ?? MobileForegroundFocus(source)
-        let task: MobileForegroundTask
+        guard let focus = begin(identifier, source: source) else { return false }
         if let operation = model.operation {
             guard model.isValid, let adapter = MobileFileExtensions.make(operation, identifier: identifier, source: source, focus: focus, queue: fileQueue, respond: respond) else {
                 respond(MobileFileResult(status: .unsupported))
                 return true
             }
-            task = adapter
-        } else {
-            task = MobileFileTask(model, identifier: identifier, source: source, focus: focus, queue: fileQueue, respond: respond)
+            return present(adapter, focus: focus)
         }
-        self.focus = focus
-        active = task
-        task.show()
-        return true
+        return present(MobileFileTask(model, identifier: identifier, source: source, focus: focus, queue: fileQueue, respond: respond), focus: focus)
     }
 
     func reject(_ identifier: String, message: String) {
@@ -61,13 +64,8 @@ final class MobileForegroundCoordinator {
     @discardableResult
     func show(_ model: MobileServiceRequest, identifier: String, from source: UIViewController,
               openRoute: @escaping (String) -> Bool, respond: @escaping (MobileServiceResult) -> Void) -> Bool {
-        guard active == nil, !identifier.isEmpty, source.presentedViewController == nil else { return false }
-        let focus = self.focus ?? MobileForegroundFocus(source)
-        self.focus = focus
-        let task = MobileServiceTask(model, identifier: identifier, source: source, focus: focus, openRoute: openRoute, respond: respond)
-        active = task
-        task.show()
-        return true
+        guard let focus = begin(identifier, source: source) else { return false }
+        return present(MobileServiceTask(model, identifier: identifier, source: source, focus: focus, openRoute: openRoute, respond: respond), focus: focus)
     }
 
     func finish(_ identifier: String, restoreFocus: Bool = true, preserveFocus: Bool = false, completion: @escaping () -> Void) {

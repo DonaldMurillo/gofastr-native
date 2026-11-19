@@ -11,11 +11,7 @@ import (
 )
 
 func TestNoteControlsCollectionsAndTabsThroughBinding(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	connection := filesHello(t)
 	editor := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/notes/new"})
 	assertTabs(t, editor.Screen, "notes")
@@ -117,10 +113,7 @@ func TestNoteControlsCollectionsAndTabsThroughBinding(t *testing.T) {
 }
 
 func TestNoteCollectionQueryChangesResetPagingAndSelection(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	for index := range 13 {
 		if _, err := Save("", fmt.Sprintf("Query note %02d", index), "Still a note"); err != nil {
 			t.Fatal(err)
@@ -148,10 +141,7 @@ func TestNoteCollectionQueryChangesResetPagingAndSelection(t *testing.T) {
 }
 
 func TestSoftTrashConfirmationKeepsAttachmentsAndCanRestore(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	note, err := Save("", "Keep my file", "Soft deletion")
 	if err != nil {
 		t.Fatal(err)

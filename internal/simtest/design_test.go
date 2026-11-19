@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
@@ -21,7 +20,6 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 	"github.com/chromedp/cdproto/emulation"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
@@ -30,12 +28,7 @@ import (
 func TestNotesVisualHierarchyWebView(t *testing.T) {
 	for _, platform := range []mobileui.Platform{mobileui.IOS, mobileui.Android} {
 		t.Run(string(platform), func(t *testing.T) {
-			t.Cleanup(func() { owner.SetExtractor(nil) })
-			directory := t.TempDir()
-			app, host, err := notesapp.BuildScreensWithPlatform(directory, origin, platform)
-			if err != nil {
-				t.Fatal(err)
-			}
+			app, directory, host := screensHost(t, platform)
 			photo := image.NewRGBA(image.Rect(0, 0, 800, 480))
 			draw.Draw(photo, photo.Bounds(), &image.Uniform{C: color.RGBA{R: 165, G: 188, B: 187, A: 255}}, image.Point{}, draw.Src)
 			draw.Draw(photo, image.Rect(0, 300, 800, 480), &image.Uniform{C: color.RGBA{R: 88, G: 117, B: 100, A: 255}}, image.Point{}, draw.Src)
@@ -43,16 +36,6 @@ func TestNotesVisualHierarchyWebView(t *testing.T) {
 			if err := jpeg.Encode(&photoBytes, photo, &jpeg.Options{Quality: 85}); err != nil {
 				t.Fatal(err)
 			}
-			if err := host.Start(); err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := host.Stop(ctx); err != nil {
-					t.Error(err)
-				}
-			})
 			user, err := localapp.LoadOrMint(directory)
 			if err != nil {
 				t.Fatal(err)

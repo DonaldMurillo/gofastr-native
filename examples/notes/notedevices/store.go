@@ -178,31 +178,7 @@ func (store *Store) Update(ctx context.Context, change func(*State) error) error
 	if len(encoded) > 24<<20 {
 		return errors.New("notes: device storage is full")
 	}
-	output, err := os.CreateTemp(store.root, ".index-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(output.Name())
-	defer output.Close()
-	if err := privatefile.Harden(output.Name(), false); err != nil {
-		return err
-	}
-	if _, err := output.Write(encoded); err != nil {
-		return err
-	}
-	if err := output.Sync(); err != nil {
-		return err
-	}
-	if err := output.Close(); err != nil {
-		return err
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := privatefile.Replace(output.Name(), filepath.Join(store.root, "index.json")); err != nil {
-		return err
-	}
-	return privatefile.SyncDirectory(store.root)
+	return privatefile.WriteFile(ctx, store.root, ".index-*", filepath.Join(store.root, "index.json"), encoded)
 }
 
 func (store *Store) Stage(ctx context.Context, item sharein.Item) error {

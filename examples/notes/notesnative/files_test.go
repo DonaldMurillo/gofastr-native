@@ -10,11 +10,7 @@ import (
 )
 
 func TestFilesThroughNativeBinding(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	connection := filesHello(t)
 	opened := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/files"})
 	command := nativeui.Command{Connection: connection, Instance: opened.Instance, Action: "import", RequestID: "import-cancel"}
@@ -98,10 +94,7 @@ func TestFilesThroughNativeBinding(t *testing.T) {
 }
 
 func TestFileValidationAndForegroundOwnership(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	connection := filesHello(t)
 	opened := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/files"})
 	shown := filesAction(t, nativeui.Command{Connection: connection, Instance: opened.Instance, RequestID: "pick", Action: "import"})
@@ -139,14 +132,7 @@ func TestFileValidationAndForegroundOwnership(t *testing.T) {
 
 func filesHello(t *testing.T) string {
 	t.Helper()
-	reply := showcaseCommand(t, nativeui.Command{Kind: "hello", Hello: &nativeui.Hello{Minimum: 1, Maximum: 1, Renderer: "uikit", Capabilities: map[nativeui.Capability]nativeui.Support{
-		nativeui.CapabilityNavigation: nativeui.SupportAvailable, nativeui.CapabilityEditor: nativeui.SupportAvailable, nativeui.CapabilityPresentation: nativeui.SupportAvailable, nativeui.CapabilityFiles: nativeui.SupportAvailable,
-		"gofastr.media/v1": nativeui.SupportAvailable,
-	}}})
-	if reply.Error != nil {
-		t.Fatal(reply.Error)
-	}
-	return reply.Connection
+	return hello(t, "uikit", map[nativeui.Capability]nativeui.Support{nativeui.CapabilityFiles: nativeui.SupportAvailable})
 }
 
 func filesAction(t *testing.T, command nativeui.Command) nativeui.Reply {

@@ -26,6 +26,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /** Native Android controls for the versioned Go screen and behavior protocol. */
@@ -302,11 +303,7 @@ public abstract class GofastrActivity extends Activity {
             if(a.optString("id").equals(primaryID) && !primary) { bar.addView(actionButton(f,a,true)); primary=true; } else more.add(a);
         }
         if(!more.isEmpty()) {
-            Button overflow=iconButton("More actions","more","native.more",v->{
-                PopupMenu menu=new PopupMenu(this,v);
-                for(int i=0;i<more.size();i++) { JSONObject a=more.get(i); menu.getMenu().add(0,i,0,a.optString("label")).setEnabled(!f.busy); }
-                menu.setOnMenuItemClickListener(item->{ action(f,more.get(item.getItemId()).optString("id"),null); return true; }); menu.show();
-            }); overflow.setContentDescription("More actions");overflow.setEnabled(!f.busy && !f.uncertain); bar.addView(overflow);
+            Button overflow=iconButton("More actions","more","native.more",v->showActionMenu(v,more,()->!f.busy,a->action(f,a.optString("id"),null))); overflow.setContentDescription("More actions");overflow.setEnabled(!f.busy && !f.uncertain); bar.addView(overflow);
         }
         JSONArray models=JSON.array(f.screen,"tabs");
         if(f.modal)return;
@@ -733,15 +730,10 @@ public abstract class GofastrActivity extends Activity {
                         Button more=iconButton("Actions for "+item.optString("title"),"more",
                                 "native.row.actions."+id,v->{
                                     swipe.close();
-                                    PopupMenu menu=new PopupMenu(GofastrActivity.this,v);
-                                    for(int j=0;j<menuActions.size();j++)
-                                        menu.getMenu().add(0,j,0,menuActions.get(j).optString("label"));
-                                    menu.setOnMenuItemClickListener(entry->{
+                                    showActionMenu(v,menuActions,()->true,a->{
                                         if(this==current && !item.optBoolean("disabled"))
-                                            action(this,menuActions.get(entry.getItemId()).optString("id"),Collections.singletonMap("row",id));
-                                        return true;
+                                            action(this,a.optString("id"),Collections.singletonMap("row",id));
                                     });
-                                    menu.show();
                                 });
                         more.setEnabled(!item.optBoolean("disabled") && !selectionMode);
                         line.addView(more);
@@ -798,6 +790,14 @@ public abstract class GofastrActivity extends Activity {
     public TextView text(String text,int size){TextView v=new TextView(this);v.setText(text);v.setTextSize(size);appearance.typography(v,Appearance.Tone.BODY);v.setPadding(dp(4),dp(6),dp(4),dp(6));return v;}
     public Button button(String label,String id,View.OnClickListener listener){Button b=new Button(this,null,android.R.attr.borderlessButtonStyle);b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(12),dp(8),dp(12),dp(8));b.setMinHeight(dp(48));appearance.apply(b,Appearance.Tone.ACTION);b.setOnClickListener(listener);identify(b,id);return b;}
     Button iconButton(String label,String icon,String id,View.OnClickListener listener){Button b=button("",id,listener);b.setContentDescription(label);b.setCompoundDrawables(appearance.icon(icon,accent(),24),null,null,null);b.setPadding(dp(12),dp(12),dp(12),dp(12));return b;}
+
+    /** Overflow menu of row/toolbar actions. Item enablement is sampled when the menu opens; dispatch re-checks frame state. */
+    void showActionMenu(View anchor,List<JSONObject> actions,BooleanSupplier enabled,Consumer<JSONObject> run){
+        PopupMenu menu=new PopupMenu(this,anchor);
+        for(int i=0;i<actions.size();i++) menu.getMenu().add(0,i,0,actions.get(i).optString("label")).setEnabled(enabled.getAsBoolean());
+        menu.setOnMenuItemClickListener(entry->{run.accept(actions.get(entry.getItemId())); return true;});
+        menu.show();
+    }
     TextView sectionLabel(String label){TextView v=text(label,13);appearance.typography(v,Appearance.Tone.SECTION);v.setPadding(dp(4),dp(16),dp(4),dp(8));return v;}
     void disclosure(Button button,String label,boolean expanded){button.setCompoundDrawables(null,null,appearance.icon(expanded?"down":"chevron",muted(),16),null);button.setCompoundDrawablePadding(dp(8));button.setContentDescription(label+", "+(expanded?"expanded":"collapsed"));}
     public static void identify(View view,String id){ view.setTag(id); view.setAccessibilityDelegate(new View.AccessibilityDelegate(){@Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setViewIdResourceName(id);}}); }

@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
@@ -16,6 +13,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
@@ -105,7 +103,7 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	for _, text := range []string{outcome.Message, outcome.Permission, outcome.Identifier} {
-		if len(text) > 512 || !utf8.ValidString(text) || strings.ContainsFunc(text, unicode.IsControl) {
+		if !uitext.Plain(text, 512) {
 			return errors.New("nativeui: invalid service outcome text")
 		}
 	}

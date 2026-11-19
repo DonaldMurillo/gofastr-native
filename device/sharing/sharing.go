@@ -3,11 +3,9 @@ package sharing
 
 import (
 	"errors"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 const (
@@ -30,7 +28,7 @@ type Clipboard struct {
 
 // Validate checks text and combined decoded document bytes.
 func (request Request) Validate() error {
-	if len(request.Title) > 200 || !utf8.ValidString(request.Title) || strings.ContainsFunc(request.Title, unicode.IsControl) || !validText(request.Text) || len(request.Files) > MaxFiles || request.Text == "" && len(request.Files) == 0 {
+	if !uitext.Plain(request.Title, 200) || !uitext.NoNUL(request.Text, MaxTextBytes) || len(request.Files) > MaxFiles || request.Text == "" && len(request.Files) == 0 {
 		return errors.New("sharing: invalid title, text or file count")
 	}
 	total := 0
@@ -55,5 +53,5 @@ func (clipboard Clipboard) Validate() error {
 }
 
 func validText(text string) bool {
-	return len(text) <= MaxTextBytes && utf8.ValidString(text) && !strings.ContainsRune(text, '\x00')
+	return uitext.NoNUL(text, MaxTextBytes)
 }

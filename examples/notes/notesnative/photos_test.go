@@ -14,11 +14,7 @@ import (
 )
 
 func TestPhotosAttachThroughNativeBinding(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	connection := photosHello(t)
 	opened := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/files"})
 	shown := filesAction(t, nativeui.Command{Connection: connection, Instance: opened.Instance, RequestID: "import", Action: "import"})
@@ -104,14 +100,8 @@ func TestPhotosAttachThroughNativeBinding(t *testing.T) {
 
 func photosHello(t *testing.T) string {
 	t.Helper()
-	reply := showcaseCommand(t, nativeui.Command{Kind: "hello", Hello: &nativeui.Hello{Minimum: 1, Maximum: 1, Renderer: "uikit", Capabilities: map[nativeui.Capability]nativeui.Support{
-		nativeui.CapabilityNavigation: nativeui.SupportAvailable, nativeui.CapabilityEditor: nativeui.SupportAvailable,
-		nativeui.CapabilityPresentation: nativeui.SupportAvailable, nativeui.CapabilityFiles: nativeui.SupportAvailable,
-		nativeui.CapabilityPhotos: nativeui.SupportAvailable, nativeui.CapabilityCamera: nativeui.SupportUnavailable,
-		"gofastr.media/v1": nativeui.SupportAvailable,
-	}}})
-	if reply.Error != nil {
-		t.Fatal(reply.Error)
-	}
-	return reply.Connection
+	return hello(t, "uikit", map[nativeui.Capability]nativeui.Support{
+		nativeui.CapabilityFiles: nativeui.SupportAvailable, nativeui.CapabilityPhotos: nativeui.SupportAvailable,
+		nativeui.CapabilityCamera: nativeui.SupportUnavailable,
+	})
 }

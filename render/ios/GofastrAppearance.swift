@@ -26,6 +26,20 @@ enum MobileAppearance {
     }
 }
 
+extension UIStackView {
+    /// Replaces the arranged children when any view changed identity,
+    /// keeping stable views in place across media updates.
+    func replaceArrangedSubviews(_ children: [UIView]) {
+        if arrangedSubviews.count != children.count || zip(arrangedSubviews, children).contains(where: { $0 !== $1 }) {
+            for child in arrangedSubviews {
+                removeArrangedSubview(child)
+                child.removeFromSuperview()
+            }
+            children.forEach(addArrangedSubview)
+        }
+    }
+}
+
 final class MobileDisclosureGroup: UIStackView {
     let content = UIStackView()
     private let button = UIButton(type: .system)

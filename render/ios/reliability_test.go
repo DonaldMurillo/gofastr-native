@@ -1,55 +1,22 @@
 package ios
 
 import (
-	"context"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestReliabilitySwiftCheckpointOrderingAndRestoration(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("executable Swift Foundation checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	source, err := Sources.ReadFile("GofastrReliability.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(directory, "GofastrReliability.swift")
-	if err := os.WriteFile(path, source, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	checks := filepath.Join(directory, "ReliabilityChecks.swift")
-	if err := os.WriteFile(checks, []byte(reliabilityChecks), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "reliability-checks")
-	arguments := []string{"--sdk", "macosx", "swiftc", "-O", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache"), path, checks, "-o", executable}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-	if output, err := exec.CommandContext(ctx, "xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("reliability checks do not compile: %v\n%s", err, output)
-	}
-	if output, err := exec.CommandContext(ctx, executable).CombinedOutput(); err != nil {
-		t.Fatalf("checkpoint, expiration, or retained restoration regression: %v\n%s", err, output)
-	}
+	sourcePath := swiftSources(t, directory, Sources, "GofastrReliability.swift")[0]
+	compileRunChecks(t, directory, "reliability-checks", reliabilityChecks,
+		"reliability checks do not compile", "checkpoint, expiration, or retained restoration regression",
+		[]string{"-O", sourcePath}, nil)
 }
 
 func TestReliabilityUIKitLifecycleContracts(t *testing.T) {
-	source, err := Sources.ReadFile("GofastrNative.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	native := string(source)
-	for _, token := range []string{
+	native := readSource(t, Sources, "GofastrNative.swift")
+	requireTokens(t, native, "native reliability contract missing",
 		"public func checkpoint(completion: @escaping (Bool) -> Void)", "public func suspend()", "public func resume()",
 		"UIApplication.willResignActiveNotification", "UIApplication.didEnterBackgroundNotification", "UIApplication.didBecomeActiveNotification",
 		"beginBackgroundTask(withName:", "UIApplication.shared.endBackgroundTask(task)", "batch.expire()", "expireCheckpoints()",
@@ -57,12 +24,7 @@ func TestReliabilityUIKitLifecycleContracts(t *testing.T) {
 		"view.window != nil, navigationController?.topViewController === self", "guard liveVisible, host.active",
 		"commandSequencer.prepare(operation", "checkpointFence.invalidate()", "checkpointFence.accepts(ticket",
 		"checkpointDeferral.hold(completion)", "defer { self.finishCheckpointDeferral() }", "guard remainingReads > 0 else",
-		"self.instance == instance, case .success(let reply) = result, reply.error == nil", "bufferRevision = reply?.revision ?? 0",
-	} {
-		if !strings.Contains(native, token) {
-			t.Errorf("native reliability contract missing: %s", token)
-		}
-	}
+		"self.instance == instance, case .success(let reply) = result, reply.error == nil", "bufferRevision = reply?.revision ?? 0")
 	start := strings.Index(native, "    public func checkpoint()")
 	end := strings.Index(native, "    private func finishStartup()")
 	if start < 0 || end <= start {

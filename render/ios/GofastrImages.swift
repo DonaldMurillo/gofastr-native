@@ -40,13 +40,7 @@ final class MobileImageGallery: UIStackView {
             items[preview.id]?.update(preview, compact: compact, open: open)
         }
         let children: [UIView] = images.isEmpty ? [] : [heading] + items.resources
-        if arrangedSubviews.count != children.count || zip(arrangedSubviews, children).contains(where: { $0 !== $1 }) {
-            for child in arrangedSubviews {
-                removeArrangedSubview(child)
-                child.removeFromSuperview()
-            }
-            children.forEach(addArrangedSubview)
-        }
+        replaceArrangedSubviews(children)
     }
 }
 

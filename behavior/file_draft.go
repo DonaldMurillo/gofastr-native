@@ -112,31 +112,7 @@ func (store *FileDraftStore) Put(ctx context.Context, key string, snapshot Snaps
 	if len(encoded) > MaxDraftBytes {
 		return ErrDraftTooLarge
 	}
-	temporary, err := os.CreateTemp(store.root, ".draft-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(temporary.Name())
-	defer temporary.Close()
-	if err := privatefile.Harden(temporary.Name(), false); err != nil {
-		return err
-	}
-	if _, err := temporary.Write(encoded); err != nil {
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := privatefile.Replace(temporary.Name(), path); err != nil {
-		return err
-	}
-	return store.syncDirectory()
+	return privatefile.WriteFile(ctx, store.root, ".draft-*", path, encoded)
 }
 
 func (store *FileDraftStore) ClearIfRevision(ctx context.Context, key string, expected DraftRevision) (bool, error) {

@@ -65,13 +65,14 @@ var lifecycleAdapter string
 
 var rendererStyle = registry.RegisterStyle("gfm-webview", func(style.Theme) string { return stylesheet })
 var rendererForeground = registry.RegisterBehavior("gfm-webview-foreground", foregroundAdapter, registry.Markers("[data-gfw-screen]"))
-var rendererServices = registry.RegisterBehavior("gfm-webview-services", servicesAdapter, registry.Markers("[data-gfw-screen]"), registry.Requires("gfm-webview-foreground"))
+var rendererServices = registry.RegisterBehavior("gfm-webview-services", servicesAdapter, registry.Markers("[data-gfw-screen]"),
+	registry.Requires("gfm-webview-foreground", "gfm-webview-components"))
 var rendererLive = registry.RegisterBehavior("gfm-webview-live", liveAdapter, registry.Markers("[data-gfw-screen]"), registry.Requires("gfm-webview-components"))
 var rendererLifecycle = registry.RegisterBehavior("gfm-webview-lifecycle", lifecycleAdapter, registry.Markers("[data-gfw-screen]"), registry.Requires(headless.LeaveGuardBehaviorName))
 var rendererComponents = registry.RegisterBehavior("gfm-webview-components", componentsAdapter, registry.Markers("[data-gfw-screen]"))
 var rendererRendering = registry.RegisterBehavior("gfm-webview-rendering", renderingAdapter, registry.Markers("[data-gfw-screen]"))
 var rendererFiles = registry.RegisterBehavior("gfm-webview-files", filesAdapter, registry.Markers("[data-gfw-screen]"),
-	registry.Requires("gfm-webview-foreground"))
+	registry.Requires("gfm-webview-foreground", "gfm-webview-components"))
 var rendererPresentation = registry.RegisterBehavior("gfm-webview-presentation", presentationAdapter, registry.Markers("[data-gfw-screen]"), registry.Requires("gfm-webview-foreground"))
 var rendererBehavior = registry.RegisterBehavior("gfm-webview", behavior, registry.Markers("[data-gfw-screen]"),
 	registry.Requires(headless.LeaveGuardBehaviorName, "gfm-webview-presentation", "gfm-webview-files", "gfm-webview-components", "gfm-webview-rendering", "gfm-webview-services", "gfm-webview-live", "gfm-webview-lifecycle"),

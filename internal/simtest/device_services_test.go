@@ -3,7 +3,6 @@ package simtest
 import (
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,13 +10,13 @@ import (
 
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 	"github.com/chromedp/cdproto/page"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notes"
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
+	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 )
 
@@ -211,22 +210,7 @@ func TestNotesLivePagingWebView(t *testing.T) {
 
 func deviceNotesBrowser(t *testing.T, platform mobileui.Platform, options ...chromedp.ExecAllocatorOption) (context.Context, *notes.Service, context.Context, *stats) {
 	t.Helper()
-	t.Cleanup(func() { owner.SetExtractor(nil) })
-	directory := t.TempDir()
-	app, host, err := notesapp.BuildScreensWithPlatform(directory, origin, platform)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := host.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		if err := host.Stop(ctx); err != nil {
-			t.Error(err)
-		}
-	})
+	app, directory, host := screensHost(t, platform)
 	user, err := localapp.LoadOrMint(directory)
 	if err != nil {
 		t.Fatal(err)
@@ -253,19 +237,5 @@ func deviceBrowserCheck(t *testing.T, ctx context.Context) func(...chromedp.Acti
 }
 
 func deviceAudioFixture() string {
-	const samples = 8000
-	data := make([]byte, 44+samples*2)
-	copy(data, "RIFF")
-	binary.LittleEndian.PutUint32(data[4:], uint32(len(data)-8))
-	copy(data[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(data[16:], 16)
-	binary.LittleEndian.PutUint16(data[20:], 1)
-	binary.LittleEndian.PutUint16(data[22:], 1)
-	binary.LittleEndian.PutUint32(data[24:], samples)
-	binary.LittleEndian.PutUint32(data[28:], samples*2)
-	binary.LittleEndian.PutUint16(data[32:], 2)
-	binary.LittleEndian.PutUint16(data[34:], 16)
-	copy(data[36:], "data")
-	binary.LittleEndian.PutUint32(data[40:], samples*2)
-	return base64.StdEncoding.EncodeToString(data)
+	return base64.StdEncoding.EncodeToString(fixtures.WAV(8000, 16000).Data)
 }

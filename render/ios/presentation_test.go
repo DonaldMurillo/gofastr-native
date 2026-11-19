@@ -1,41 +1,15 @@
 package ios
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"testing"
 )
 
 func TestPresentationWireAndSelectionState(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("Swift Foundation checks require the macOS SDK")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	model, err := Sources.ReadFile("GofastrPresentation.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	modelPath := filepath.Join(directory, "GofastrPresentation.swift")
-	if err := os.WriteFile(modelPath, model, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	checksPath := filepath.Join(directory, "PresentationChecks.swift")
-	if err := os.WriteFile(checksPath, []byte(presentationChecks), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "presentation-checks")
-	compile := exec.Command("xcrun", "--sdk", "macosx", "swiftc", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache"), modelPath, checksPath, "-o", executable)
-	if output, err := compile.CombinedOutput(); err != nil {
-		t.Fatalf("presentation model checks do not compile: %v\n%s", err, output)
-	}
-	if output, err := exec.Command(executable).CombinedOutput(); err != nil {
-		t.Fatalf("presentation wire or local selection regression: %v\n%s", err, output)
-	}
+	modelPath := swiftSources(t, directory, Sources, "GofastrPresentation.swift")[0]
+	compileRunChecks(t, directory, "presentation-checks", presentationChecks,
+		"presentation model checks do not compile", "presentation wire or local selection regression", []string{modelPath}, nil)
 }
 
 const presentationChecks = `

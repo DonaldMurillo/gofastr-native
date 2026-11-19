@@ -1,12 +1,9 @@
 package ios
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -14,57 +11,16 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
 func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("executable Swift Foundation checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	arguments := []string{"--sdk", "macosx", "swiftc", "-O", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache")}
-	for _, name := range []string{"GofastrComponents.swift", "GofastrComponentExtensions.swift", "GofastrActions.swift", "GofastrFiles.swift", "GofastrPresentation.swift", "GofastrImages.swift", "GofastrAttachments.swift", "GofastrServices.swift", "GofastrIncomingShares.swift", "GofastrSecureStorage.swift", "GofastrWidgets.swift"} {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
-	native, err := Sources.ReadFile("GofastrNative.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	start := strings.Index(string(native), "struct MobileDraft:")
-	end := strings.Index(string(native), "final class MobileHost {")
-	if start < 0 || end <= start {
-		t.Fatal("missing actual renderer DTOs")
-	}
-	checks := filepath.Join(directory, "ServiceChecks.swift")
-	if err := os.WriteFile(checks, []byte("import Foundation\n"+string(native[start:end])+serviceChecks), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	sources := swiftSources(t, directory, Sources, rendererSourceFiles...)
 	fixturePath := filepath.Join(directory, "go-wire.json")
-	content := make([]byte, 48)
-	copy(content, "RIFF")
-	binary.LittleEndian.PutUint32(content[4:], uint32(len(content)-8))
-	copy(content[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(content[16:], 16)
-	binary.LittleEndian.PutUint16(content[20:], 1)
-	binary.LittleEndian.PutUint16(content[22:], 1)
-	binary.LittleEndian.PutUint32(content[24:], 16000)
-	binary.LittleEndian.PutUint32(content[28:], 32000)
-	binary.LittleEndian.PutUint16(content[32:], 2)
-	binary.LittleEndian.PutUint16(content[34:], 16)
-	copy(content[36:], "data")
-	binary.LittleEndian.PutUint32(content[40:], 4)
-	file := files.Document{Name: "recording.wav", MediaType: "audio/wav", Data: content}
+	file := fixtures.WAV(16000, 4)
 	fixture := map[string]any{
 		"requests": []nativeui.ServiceRequest{
 			{ID: "copy", Clipboard: &sharing.Clipboard{Text: "explicit copy"}},
@@ -83,15 +39,10 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 	if err := os.WriteFile(fixturePath, encoded, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	executable := filepath.Join(directory, "service-checks")
-	arguments = append(arguments, checks, "-o", executable)
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("service Foundation checks do not compile: %v\n%s", err, output)
-	}
 	resultPath := filepath.Join(directory, "swift-result.json")
-	if output, err := exec.Command(executable, fixturePath, resultPath).CombinedOutput(); err != nil {
-		t.Fatalf("service DTO, local calendar, bounds, cancellation, or stale read regression: %v\n%s", err, output)
-	}
+	compileRunChecks(t, directory, "service-checks", "import Foundation\n"+draftDTOs(t)+serviceChecks,
+		"service Foundation checks do not compile", "service DTO, local calendar, bounds, cancellation, or stale read regression",
+		append([]string{"-O"}, sources...), []string{fixturePath, resultPath})
 	encoded, err = os.ReadFile(resultPath)
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +60,7 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 }
 
 func TestServiceRunnerAndVisibleLiveContracts(t *testing.T) {
-	checks := map[string][]string{
+	requireTokenMap(t, map[string][]string{
 		"GofastrServiceRunner.swift": {
 			"public final class GofastrServiceRunner", "public init(presenter: UIViewController, openRoute: @escaping (String) -> Bool)",
 			"public static func capabilities() -> [String: String]", "public func perform(requestJSON: String, completion: @escaping (String) -> Void)", "public func cancel()",
@@ -134,18 +85,7 @@ func TestServiceRunnerAndVisibleLiveContracts(t *testing.T) {
 		},
 		"GofastrForeground.swift":  {"final class MobileServiceTask: MobileForegroundTask", "runner.perform(requestJSON: json)", "runner.cancel()", "focus.restore(source)"},
 		"GofastrAttachments.swift": {"let audio: MobileAudioDocument?", "MobileAudioPreview(audio, identifier: file.id)", "players.forEach { $0.stop() }"},
-	}
-	for name, tokens := range checks {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, token := range tokens {
-			if !strings.Contains(string(source), token) {
-				t.Errorf("%s lost native services contract: %s", name, token)
-			}
-		}
-	}
+	}, "%s lost native services contract")
 	runner, _ := Sources.ReadFile("GofastrServiceRunner.swift")
 	if strings.Contains(string(runner), "UIPasteboard.general.string\n") || strings.Contains(string(runner), "import Go") {
 		t.Fatal("runner must not read clipboard or import application bindings")

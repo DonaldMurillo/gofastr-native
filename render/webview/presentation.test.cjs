@@ -5,83 +5,15 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 const { runInNewContext } = require('node:vm');
 
-class Target {
-  listeners = new Map();
-  addEventListener(type, listener) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(listener);
-  }
-  dispatchEvent(event) {
-    event.target ||= this;
-    event.preventDefault ||= () => { event.defaultPrevented = true; };
-    event.stopPropagation ||= () => {};
-    for (const listener of this.listeners.get(event.type) || []) listener(event);
-    return !event.defaultPrevented;
-  }
-}
+const { Target, Element: BaseElement, flush } = require('./test-dom.cjs');
 
-class Element extends Target {
-  attributes = new Map();
-  children = [];
-  dataset = {};
-  disabled = false;
-  checked = false;
-  open = false;
-  textContent = '';
-  constructor(document, tag) {
-    super();
-    this.document = document;
-    this.tagName = tag.toUpperCase();
-  }
-  get isConnected() { return this === this.document.body || !!this.parent?.isConnected; }
-  get id() { return this.getAttribute('id'); }
-  get value() { return this.currentValue ?? this.getAttribute('value') ?? ''; }
-  set value(value) { this.currentValue = value; }
-  get type() { return this.getAttribute('type') || ''; }
+class Element extends BaseElement {
   set innerHTML(_) { throw new Error('Untrusted HTML is not supported'); }
-  setAttribute(name, value) {
-    this.attributes.set(name, String(value));
-    if (name.startsWith('data-')) this.dataset[name.slice(5).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = String(value);
-  }
-  getAttribute(name) { return this.attributes.get(name) ?? null; }
-  hasAttribute(name) { return this.attributes.has(name); }
-  removeAttribute(name) { this.attributes.delete(name); }
-  append(...children) {
-    for (const child of children) {
-      child.parent = this;
-      this.children.push(child);
-    }
-  }
-  remove() {
-    if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
-    this.parent = null;
-  }
-  contains(node) { return node === this || this.children.some((child) => child.contains(node)); }
-  matches(selector) {
-    return selector.split(',').some((part) => {
-      const match = part.trim().match(/^([a-z][a-z0-9]*)?(?:\[([^=\]]+)(?:="([^"]*)")?\])?$/);
-      return !!match && (!match[1] || this.tagName === match[1].toUpperCase()) &&
-        (!match[2] || (this.hasAttribute(match[2]) && (match[3] === undefined || this.getAttribute(match[2]) === match[3])));
-    });
-  }
-  closest(selector) { return this.matches(selector) ? this : this.parent?.closest(selector) || null; }
-  querySelectorAll(selector) {
-    return this.children.flatMap((child) => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]);
-  }
-  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
-  showModal() { this.open = true; }
-  close() { this.open = false; }
   getBoundingClientRect() { return { left: 100, right: 400, top: 100, bottom: 500 }; }
-  focus() {
-    this.document.activeElement = this;
-    this.document.dispatchEvent({ type: 'focusin', target: this });
-  }
   click() { if (!this.disabled) this.dispatchEvent({ type: 'click', target: this }); }
 }
-
 class Form extends Element {}
 
-const flush = () => new Promise((resolve) => setImmediate(resolve));
 const choice = (identifier, role = '', disabled = false) => ({ id: identifier, label: identifier, role, disabled });
 const definition = (extra = {}) => ({ id: 'go-continuation', kind: 'dialog', title: 'Choose <not HTML>', message: 'Message <script>unsafe()</script>',
   dismissible: true, choices: [choice('apply'), choice('cancel', 'cancel'), choice('delete', 'destructive'), choice('unavailable', '', true)], ...extra });

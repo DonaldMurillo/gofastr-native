@@ -133,6 +133,22 @@ struct MobileReply: Decodable {
     let dataVersion: String?
     let changed: Bool?
 }
+extension MobileResponse {
+    /// The failure reported when a versioned-only foreground task reaches a
+    /// backend without the mobile command protocol.
+    func unsupportedFailure(legacy: Bool) -> MobileFailure? {
+        if presentation != nil && legacy {
+            return MobileFailure(code: "unsupported", message: "This backend does not support presentation/v1. A versioned mobile command backend is required.", fields: nil)
+        }
+        if files != nil && legacy {
+            return MobileFailure(code: "unsupported", message: "This backend does not support files/v1. A versioned mobile command backend is required.", fields: nil)
+        }
+        if service != nil && legacy {
+            return MobileFailure(code: "unsupported", message: "Device services require a versioned mobile command backend.", fields: nil)
+        }
+        return nil
+    }
+}
 
 final class MobileHost {
     let queue = DispatchQueue(label: "gofastr.native.commands", qos: .userInitiated)
@@ -165,20 +181,21 @@ final class MobileHost {
         error ?? NSError(domain: "GoFastrMobile", code: 1, userInfo: [NSLocalizedDescriptionKey: "Couldn’t finish. Please try again."])
     }
 
+    /// Closes a screen instance that a failed or abandoned navigation opened.
+    func closeStale(_ result: Result<MobileReply, Error>) {
+        if case .success(let reply) = result, let instance = reply.instance {
+            command(["kind": "close", "instance": instance]) { _ in }
+        }
+    }
+
     func call(_ command: @escaping () throws -> String, completion: @escaping (Result<MobileResponse, Error>) -> Void) {
         queue.async {
             let result = Result { () throws -> MobileResponse in
                 let encoded = try command()
                 let response = try JSONDecoder().decode(MobileResponse.self, from: Data(encoded.utf8))
                 guard response.version == 1 else { throw Self.failure(nil) }
-                if self.backend.command == nil && response.presentation != nil {
-                    throw MobileFailure(code: "unsupported", message: "This backend does not support presentation/v1. A versioned mobile command backend is required.", fields: nil)
-                }
-                if self.backend.command == nil && response.files != nil {
-                    throw MobileFailure(code: "unsupported", message: "This backend does not support files/v1. A versioned mobile command backend is required.", fields: nil)
-                }
-                if self.backend.command == nil && response.service != nil {
-                    throw MobileFailure(code: "unsupported", message: "Device services require a versioned mobile command backend.", fields: nil)
+                if let unsupported = response.unsupportedFailure(legacy: self.backend.command == nil) {
+                    throw unsupported
                 }
                 return response
             }
@@ -485,7 +502,7 @@ public final class GofastrNativeRenderer {
             self.host.open(route) { result in
                 source.setNavigationInFlight(false)
                 guard source.navigationStillSafe else {
-                    if case .success(let reply) = result, let instance = reply.instance { self.host.command(["kind": "close", "instance": instance]) { _ in } }
+                    self.host.closeStale(result)
                     return
                 }
                 guard case .success(let reply) = result, reply.error == nil, let model = reply.screen else { source.showFailure(MobileHost.failure(nil)); return }
@@ -871,7 +888,7 @@ final class NativeScreenController: UIViewController, UITableViewDataSource, UIT
             host.open(screen.route, values: queryValues) { [weak self] result in
                 guard let self else { return }
                 guard current == self.revision else {
-                    if case .success(let reply) = result, let instance = reply.instance { self.host.command(["kind": "close", "instance": instance]) { _ in } }
+                    self.host.closeStale(result)
                     return
                 }
                 self.listLoading = false
@@ -1356,7 +1373,7 @@ final class NativeScreenController: UIViewController, UITableViewDataSource, UIT
                 guard let self else { return }
                 self.setBusy(false)
                 guard current == self.bufferRevision, !self.hasUncertainEditor, stillValid() else {
-                    if case .success(let reply) = result, let instance = reply.instance { self.host.command(["kind": "close", "instance": instance]) { _ in } }
+                    self.host.closeStale(result)
                     return
                 }
                 switch result {
@@ -1991,16 +2008,8 @@ final class NativeScreenController: UIViewController, UITableViewDataSource, UIT
     }
 
     private func apply(_ response: MobileResponse, request: String = "", effectIDs: [String: String] = [:], presentationID: String? = nil, fileID: String? = nil, serviceID: String? = nil) {
-        if response.presentation != nil && (instance == nil || host.backend.command == nil) {
-            report(MobileFailure(code: "unsupported", message: "This backend does not support presentation/v1. A versioned mobile command backend is required.", fields: nil))
-            return
-        }
-        if response.files != nil && (instance == nil || host.backend.command == nil) {
-            report(MobileFailure(code: "unsupported", message: "This backend does not support files/v1. A versioned mobile command backend is required.", fields: nil))
-            return
-        }
-        if response.service != nil && (instance == nil || host.backend.command == nil) {
-            report(MobileFailure(code: "unsupported", message: "Device services require a versioned mobile command backend.", fields: nil))
+        if let unsupported = response.unsupportedFailure(legacy: instance == nil || host.backend.command == nil) {
+            report(unsupported)
             return
         }
         if [response.files != nil, response.presentation != nil, response.service != nil].filter({ $0 }).count > 1 {
@@ -2080,7 +2089,7 @@ final class NativeScreenController: UIViewController, UITableViewDataSource, UIT
                 host.open(route) { [weak self] result in
                     guard let self else { return }
                     guard openingRevision == self.bufferRevision, !self.hasUncertainEditor else {
-                        if case .success(let reply) = result, let instance = reply.instance { self.host.command(["kind": "close", "instance": instance]) { _ in } }
+                        self.host.closeStale(result)
                         self.receipt("navigation", request: request, ids: effectIDs, outcome: "cancelled")
                         return
                     }

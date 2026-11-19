@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 // Attachment presents file metadata and a registered detail destination, not
@@ -32,7 +32,7 @@ type FilePreview struct {
 }
 
 func validateFilePreview(preview FilePreview) error {
-	if len(preview.Text) > 16384 || !utf8.ValidString(preview.Text) || strings.ContainsRune(preview.Text, '\x00') || len(preview.Caption) > 4096 || len(preview.PreviewTitle) > 200 {
+	if !uitext.NoNUL(preview.Text, 16384) || len(preview.Caption) > 4096 || len(preview.PreviewTitle) > 200 {
 		return errors.New("nativeui: invalid file preview")
 	}
 	if preview.File.Audio != nil {

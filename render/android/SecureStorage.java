@@ -91,7 +91,7 @@ public final class SecureStorage {
             if(op.equals("get")) {
                 // openRead recovers AtomicFile's backup after an interrupted
                 // write, including API 24's older rename-to-backup format.
-                try{stored=read(file.openRead(),MAX*2);}
+                try{stored=Bounded.read(file.openRead(),MAX*2,"Envelope too large");}
                 catch(FileNotFoundException absent){main.execute(()->finish(token,success(JSON.object("found",false))));return;}
             }
             SecretKey key;
@@ -197,9 +197,6 @@ public final class SecureStorage {
     private static String identity(String protection,String key)throws Exception {
         byte[] digest=MessageDigest.getInstance("SHA-256").digest((protection+":"+key).getBytes(StandardCharsets.UTF_8));
         StringBuilder value=new StringBuilder();for(byte part:digest)value.append(String.format(Locale.ROOT,"%02x",part&255));return value.toString();
-    }
-    private static byte[] read(InputStream source,int max)throws IOException {
-        try(InputStream input=source;ByteArrayOutputStream output=new ByteArrayOutputStream()) {byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){if(output.size()+count>max)throw new IOException("Envelope too large");output.write(buffer,0,count);}return output.toByteArray();}
     }
     public static void validate(JSONObject request)throws Exception {
         String op=request.optString("operation"),key=request.optString("key"),protection=request.optString("protection"),reason=request.optString("reason"),encoded=request.optString("value");

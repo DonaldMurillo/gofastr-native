@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"image/jpeg"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -40,38 +38,13 @@ func photoTestSources(t *testing.T) fstest.MapFS {
 }
 
 func TestPhotosWireAndImageProcessing(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("Swift Foundation/ImageIO checks require the macOS SDK")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	arguments := []string{"--sdk", "macosx", "swiftc", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache")}
-	for _, name := range []string{"GofastrFiles.swift", "GofastrPhotos.swift"} {
-		source, err := photoTestSources(t).ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
-	checksPath := filepath.Join(directory, "PhotosChecks.swift")
-	if err := os.WriteFile(checksPath, []byte(photoChecks), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "photo-checks")
-	arguments = append(arguments, checksPath, "-o", executable)
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("photo checks do not compile: %v\n%s", err, output)
-	}
+	sources := swiftSources(t, directory, photoTestSources(t), "GofastrFiles.swift", "GofastrPhotos.swift")
 	fixturePath := filepath.Join(directory, "normalized.jpg")
-	if output, err := exec.Command(executable, fixturePath).CombinedOutput(); err != nil {
-		t.Fatalf("photo wire, original read, JPEG, orientation, metadata, or cancellation regression: %v\n%s", err, output)
-	}
+	compileRunChecks(t, directory, "photo-checks", photoChecks,
+		"photo checks do not compile", "photo wire, original read, JPEG, orientation, metadata, or cancellation regression",
+		sources, []string{fixturePath})
 	fixture, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatal(err)
@@ -83,54 +56,19 @@ func TestPhotosWireAndImageProcessing(t *testing.T) {
 }
 
 func TestPhotosUIKitTypechecks(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("UIKit typechecking requires Xcode on macOS")
-	}
-	sdk, err := exec.Command("xcrun", "--sdk", "iphonesimulator", "--show-sdk-path").Output()
-	if err != nil {
-		t.Skipf("no iOS simulator SDK: %v", err)
-	}
-	architecture := runtime.GOARCH
-	if architecture == "amd64" {
-		architecture = "x86_64"
-	}
 	directory := t.TempDir()
-	arguments := []string{"--sdk", "iphonesimulator", "swiftc", "-parse-as-library", "-typecheck", "-module-name", "GofastrPhotoChecks",
-		"-target", architecture + "-apple-ios16.0-simulator", "-sdk", strings.TrimSpace(string(sdk)), "-module-cache-path", filepath.Join(directory, "module-cache")}
-	entries, err := photoTestSources(t).ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".swift") {
-			continue
-		}
-		source, err := photoTestSources(t).ReadFile(entry.Name())
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(directory, entry.Name())
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("the photo adapter must compile without Go bindings: %v\n%s", err, output)
-	}
+	arguments := uikitSimulatorArguments(t, directory, "-parse-as-library", "-typecheck", "-module-name", "GofastrPhotoChecks")
+	arguments = append(arguments, swiftDirectorySources(t, directory, photoTestSources(t))...)
+	requireXcrun(t, "the photo adapter must compile without Go bindings", arguments...)
 }
 
 func TestPhotosAcquisitionContract(t *testing.T) {
 	read := func(name string) string {
 		t.Helper()
-		source, err := photoTestSources(t).ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return strings.ReplaceAll(string(source), "\r\n", "\n")
+		return strings.ReplaceAll(readSource(t, photoTestSources(t), name), "\r\n", "\n")
 	}
 	controller := read("GofastrPhotoController.swift")
-	for _, required := range []string{
+	requireTokens(t, controller, "missing photo acquisition boundary",
 		"PHPickerViewController(configuration:", "configuration.filter = .images", "configuration.selectionLimit = 1",
 		"loadFileRepresentation(forTypeIdentifier:", "MobilePhotoAccess.readOriginal(url, work: work)",
 		"UIImagePickerController.isSourceTypeAvailable(.camera)", "NSCameraUsageDescription",
@@ -139,23 +77,15 @@ func TestPhotosAcquisitionContract(t *testing.T) {
 		"case .denied, .restricted:", "status: .unsupported", "status: .cancelled", "status: .failed",
 		"state.receive()", "guard state.report() else { return }", "guard state.phase == .reading else { return }",
 		"self.state.phase == .preparing", "work.cancel()", "progress?.cancel()", "provider = nil", "controller = nil",
-		"MobileForegroundDismissal.dismiss(controller)", "focus.restore(source)", "queue.async", "DispatchQueue.main.async",
-	} {
-		if !strings.Contains(controller, required) {
-			t.Errorf("missing photo acquisition boundary: %s", required)
-		}
-	}
+		"MobileForegroundDismissal.dismiss(controller)", "focus.restore(source)", "queue.async", "DispatchQueue.main.async")
 	for _, forbidden := range []string{"loadObject(", "UIImageWriteToSavedPhotosAlbum", "PHPhotoLibrary", "requestAccess(for: .audio)", "Data(contentsOf:", "send(\"file-result\""} {
 		if strings.Contains(controller, forbidden) {
 			t.Errorf("photo controller must not bypass bounded acquisition/settlement: %s", forbidden)
 		}
 	}
 	foreground := read("GofastrForeground.swift")
-	for _, required := range []string{"private var active: MobileForegroundTask?", "if let operation = model.operation", "MobileFileExtensions.make(", "task = MobileFileTask(", "active = task"} {
-		if !strings.Contains(foreground, required) {
-			t.Errorf("photos must reuse the existing foreground factory: %s", required)
-		}
-	}
+	requireTokens(t, foreground, "photos must reuse the existing foreground factory",
+		"private var active: MobileForegroundTask?", "if let operation = model.operation", "MobileFileExtensions.make(", "present(MobileFileTask(", "active = task")
 	native := read("GofastrNative.swift")
 	start := strings.Index(native, "func connect(")
 	end := strings.Index(native, "func open(")
@@ -163,11 +93,8 @@ func TestPhotosAcquisitionContract(t *testing.T) {
 		t.Fatal("missing hello boundary")
 	}
 	hello := native[start:end]
-	for _, required := range []string{"MobileFileExtensions.capabilities()", "guard Thread.isMainThread else", "DispatchQueue.main.async"} {
-		if !strings.Contains(hello, required) {
-			t.Errorf("missing main-thread photo capability negotiation: %s", required)
-		}
-	}
+	requireTokens(t, hello, "missing main-thread photo capability negotiation",
+		"MobileFileExtensions.capabilities()", "guard Thread.isMainThread else", "DispatchQueue.main.async")
 	if strings.Contains(hello, "requestAccess") || strings.Contains(hello, "MobilePhotoPlatform") || strings.Index(hello, "guard Thread.isMainThread") > strings.Index(hello, "MobileFileExtensions.capabilities()") {
 		t.Error("hello must check hardware/purpose on main without requesting permission")
 	}

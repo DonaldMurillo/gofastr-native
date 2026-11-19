@@ -18,7 +18,6 @@ import (
 
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 
 	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
 	"github.com/DonaldMurillo/gofastr-native/mobilehost"
@@ -32,22 +31,7 @@ func TestSharedMobileScreensWebView(t *testing.T) {
 }
 
 func runSharedMobileScreens(t *testing.T, platform mobileui.Platform) {
-	t.Cleanup(func() { owner.SetExtractor(nil) })
-	dataDir := t.TempDir()
-	app, host, err := notesapp.BuildScreensWithPlatform(dataDir, origin, platform)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := host.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := host.Stop(ctx); err != nil {
-			t.Error(err)
-		}
-	})
+	app, dataDir, host := screensHost(t, platform)
 	ctx, traffic := mobileScreensBrowser(t, host, platform == mobileui.Android)
 	shots := shotsDir(t)
 	shot := func(name string) chromedp.Action {
@@ -61,7 +45,7 @@ func runSharedMobileScreens(t *testing.T, platform mobileui.Platform) {
 	}
 	var savedMarker, invalidTitle, invalidBody, renderedPlatform, createdRoute string
 	var layoutFits, editorFits bool
-	err = chromedp.Run(ctx,
+	err := chromedp.Run(ctx,
 		chromedp.Navigate(origin+"/"),
 		chromedp.WaitVisible(`input[type="search"]`, chromedp.ByQuery),
 		chromedp.Poll(`!!window.__simPort && typeof window.__gofastr_transport === 'function'`, nil),

@@ -2,7 +2,6 @@ package webview_test
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +10,8 @@ import (
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
-	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 	"github.com/DonaldMurillo/gofastr-native/render/webview"
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
@@ -185,22 +184,10 @@ func TestServiceLiveAssetsAndBoundedAudioSSR(t *testing.T) {
 			}
 		}
 	}
-	data := make([]byte, 46)
-	copy(data, "RIFF")
-	binary.LittleEndian.PutUint32(data[4:], 38)
-	copy(data[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(data[16:], 16)
-	binary.LittleEndian.PutUint16(data[20:], 1)
-	binary.LittleEndian.PutUint16(data[22:], 1)
-	binary.LittleEndian.PutUint32(data[24:], 8000)
-	binary.LittleEndian.PutUint32(data[28:], 16000)
-	binary.LittleEndian.PutUint16(data[32:], 2)
-	binary.LittleEndian.PutUint16(data[34:], 16)
-	copy(data[36:], "data")
-	binary.LittleEndian.PutUint32(data[40:], 2)
+	recording := fixtures.WAV(8000, 2)
 	app, err := nativeui.New("/audio", nativeui.Route{Path: "/audio", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Audio", Text: "Private recording", Attachments: []nativeui.Attachment{{ID: "audio-1", Name: "recording.wav", MediaType: "audio/wav", Size: len(data), Destination: "/audio",
-			Audio: &audio.Document{File: files.Document{Name: "recording.wav", MediaType: "audio/wav", Data: data}, DurationMillis: 1000}}}}, nil
+		return nativeui.Screen{Title: "Audio", Text: "Private recording", Attachments: []nativeui.Attachment{{ID: "audio-1", Name: "recording.wav", MediaType: "audio/wav", Size: len(recording.Data), Destination: "/audio",
+			Audio: &audio.Document{File: recording, DurationMillis: 1000}}}}, nil
 	}})
 	if err != nil {
 		t.Fatal(err)

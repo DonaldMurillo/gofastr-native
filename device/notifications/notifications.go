@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 const (
@@ -30,12 +30,10 @@ type Request struct {
 
 // Validate checks shape only, never interprets a schedule in the Go timezone.
 func (request Request) Validate() error {
-	if request.Identifier == "" || len(request.Identifier) > 128 || strings.ContainsFunc(request.Identifier, func(character rune) bool {
-		return !(character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || strings.ContainsRune("._:-", character))
-	}) {
+	if request.Identifier == "" || !uitext.Token(request.Identifier, 128) {
 		return errors.New("notifications: a stable application-scoped identifier is required")
 	}
-	if !utf8.ValidString(request.Title) || !utf8.ValidString(request.Body) || len(request.Title) > 200 || len(request.Body) > 64<<10 || strings.ContainsFunc(request.Title, unicode.IsControl) || strings.ContainsRune(request.Body, '\x00') {
+	if !uitext.Plain(request.Title, 200) || !uitext.NoNUL(request.Body, 64<<10) {
 		return errors.New("notifications: invalid reminder text")
 	}
 	switch request.Operation {

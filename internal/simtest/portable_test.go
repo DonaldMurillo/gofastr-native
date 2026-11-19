@@ -15,29 +15,13 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
 	"github.com/DonaldMurillo/gofastr/core/handler"
 	"github.com/DonaldMurillo/gofastr/framework/localapp"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
 )
 
 func TestPortableNotesFlowsInBrowser(t *testing.T) {
-	t.Cleanup(func() { owner.SetExtractor(nil) })
-	directory := t.TempDir()
-	app, host, err := notesapp.BuildScreensWithPlatform(directory, origin, mobileui.Android)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = host.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := host.Stop(ctx); err != nil {
-			t.Error(err)
-		}
-	})
+	app, directory, host := screensHost(t, mobileui.Android)
 	user, err := localapp.LoadOrMint(directory)
 	if err != nil {
 		t.Fatal(err)

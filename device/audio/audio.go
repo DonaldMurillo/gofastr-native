@@ -6,11 +6,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"mime"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 const (
@@ -35,7 +33,7 @@ type Document struct {
 
 // Validate checks policy before a host may request microphone permission.
 func (request Request) Validate() error {
-	if request.Title == "" || len(request.Title) > 200 || !utf8.ValidString(request.Title) || strings.ContainsFunc(request.Title, unicode.IsControl) || request.MaxSeconds < 0 || request.MaxSeconds > MaxSeconds || request.MaxBytes < 0 || request.MaxBytes > MaxBytes {
+	if request.Title == "" || !uitext.Plain(request.Title, 200) || request.MaxSeconds < 0 || request.MaxSeconds > MaxSeconds || request.MaxBytes < 0 || request.MaxBytes > MaxBytes {
 		return errors.New("audio: invalid title or recording limits")
 	}
 	return nil

@@ -15,6 +15,26 @@ import (
 )
 
 const notesPkg = "github.com/DonaldMurillo/gofastr-native/examples/notes/notesmobile"
+const nativePkg = "github.com/DonaldMurillo/gofastr-native/examples/notes/notesnative"
+
+// runCommand buffers a command's output and returns its exit code, stdout and stderr.
+func runCommand(t *testing.T, cmd func(context.Context, []string, io.Writer, io.Writer) int, args ...string) (int, string, string) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	code := cmd(context.Background(), args, &stdout, &stderr)
+	return code, stdout.String(), stderr.String()
+}
+
+// runCLI runs the command and returns exit code, stdout and stderr.
+func runCLI(t *testing.T, args ...string) (int, string, string) {
+	return runCommand(t, run, args...)
+}
+
+// planText strips the shell quoting and Windows suffixes from a plan.
+func planText(s string) string {
+	s = strings.ReplaceAll(s, "'", "")
+	return strings.ReplaceAll(strings.ReplaceAll(s, ".exe", ""), ".bat", "")
+}
 
 func notesApp(t *testing.T) app {
 	t.Helper()

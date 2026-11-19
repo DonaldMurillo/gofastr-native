@@ -86,7 +86,7 @@ func (n *Notifications) Element() view.Element {
 	items := make([]view.Element, len(n.items))
 	for i, item := range n.items {
 		glyph, style := item.Level.appearance()
-		toast := view.E(surfaceBox{Box{Border: BorderRounded, Title: glyph + " " + item.Title, BorderStyle: style, NoFocusBorder: true, Padding: layout.Symmetric(0, 1), Style: Theme.Text}}, Paragraph(item.Text))
+		toast := view.E(SurfaceBox{Box{Border: BorderRounded, Title: glyph + " " + item.Title, BorderStyle: style, NoFocusBorder: true, Padding: layout.Symmetric(0, 1), Style: Theme.Text}}, Paragraph(item.Text))
 		items[i] = OnClick(func(*view.PointerEvent) { n.Dismiss(item.ID) }, toast).WithKey(strconv.Itoa(item.ID))
 	}
 	// Equal widths and no gaps keep the stack's whole rectangle clickable.

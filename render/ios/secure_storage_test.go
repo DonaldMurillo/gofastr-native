@@ -3,30 +3,16 @@ package ios
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 )
 
 func TestSecureStorageSwiftContract(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("executable Swift Foundation checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	source, err := Sources.ReadFile("GofastrSecureStorage.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(directory, "GofastrSecureStorage.swift")
-	if err := os.WriteFile(path, source, 0600); err != nil {
-		t.Fatal(err)
-	}
+	sourcePath := swiftSources(t, directory, Sources, "GofastrSecureStorage.swift")[0]
 	fixture := map[string]any{
 		"requests": []securestore.Request{
 			{Operation: securestore.Status},
@@ -42,21 +28,11 @@ func TestSecureStorageSwiftContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixturePath := filepath.Join(directory, "wire.json")
-	if err := os.WriteFile(fixturePath, content, 0600); err != nil {
+	if err := os.WriteFile(fixturePath, content, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	checks := filepath.Join(directory, "SecureStorageChecks.swift")
-	if err := os.WriteFile(checks, []byte(secureStorageChecks), 0600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "checks")
-	args := []string{"--sdk", "macosx", "swiftc", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "cache"), path, checks, "-o", executable}
-	if output, err := exec.Command("xcrun", args...).CombinedOutput(); err != nil {
-		t.Fatalf("secure storage contract compile: %v\n%s", err, output)
-	}
-	if output, err := exec.Command(executable, fixturePath).CombinedOutput(); err != nil {
-		t.Fatalf("secure storage contract: %v\n%s", err, output)
-	}
+	compileRunChecks(t, directory, "checks", secureStorageChecks,
+		"secure storage contract compile", "secure storage contract", []string{sourcePath}, []string{fixturePath})
 }
 
 const secureStorageChecks = `

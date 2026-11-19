@@ -25,10 +25,7 @@ func repoRoot(t *testing.T) string {
 }
 
 func runInit(t *testing.T, args ...string) (int, string, string) {
-	t.Helper()
-	var stdout, stderr bytes.Buffer
-	code := initCommand(context.Background(), args, &stdout, &stderr)
-	return code, stdout.String(), stderr.String()
+	return runCommand(t, initCommand, args...)
 }
 
 func TestInitRejectsBadInputsAndCreatesNothing(t *testing.T) {

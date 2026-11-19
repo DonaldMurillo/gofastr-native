@@ -3,16 +3,15 @@ package nativeui
 import (
 	"context"
 	"maps"
-	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 const WatchTimeout = 10 * time.Second
 
 func validDataVersion(version string) bool {
-	return version != "" && len(version) <= 256 && utf8.ValidString(version) && !strings.ContainsFunc(version, unicode.IsControl)
+	return version != "" && uitext.Plain(version, 256)
 }
 
 func (runtime *Runtime) cancelWatch(session *runtimeSession) {
@@ -32,7 +31,7 @@ func (runtime *Runtime) watch(ctx context.Context, session *runtimeSession, comm
 		reply.Error = commandFailure("stale", "This live read belongs to an obsolete screen.")
 		return reply
 	}
-	if session.screen.Live == nil || !validDataVersion(command.DataVersion) || session.active || session.service != nil || session.presentation != nil || session.files != nil || session.uncertain {
+	if session.screen.Live == nil || !validDataVersion(command.DataVersion) || session.active || session.presented() {
 		reply.Error = commandFailure("invalid_request", "This live read is no longer available.")
 		return reply
 	}

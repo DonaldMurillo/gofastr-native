@@ -3,31 +3,24 @@ package notesnative
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
 func servicesHello(t *testing.T) string {
 	t.Helper()
-	reply := showcaseCommand(t, nativeui.Command{Kind: "hello", Hello: &nativeui.Hello{Minimum: 1, Maximum: 1, Renderer: "uikit", Capabilities: map[nativeui.Capability]nativeui.Support{
-		nativeui.CapabilityNavigation: nativeui.SupportAvailable, nativeui.CapabilityEditor: nativeui.SupportAvailable,
+	return hello(t, "uikit", map[nativeui.Capability]nativeui.Support{
 		nativeui.CapabilityDrafts: nativeui.SupportAvailable, nativeui.CapabilityFiles: nativeui.SupportAvailable,
-		nativeui.CapabilityPresentation: nativeui.SupportAvailable,
-		nativeui.CapabilityPhotos:       nativeui.SupportAvailable, nativeui.CapabilitySharing: nativeui.SupportAvailable,
+		nativeui.CapabilityPhotos: nativeui.SupportAvailable, nativeui.CapabilitySharing: nativeui.SupportAvailable,
 		nativeui.CapabilityClipboard: nativeui.SupportAvailable, nativeui.CapabilityNotifications: nativeui.SupportAvailable,
 		nativeui.CapabilityAudio: nativeui.SupportAvailable, nativeui.CapabilityLive: nativeui.SupportAvailable,
-		"gofastr.media/v1": nativeui.SupportAvailable,
-	}}})
-	if reply.Error != nil {
-		t.Fatal(reply.Error)
-	}
-	return reply.Connection
+	})
 }
 
 func liveVersion(t *testing.T, connection string) string {
@@ -46,11 +39,7 @@ func serviceResult(t *testing.T, command nativeui.Command, identifier string, re
 }
 
 func TestNotesDeviceServicesKeepMetadataAndDirtyTextIndependent(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	connection := servicesHello(t)
 	newNote := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/notes/new"})
 	if newNote.Response != nil {
@@ -160,28 +149,11 @@ func TestNotesDeviceServicesKeepMetadataAndDirtyTextIndependent(t *testing.T) {
 }
 
 func recordedWAV() files.Document {
-	data := make([]byte, 48)
-	copy(data, "RIFF")
-	binary.LittleEndian.PutUint32(data[4:8], uint32(len(data)-8))
-	copy(data[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(data[16:20], 16)
-	binary.LittleEndian.PutUint16(data[20:22], 1)
-	binary.LittleEndian.PutUint16(data[22:24], 1)
-	binary.LittleEndian.PutUint32(data[24:28], 8000)
-	binary.LittleEndian.PutUint32(data[28:32], 16000)
-	binary.LittleEndian.PutUint16(data[32:34], 2)
-	binary.LittleEndian.PutUint16(data[34:36], 16)
-	copy(data[36:], "data")
-	binary.LittleEndian.PutUint32(data[40:44], 4)
-	return files.Document{Name: "recording.wav", MediaType: "audio/wav", Data: data}
+	return fixtures.WAV(8000, 4)
 }
 
 func TestNotesRecordingValidatesPersistsReopensPlaysAndSharesWithoutSavingDraft(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	note, err := Save("", "Audio note", "Saved body")
 	if err != nil {
 		t.Fatal(err)
@@ -281,11 +253,7 @@ func TestNotesRecordingValidatesPersistsReopensPlaysAndSharesWithoutSavingDraft(
 }
 
 func TestNotesRecordingStorageFailureDoesNotBumpLiveOrSaveText(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	note, err := Save("", "Full storage", "Still saved")
 	if err != nil {
 		t.Fatal(err)
@@ -325,10 +293,7 @@ func TestNotesRecordingStorageFailureDoesNotBumpLiveOrSaveText(t *testing.T) {
 }
 
 func TestNotesShareCopyBoundsDoNotCommitDraft(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	connection := servicesHello(t)
 	editor := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/notes/new"})
 	version := liveVersion(t, connection)

@@ -1,12 +1,7 @@
 (() => {
   'use strict';
   if (window.__gofastr_live) return;
-  const element = (tag, text, attributes = {}) => {
-    const node = document.createElement(tag);
-    if (text) node.textContent = text;
-    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
-    return node;
-  };
+  const element = window.__gofastr_components.element;
   const rows = screen => {
     const list = screen.list;
     const body = element('div', '', { 'data-gfw-collection-content': '' });
@@ -47,10 +42,9 @@
           menu.append(element('summary', '•••', { 'aria-label': 'Actions for ' + row.title }));
           const buttons = element('div');
           for (const side of ['leading', 'trailing']) for (const action of row[side + 'Actions'] || []) {
-            const query = new URLSearchParams({ route: screen.route, action: action.id, row: row.id });
             const control = element('button', action.label, { type: 'submit', form: 'gfw-form', name: 'action', value: action.id,
               'data-gfw-row-action': action.id, 'data-gfw-row-id': row.id, 'data-gfw-side': side, 'data-gfw-role': action.role || '',
-              formaction: '/_mobile/actions?' + query });
+              formaction: window.__gofastr_components.actionTarget(screen.route, action.id, row.id) });
             if (action.fullSwipe && action.role !== 'destructive') control.dataset.gfwFullSwipe = 'true';
             control.disabled = !!row.disabled;
             buttons.append(control);

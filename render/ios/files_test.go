@@ -1,116 +1,53 @@
 package ios
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestFilesWireAndBoundedAccess(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("Swift Foundation checks require the macOS SDK")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	arguments := []string{"--sdk", "macosx", "swiftc", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache")}
-	for _, name := range []string{"GofastrComponents.swift", "GofastrComponentExtensions.swift", "GofastrFiles.swift", "GofastrPresentation.swift", "GofastrActions.swift", "GofastrImages.swift", "GofastrAttachments.swift", "GofastrServices.swift", "GofastrIncomingShares.swift", "GofastrSecureStorage.swift", "GofastrWidgets.swift"} {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
-	native, err := Sources.ReadFile("GofastrNative.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	start := strings.Index(string(native), "struct MobileDraft:")
-	end := strings.Index(string(native), "final class MobileHost {")
-	if start < 0 || end <= start {
-		t.Fatal("could not locate the real binding-independent wire DTOs")
-	}
-	checksPath := filepath.Join(directory, "FilesChecks.swift")
-	checks := "import Foundation\n" + string(native[start:end]) + filesChecks
-	if err := os.WriteFile(checksPath, []byte(checks), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "files-checks")
-	arguments = append(arguments, checksPath, "-o", executable)
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("file checks do not compile: %v\n%s", err, output)
-	}
-	if output, err := exec.Command(executable).CombinedOutput(); err != nil {
-		t.Fatalf("file wire, bounded I/O, or result lifecycle regression: %v\n%s", err, output)
-	}
+	sources := swiftSources(t, directory, Sources, rendererSourceFiles...)
+	compileRunChecks(t, directory, "files-checks", "import Foundation\n"+draftDTOs(t)+filesChecks,
+		"file checks do not compile", "file wire, bounded I/O, or result lifecycle regression", sources, nil)
 }
 
 func TestFilesForegroundAndSettlementContract(t *testing.T) {
-	read := func(name string) string {
-		t.Helper()
-		content, err := Sources.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(content)
-	}
-	native := read("GofastrNative.swift")
-	for _, required := range []string{
+	native := readSource(t, Sources, "GofastrNative.swift")
+	requireTokens(t, native, "missing file foreground/wire contract",
 		`"files/v1": "available"`, "let files: MobileFiles?", "let fileId: String?",
 		"let foreground = MobileForegroundCoordinator()", "guard !busy, !host.foreground.isActive",
 		`["kind": kind, "instance": instance, "revision": bufferRevision, "values": values]`,
 		"let chained = reply.response?.presentation != nil || reply.response?.files != nil",
 		"if !editor.dirty && response.presentation == nil && response.files == nil",
-		"fileID: reply.fileId", "self.finishForeground(foregroundID, restoreFocus: restoreFocus, preserveFocus: chained)",
-	} {
-		if !strings.Contains(native, required) {
-			t.Errorf("missing file foreground/wire contract: %s", required)
-		}
-	}
+		"fileID: reply.fileId", "self.finishForeground(foregroundID, restoreFocus: restoreFocus, preserveFocus: chained)")
 	start := strings.Index(native, "private func fileResult(")
 	end := strings.Index(native, "private func finishForeground(")
 	if start < 0 || end <= start {
 		t.Fatal("missing file result submission boundary")
 	}
 	submission := native[start:end]
-	for _, required := range []string{
+	requireTokens(t, submission, "file results must write once then settle",
 		"let request = UUID().uuidString", `send("file-result", extra: ["requestId": request, "fileId": identifier, "fileResult": result.wire])`,
-		"self?.complete(request, foregroundID: identifier)",
-	} {
-		if !strings.Contains(submission, required) {
-			t.Errorf("file results must write once then settle: %s", required)
-		}
-	}
+		"self?.complete(request, foregroundID: identifier)")
 	if strings.Count(submission, `send("file-result"`) != 1 || strings.Contains(submission, "self?.fileResult(") || strings.Contains(submission, "self.fileResult(") {
 		t.Error("file-result writes must never retry")
 	}
-	controller := read("GofastrFileController.swift")
-	for _, required := range []string{
+	controller := readSource(t, Sources, "GofastrFileController.swift")
+	requireTokens(t, controller, "missing picker lifecycle boundary",
 		"UIDocumentPickerViewController(forOpeningContentTypes:", "asCopy: true", "UIDocumentPickerViewController(forExporting: [url], asCopy: true)",
 		"func documentPickerWasCancelled(", "queue.async", "MobileFileAccess.read(url, pick: pick)",
-		"MobileForegroundDismissal.dismiss(controller)", "guard state.report() else { return }", "cleanExport()",
-	} {
-		if !strings.Contains(controller, required) {
-			t.Errorf("missing picker lifecycle boundary: %s", required)
-		}
-	}
+		"MobileForegroundDismissal.dismiss(controller)", "guard state.report() else { return }", "cleanExport()")
 	if strings.Contains(native, "files.id") || strings.Contains(native, "fileId: files.id") {
 		t.Error("the declared file continuation id is not a runtime task identity")
 	}
-	presentation := read("GofastrPresentationController.swift")
+	presentation := readSource(t, Sources, "GofastrPresentationController.swift")
 	if strings.Count(presentation, "if !(controller is UIAlertController) { controller.presentationController?.delegate = self }") != 2 {
 		t.Error("do not reintroduce the system alert presentationController.delegate trap")
 	}
-	foreground := read("GofastrForeground.swift")
-	if strings.Count(foreground, "guard active == nil, !identifier.isEmpty") != 3 || !strings.Contains(foreground, "private var active: MobileForegroundTask?") {
+	foreground := readSource(t, Sources, "GofastrForeground.swift")
+	if strings.Count(foreground, "guard active == nil, !identifier.isEmpty") != 1 || strings.Count(foreground, "begin(identifier, source: source)") != 3 || !strings.Contains(foreground, "private var active: MobileForegroundTask?") {
 		t.Error("file tasks, presentations, and device services must reserve the same foreground slot")
 	}
 }

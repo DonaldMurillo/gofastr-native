@@ -50,10 +50,7 @@ public final class Services {
     private void failed(Exception e){Log.e("gofastr-native","device operation failed",e);releaseCapture();finish(outcome(e instanceof SecurityException?"denied":"failed",e instanceof SecurityException?"Access was denied.":"The device operation failed."));}
     public static byte[] read(InputStream input,int maximum) throws IOException {
         if(input==null)throw new IOException("No file content");
-        try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){
-            byte[] buffer=new byte[16384];int count;
-            while((count=in.read(buffer))!=-1){if(out.size()+count>maximum)throw new IOException("File exceeds the transfer limit");out.write(buffer,0,count);}return out.toByteArray();
-        }
+        return Bounded.read(input,maximum,"File exceeds the transfer limit");
     }
     public static JSONObject document(String name,String type,byte[] bytes){
         if(name==null || name.isEmpty() || name.equals(".") || name.equals("..") || name.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>200 || name.contains("/") || name.contains("\\") || name.matches("(?s).*[\\p{Cntrl}].*") || type==null || type.length()>128 || !type.matches("[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+(?:;[^\\r\\n\\x00-\\x1f]*)?") || bytes.length>1<<20)throw new IllegalArgumentException("Invalid private document");

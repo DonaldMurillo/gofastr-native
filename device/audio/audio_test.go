@@ -5,23 +5,19 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 )
 
 func wav() files.Document {
-	data := make([]byte, 46)
-	copy(data, "RIFF")
-	binary.LittleEndian.PutUint32(data[4:], 38)
-	copy(data[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(data[16:], 16)
-	binary.LittleEndian.PutUint16(data[20:], 1)
-	binary.LittleEndian.PutUint16(data[22:], 1)
-	binary.LittleEndian.PutUint32(data[24:], 8000)
-	binary.LittleEndian.PutUint32(data[28:], 16000)
-	binary.LittleEndian.PutUint16(data[32:], 2)
-	binary.LittleEndian.PutUint16(data[34:], 16)
-	copy(data[36:], "data")
-	binary.LittleEndian.PutUint32(data[40:], 2)
-	return files.Document{Name: "recording.wav", MediaType: "audio/wav", Data: data}
+	return fixtures.WAV(8000, 2)
+}
+
+func mp4Box(kind string, body []byte) []byte {
+	data := make([]byte, 8+len(body))
+	binary.BigEndian.PutUint32(data, uint32(len(data)))
+	copy(data[4:], kind)
+	copy(data[8:], body)
+	return data
 }
 
 func TestAudioBoundsAndUntrustedContent(t *testing.T) {
@@ -65,15 +61,8 @@ func TestAudioBoundsAndUntrustedContent(t *testing.T) {
 }
 
 func TestAcceptedAudioContainers(t *testing.T) {
-	box := func(kind string, body []byte) []byte {
-		data := make([]byte, 8+len(body))
-		binary.BigEndian.PutUint32(data, uint32(len(data)))
-		copy(data[4:], kind)
-		copy(data[8:], body)
-		return data
-	}
-	m4a := append(box("ftyp", []byte("M4A \x00\x00\x00\x00isom")), box("moov", []byte("mp4a"))...)
-	m4a = append(m4a, box("mdat", []byte{1})...)
+	m4a := append(mp4Box("ftyp", []byte("M4A \x00\x00\x00\x00isom")), mp4Box("moov", []byte("mp4a"))...)
+	m4a = append(m4a, mp4Box("mdat", []byte{1})...)
 	page := func(body []byte, flags byte) []byte {
 		data := make([]byte, 28+len(body))
 		copy(data, "OggS")
@@ -93,14 +82,7 @@ func TestAcceptedAudioContainers(t *testing.T) {
 }
 
 func TestAndroidM4AExtendedSizeMediaBox(t *testing.T) {
-	box := func(kind string, body []byte) []byte {
-		b := make([]byte, 8+len(body))
-		binary.BigEndian.PutUint32(b, uint32(len(b)))
-		copy(b[4:], kind)
-		copy(b[8:], body)
-		return b
-	}
-	header := append(box("ftyp", []byte("mp42\x00\x00\x00\x00isommp42")), box("moov", []byte("mp4a"))...)
+	header := append(mp4Box("ftyp", []byte("mp42\x00\x00\x00\x00isommp42")), mp4Box("moov", []byte("mp4a"))...)
 	media := make([]byte, 20)
 	binary.BigEndian.PutUint32(media, 1)
 	copy(media[4:], "mdat")

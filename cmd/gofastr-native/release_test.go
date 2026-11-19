@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"flag"
 	"io"
 	"os"
@@ -10,22 +9,6 @@ import (
 	"strings"
 	"testing"
 )
-
-const nativePkg = "github.com/DonaldMurillo/gofastr-native/examples/notes/notesnative"
-
-// runCLI runs the command and returns exit code, stdout and stderr.
-func runCLI(t *testing.T, args ...string) (int, string, string) {
-	t.Helper()
-	var stdout, stderr bytes.Buffer
-	code := run(context.Background(), args, &stdout, &stderr)
-	return code, stdout.String(), stderr.String()
-}
-
-// planText strips the shell quoting and Windows suffixes from a plan.
-func planText(s string) string {
-	s = strings.ReplaceAll(s, "'", "")
-	return strings.ReplaceAll(strings.ReplaceAll(s, ".exe", ""), ".bat", "")
-}
 
 func TestReleaseValidationMatrix(t *testing.T) {
 	keystore := filepath.Join(t.TempDir(), "upload.jks")

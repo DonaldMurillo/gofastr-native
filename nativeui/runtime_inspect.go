@@ -91,14 +91,7 @@ func (runtime *Runtime) describeSession(session *runtimeSession, state *SessionS
 	state.Renderer = session.contract.Renderer
 	state.Active, state.Closed, state.Uncertain, state.PrivacyRevoked = session.active, session.closed, session.uncertain, session.privacyRevoked
 	state.Protected, state.Live = session.screen.Protection != nil, session.screen.Live != nil
-	switch {
-	case session.presentation != nil:
-		state.Foreground = "presentation"
-	case session.files != nil:
-		state.Foreground = "files"
-	case session.service != nil:
-		state.Foreground = "service"
-	}
+	state.Foreground = session.foreground()
 	if session.editor != nil {
 		// Snapshot only: Editor.Leave records the current buffer, which would
 		// be a mutation.

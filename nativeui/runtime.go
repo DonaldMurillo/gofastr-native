@@ -86,6 +86,25 @@ type runtimeSession struct {
 	restoreBaseline behavior.Values
 }
 
+// presented reports whether a foreground task or an uncertain outcome blocks
+// starting another action or leaving the screen.
+func (session *runtimeSession) presented() bool {
+	return session.presentation != nil || session.files != nil || session.service != nil || session.uncertain
+}
+
+// foreground names the presented task by precedence, or "" when none is.
+func (session *runtimeSession) foreground() string {
+	switch {
+	case session.presentation != nil:
+		return "presentation"
+	case session.files != nil:
+		return "files"
+	case session.service != nil:
+		return "service"
+	}
+	return ""
+}
+
 type runtimeAction struct {
 	action         string
 	values         map[string]string
@@ -296,7 +315,7 @@ func (runtime *Runtime) handle(ctx context.Context, command Command) Reply {
 	}
 	switch command.Kind {
 	case "checkpoint", "leave":
-		if command.Kind == "leave" && (session.presentation != nil || session.files != nil || session.service != nil || session.uncertain) {
+		if command.Kind == "leave" && session.presented() {
 			reply.Error = commandFailure("pending", "Finish the presented task before leaving this screen.")
 			return reply
 		}
@@ -440,7 +459,7 @@ func (runtime *Runtime) open(ctx context.Context, command Command, contract Cont
 }
 
 func (runtime *Runtime) action(ctx context.Context, session *runtimeSession, command Command, reply Reply) Reply {
-	if session.presentation != nil || session.files != nil || session.service != nil || session.uncertain {
+	if session.presented() {
 		reply.Error = commandFailure("pending", "Finish the presented task before starting another action.")
 		return reply
 	}

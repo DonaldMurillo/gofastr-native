@@ -20,6 +20,26 @@ Both are experimental. Until 1.0, any minor or patch release can change the API.
   portrait with one finger. Not yet checked: landscape, multi-touch,
   VoiceOver itself, the sound by ear, and a physical iPhone.
 
+### Internal
+
+- De-duplicated production and test code with no intended behavior change:
+  one atomic private-file write and bounded-text predicates shared via
+  `internal/privatefile` and `internal/uitext`; one WAV test fixture via
+  `internal/fixtures`; one foreground-presented guard in `nativeui`;
+  shared Swift helpers in the UIKit renderer (stack-view reconcile,
+  stale-instance close, unsupported-capability failure, foreground
+  coordinator); a shared bounded stream read and action menu in the
+  Android renderer; shared modal-dialog and base64 helpers across the
+  WebView renderer's modules; and consolidated Swift-compile, simulator
+  and app-boot test harnesses in `render/ios`, `internal/simtest`,
+  `examples/notes/notesnative` and `cmd/gofastr-native`.
+  The tui module exports `widget.SurfaceBox`, previously private.
+  Two small deviations: `notesbackup.Stage` now discards its staging
+  token when the final directory sync fails (callers already ignored
+  it on error), and every executable Swift check in `render/ios` now
+  shares one 90-second compile-and-run deadline instead of only the
+  reliability check having one.
+
 ## v0.0.1 (2026-11-08)
 
 The first tagged release of both modules.

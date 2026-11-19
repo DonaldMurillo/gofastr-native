@@ -59,12 +59,18 @@ func (runtime *Runtime) releasePresentation(session *runtimeSession) {
 	if session.presentation == nil {
 		return
 	}
+	runtime.releaseOwned(session, session.presentation.id)
+	session.presentation = nil
+}
+
+// releaseOwned clears the presentation owner slot for session while it still
+// holds the given presentation identifier.
+func (runtime *Runtime) releaseOwned(session *runtimeSession, id string) {
 	runtime.presentationMu.Lock()
-	if runtime.presentationOwners[session.connection] == session.presentation.id {
+	if runtime.presentationOwners[session.connection] == id {
 		delete(runtime.presentationOwners, session.connection)
 	}
 	runtime.presentationMu.Unlock()
-	session.presentation = nil
 }
 
 func (runtime *Runtime) respond(ctx context.Context, session *runtimeSession, command Command, reply Reply) Reply {

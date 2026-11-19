@@ -5,8 +5,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 const MaxBytes = 16 << 10
@@ -51,7 +51,7 @@ type Result struct {
 var keyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
 func (request Request) Validate() error {
-	if len(request.Value) > MaxBytes || len(request.Reason) > 200 || !utf8.ValidString(request.Reason) || strings.ContainsFunc(request.Reason, unicode.IsControl) {
+	if len(request.Value) > MaxBytes || !uitext.Plain(request.Reason, 200) {
 		return errors.New("securestore: invalid secret size or authentication reason")
 	}
 	switch request.Operation {

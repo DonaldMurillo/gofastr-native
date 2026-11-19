@@ -9,12 +9,7 @@
   let current;
   let sequence = 0;
   let discovered;
-  const element = (tag, text, attributes = {}) => {
-    const node = document.createElement(tag);
-    if (text) node.textContent = text;
-    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
-    return node;
-  };
+  const element = (tag, text, attributes) => window.__gofastr_components.element(tag, text, attributes);
   const bridge = () => {
     const injected = window.__gofastrDeviceServices;
     if (typeof injected?.capabilities === 'function' && typeof injected?.perform === 'function') return injected;
@@ -60,11 +55,10 @@
   const bytesOf = file => {
     if (!file || typeof file.name !== 'string' || !file.name || file.name.length > 200 || /[/\\:\u0000-\u001f\u007f]/.test(file.name) ||
         typeof file.mediaType !== 'string' || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+(?:;[^\r\n]*)?$/i.test(file.mediaType) ||
-        typeof file.data !== 'string' || !file.data || file.data.length > 4 * Math.ceil(maximum / 3) ||
-        !/^[A-Za-z0-9+/]+={0,2}$/.test(file.data) || file.data.length % 4 !== 0) throw new Error('Invalid or oversized private file.');
-    const raw = atob(file.data);
-    if (!raw.length || raw.length > maximum) throw new Error('Invalid or oversized private file.');
-    return Uint8Array.from(raw, character => character.charCodeAt(0));
+        typeof file.data !== 'string' || !file.data) throw new Error('Invalid or oversized private file.');
+    const bytes = window.__gofastr_components.decodeBase64(file.data, maximum, 'Invalid or oversized private file.');
+    if (!bytes.length || bytes.length > maximum) throw new Error('Invalid or oversized private file.');
+    return bytes;
   };
   const audioBytes = file => {
     const bytes = bytesOf(file);
@@ -87,6 +81,10 @@
     for (const track of view.stream?.getTracks() || []) { track.onended = null; track.onmute = null; track.stop(); }
     view.stream = null;
   };
+  const detachPlayer = (player, url) => {
+    if (player) { player.pause?.(); player.removeAttribute('src'); player.load?.(); }
+    if (url) URL.revokeObjectURL(url);
+  };
   const cleanupAudio = view => {
     clearTimeout(view.timer);
     if (view.recorder) {
@@ -97,8 +95,7 @@
       view.recorder = null;
     }
     stopTracks(view);
-    if (view.preview) { view.preview.pause?.(); view.preview.removeAttribute('src'); view.preview.load?.(); }
-    if (view.url) URL.revokeObjectURL(view.url);
+    detachPlayer(view.preview, view.url);
     view.url = null;
     view.chunks = [];
     view.blob = null;
@@ -298,11 +295,9 @@
       try {
         const bytes = new Uint8Array(await view.blob.arrayBuffer());
         if (current !== view || view.sent || !view.root.isConnected) return;
-        let raw = '';
-        for (const byte of bytes) raw += String.fromCharCode(byte);
         const mediaType = view.blob.type.split(';')[0];
         const extension = { 'audio/webm': 'webm', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/wav': 'wav' }[mediaType];
-        const file = { name: 'recording.' + (extension || 'audio'), mediaType, data: btoa(raw) };
+        const file = { name: 'recording.' + (extension || 'audio'), mediaType, data: window.__gofastr_components.encodeBase64(bytes) };
         audioBytes(file);
         await settle(view, { status: 'completed', file, durationMillis: view.durationMillis });
       } catch (error) { await settle(view, { status: 'failed', message: error.message || 'The recording could not be accepted.' }); }
@@ -384,9 +379,7 @@
     for (const player of playbackSources.keys()) {
       if (disconnectedOnly && player.isConnected) continue;
       if (root && !root.contains(player) && player.isConnected) continue;
-      player.pause?.(); player.removeAttribute('src'); player.load?.();
-      const url = playback.get(player);
-      if (url) URL.revokeObjectURL(url);
+      detachPlayer(player, playback.get(player));
       playback.delete(player);
       if (!retain) playbackSources.delete(player);
     }

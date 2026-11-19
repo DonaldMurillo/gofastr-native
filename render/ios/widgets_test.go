@@ -3,30 +3,16 @@ package ios
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
 )
 
 func TestWidgetSwiftContract(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("executable Swift checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("Swift toolchain unavailable")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	source, err := Sources.ReadFile("GofastrWidgets.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sourcePath := filepath.Join(directory, "GofastrWidgets.swift")
-	if err := os.WriteFile(sourcePath, source, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	sourcePath := swiftSources(t, directory, Sources, "GofastrWidgets.swift")[0]
 	fixture, err := json.Marshal([]widgets.Request{
 		{Operation: widgets.Publish, Snapshot: &widgets.Snapshot{Title: "Recent notes", Text: "Published by Go", Route: "/notes?filter=recent%20notes", Items: []widgets.Item{{ID: "1", Title: "Shopping", Subtitle: "Milk\nBread"}}}},
 		{Operation: widgets.Clear}, {Operation: widgets.Status},
@@ -38,17 +24,8 @@ func TestWidgetSwiftContract(t *testing.T) {
 	if err := os.WriteFile(fixturePath, fixture, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	checkPath := filepath.Join(directory, "WidgetChecks.swift")
-	if err := os.WriteFile(checkPath, []byte(widgetSwiftChecks), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "widget-checks")
-	if output, err := exec.Command("xcrun", "--sdk", "macosx", "swiftc", "-O", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "cache"), sourcePath, checkPath, "-o", executable).CombinedOutput(); err != nil {
-		t.Fatalf("compile Widget DTOs: %v\n%s", err, output)
-	}
-	if output, err := exec.Command(executable, fixturePath).CombinedOutput(); err != nil {
-		t.Fatalf("execute Widget DTOs: %v\n%s", err, output)
-	}
+	compileRunChecks(t, directory, "widget-checks", widgetSwiftChecks,
+		"compile Widget DTOs", "execute Widget DTOs", []string{"-O", sourcePath}, []string{fixturePath})
 }
 
 const widgetSwiftChecks = `

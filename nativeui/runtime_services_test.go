@@ -2,7 +2,6 @@ package nativeui
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 )
 
 func serviceCommand(t *testing.T, ctx context.Context, runtime *Runtime, command Command) Reply {
@@ -399,18 +399,5 @@ func TestServiceCoordinatesWithFilesAndPresentations(t *testing.T) {
 }
 
 func serviceWAV() files.Document {
-	data := make([]byte, 46)
-	copy(data, "RIFF")
-	binary.LittleEndian.PutUint32(data[4:], 38)
-	copy(data[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(data[16:], 16)
-	binary.LittleEndian.PutUint16(data[20:], 1)
-	binary.LittleEndian.PutUint16(data[22:], 1)
-	binary.LittleEndian.PutUint32(data[24:], 8000)
-	binary.LittleEndian.PutUint32(data[28:], 16000)
-	binary.LittleEndian.PutUint16(data[32:], 2)
-	binary.LittleEndian.PutUint16(data[34:], 16)
-	copy(data[36:], "data")
-	binary.LittleEndian.PutUint32(data[40:], 2)
-	return files.Document{Name: "recording.wav", MediaType: "audio/wav", Data: data}
+	return fixtures.WAV(8000, 2)
 }

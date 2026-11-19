@@ -1,7 +1,6 @@
 package simtest
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,9 +10,7 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/chromedp"
 
-	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 )
 
 func TestNotesBehaviorShowcaseWebView(t *testing.T) {
@@ -23,21 +20,7 @@ func TestNotesBehaviorShowcaseWebView(t *testing.T) {
 }
 
 func runNotesBehaviorShowcase(t *testing.T, platform mobileui.Platform) {
-	t.Cleanup(func() { owner.SetExtractor(nil) })
-	_, host, err := notesapp.BuildScreensWithPlatform(t.TempDir(), origin, platform)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := host.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := host.Stop(ctx); err != nil {
-			t.Error(err)
-		}
-	})
+	_, _, host := screensHost(t, platform)
 	ctx, traffic := mobileScreensBrowser(t, host, platform == mobileui.Android)
 	if err := chromedp.Run(ctx, chromedp.Navigate(origin+"/"), clickMobileAction("Behaviors"), waitForPath("/behaviors", 10*time.Second), chromedp.WaitVisible(`a[href="/behaviors/alert"]`, chromedp.ByQuery)); err != nil {
 		t.Fatal(err)

@@ -239,10 +239,7 @@ func TestParseAndroidPackage(t *testing.T) {
 }
 
 func runDev(t *testing.T, args ...string) (int, string, string) {
-	t.Helper()
-	var stdout, stderr bytes.Buffer
-	code := devCommand(context.Background(), args, &stdout, &stderr)
-	return code, stdout.String(), stderr.String()
+	return runCommand(t, devCommand, args...)
 }
 
 const starterPkg = "../../examples/starter/starter"

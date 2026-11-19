@@ -20,10 +20,7 @@ import (
 )
 
 func TestNotesRepositoryPagesBeyondTwoHundredWithStableTiesAndScopedSelection(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	var expected []string
 	for range 215 {
 		note, err := Save("", "Equal title", "Bodies are not fetched into collection screens")
@@ -129,10 +126,7 @@ func TestNotesRepositoryPagesBeyondTwoHundredWithStableTiesAndScopedSelection(t 
 }
 
 func TestNotesLiveCommandsObserveOnlyConfirmedOwnerWritesAndCancelOnClose(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	connection := servicesHello(t)
 	list := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/notes"})
 	version := list.Screen.Live.Version
@@ -208,10 +202,7 @@ func TestNotesLiveCommandsObserveOnlyConfirmedOwnerWritesAndCancelOnClose(t *tes
 }
 
 func TestNotesSharingTextAndPhotoUsesTypedDocuments(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	note, err := Save("", "Share attachments", "Do not mutate")
 	if err != nil {
 		t.Fatal(err)

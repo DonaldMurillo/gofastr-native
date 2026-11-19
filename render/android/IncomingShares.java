@@ -80,7 +80,7 @@ public final class IncomingShares {
                     File[] entries=items(directory);
                     if(entries.length==0) return JSON.object("status","completed");
                     JSONObject item;
-                    try(FileInputStream stream=new FileInputStream(entries[0])) { item=new JSONObject(new String(read(stream,MAX_JSON),StandardCharsets.UTF_8)); }
+                    try(FileInputStream stream=new FileInputStream(entries[0])) { item=new JSONObject(new String(Bounded.read(stream,MAX_JSON,"Too large"),StandardCharsets.UTF_8)); }
                     if(!item.optString("identifier").equals(entries[0].getName().substring(0,32))) throw new IllegalArgumentException("Invalid transfer");
                     return JSON.object("status","completed","incomingShare",item);
                 }
@@ -127,7 +127,7 @@ public final class IncomingShares {
                     column=cursor.getColumnIndex(OpenableColumns.SIZE); if(column>=0 && !cursor.isNull(column) && cursor.getLong(column)>remaining) throw new IllegalArgumentException("Too large");
                 }
             }
-            byte[] bytes; try(InputStream stream=resolver.openInputStream(uri)) { if(stream==null) throw new IllegalArgumentException("No stream"); bytes=read(stream,remaining); }
+            byte[] bytes; try(InputStream stream=resolver.openInputStream(uri)) { if(stream==null) throw new IllegalArgumentException("No stream"); bytes=Bounded.read(stream,remaining,"Too large"); }
             remaining-=bytes.length;
             String type=resolver.getType(uri); if(type==null || !type.matches("[A-Za-z0-9!#$&^_.+\\-]+/[A-Za-z0-9!#$&^_.+\\-]+") || type.length()>128) type="application/octet-stream";
             documents.put(JSON.object("name",name,"mediaType",type,"data",Base64.encodeToString(bytes,Base64.NO_WRAP)));
@@ -140,11 +140,6 @@ public final class IncomingShares {
         return item;
     }
 
-    private static byte[] read(InputStream stream,int maximum) throws Exception {
-        ByteArrayOutputStream bytes=new ByteArrayOutputStream(); byte[] buffer=new byte[8192]; int count;
-        while((count=stream.read(buffer,0,Math.min(buffer.length,maximum-bytes.size()+1)))!=-1) { bytes.write(buffer,0,count); if(bytes.size()>maximum) throw new IllegalArgumentException("Too large"); }
-        return bytes.toByteArray();
-    }
     private static boolean identifier(String id) { return id!=null && id.matches("[0-9a-f]{32}"); }
     private static boolean controls(String value) { for(int i=0;i<value.length();i++) if(Character.isISOControl(value.charAt(i))) return true; return false; }
     private static boolean filename(String name) { return name!=null && !name.isEmpty() && name.getBytes(StandardCharsets.UTF_8).length<=200 && !name.equals(".") && !name.equals("..") && !name.contains("/") && !name.contains("\\") && !controls(name); }

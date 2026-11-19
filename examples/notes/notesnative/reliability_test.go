@@ -10,11 +10,7 @@ import (
 )
 
 func TestBindingRestartWithoutSaveCompletionRetainsUnknownAndNewestText(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	note, err := Save("", "Saved baseline", "Saved body")
 	if err != nil {
 		t.Fatal(err)
@@ -63,11 +59,7 @@ func TestBindingRestartWithoutSaveCompletionRetainsUnknownAndNewestText(t *testi
 }
 
 func TestBindingFilesystemDraftFaultBlocksWriteAndKeep(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	note, err := Save("", "Saved baseline", "Saved body")
 	if err != nil {
 		t.Fatal(err)

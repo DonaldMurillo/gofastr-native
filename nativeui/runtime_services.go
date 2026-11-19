@@ -75,11 +75,7 @@ func (runtime *Runtime) releaseService(session *runtimeSession) {
 	if session.service == nil {
 		return
 	}
-	runtime.presentationMu.Lock()
-	if runtime.presentationOwners[session.connection] == session.service.id {
-		delete(runtime.presentationOwners, session.connection)
-	}
-	runtime.presentationMu.Unlock()
+	runtime.releaseOwned(session, session.service.id)
 	session.service = nil
 }
 

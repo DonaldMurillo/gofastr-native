@@ -2,94 +2,26 @@ package ios
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 )
 
 func TestComponentsWireRoutesAndState(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("executable Swift Foundation checks require macOS")
-	}
-	if _, err := exec.LookPath("xcrun"); err != nil {
-		t.Skip("the Swift toolchain is not installed")
-	}
+	requireSwift(t)
 	directory := t.TempDir()
-	arguments := []string{"--sdk", "macosx", "swiftc", "-O", "-parse-as-library", "-module-cache-path", filepath.Join(directory, "module-cache")}
-	for _, name := range []string{"GofastrComponents.swift", "GofastrComponentExtensions.swift", "GofastrActions.swift", "GofastrFiles.swift", "GofastrPresentation.swift", "GofastrImages.swift", "GofastrAttachments.swift", "GofastrServices.swift", "GofastrIncomingShares.swift", "GofastrSecureStorage.swift", "GofastrWidgets.swift"} {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
-	native, err := Sources.ReadFile("GofastrNative.swift")
-	if err != nil {
-		t.Fatal(err)
-	}
-	start := strings.Index(string(native), "struct MobileDraft:")
-	end := strings.Index(string(native), "final class MobileHost {")
-	if start < 0 || end <= start {
-		t.Fatal("missing actual renderer DTO boundary")
-	}
-	checks := filepath.Join(directory, "ComponentsChecks.swift")
-	if err := os.WriteFile(checks, []byte("import Foundation\n"+string(native[start:end])+componentChecks), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	executable := filepath.Join(directory, "component-checks")
-	arguments = append(arguments, checks, "-o", executable)
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("component checks do not compile: %v\n%s", err, output)
-	}
-	if output, err := exec.Command(executable).CombinedOutput(); err != nil {
-		t.Fatalf("wire, selection, date, route, or metadata regression: %v\n%s", err, output)
-	}
+	arguments := append([]string{"-O"}, swiftSources(t, directory, Sources, rendererSourceFiles...)...)
+	compileRunChecks(t, directory, "component-checks", "import Foundation\n"+draftDTOs(t)+componentChecks,
+		"component checks do not compile", "wire, selection, date, route, or metadata regression", arguments, nil)
 }
 
 func TestComponentsUIKitOptimizedCompiles(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("optimized UIKit compilation requires Xcode on macOS")
-	}
-	sdk, err := exec.Command("xcrun", "--sdk", "iphonesimulator", "--show-sdk-path").Output()
-	if err != nil {
-		t.Skipf("no iOS simulator SDK: %v", err)
-	}
-	architecture := runtime.GOARCH
-	if architecture == "amd64" {
-		architecture = "x86_64"
-	}
 	directory := t.TempDir()
-	arguments := []string{"--sdk", "iphonesimulator", "swiftc", "-O", "-parse-as-library", "-emit-library", "-module-name", "GofastrComponentsChecks",
-		"-emit-module", "-emit-module-path", filepath.Join(directory, "GofastrComponentsChecks.swiftmodule"),
-		"-target", architecture + "-apple-ios16.0-simulator", "-sdk", strings.TrimSpace(string(sdk)), "-module-cache-path", filepath.Join(directory, "module-cache")}
-	entries, err := Sources.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".swift") {
-			continue
-		}
-		source, err := Sources.ReadFile(entry.Name())
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(directory, entry.Name())
-		if err := os.WriteFile(path, source, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		arguments = append(arguments, path)
-	}
+	arguments := uikitSimulatorArguments(t, directory,
+		"-O", "-parse-as-library", "-emit-library", "-module-name", "GofastrComponentsChecks",
+		"-emit-module", "-emit-module-path", filepath.Join(directory, "GofastrComponentsChecks.swiftmodule"))
+	arguments = append(arguments, swiftDirectorySources(t, directory, Sources)...)
 	arguments = append(arguments, "-o", filepath.Join(directory, "libGofastrComponentsChecks.dylib"))
-	if output, err := exec.Command("xcrun", arguments...).CombinedOutput(); err != nil {
-		t.Fatalf("binding-independent optimized UIKit library does not compile/link: %v\n%s", err, output)
-	}
+	requireXcrun(t, "binding-independent optimized UIKit library does not compile/link", arguments...)
 	client := filepath.Join(directory, "PublicServiceClient.swift")
 	if err := os.WriteFile(client, []byte(`
 import UIKit
@@ -110,15 +42,12 @@ func usePublicRendererLifecycle(_ renderer: GofastrNativeRenderer, completion: @
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	clientArguments := []string{"--sdk", "iphonesimulator", "swiftc", "-typecheck", "-parse-as-library", "-I", directory,
-		"-target", architecture + "-apple-ios16.0-simulator", "-sdk", strings.TrimSpace(string(sdk)), "-module-cache-path", filepath.Join(directory, "module-cache"), client}
-	if output, err := exec.Command("xcrun", clientArguments...).CombinedOutput(); err != nil {
-		t.Fatalf("public runner interface cannot be reused by a separate hosted/native module: %v\n%s", err, output)
-	}
+	clientArguments := uikitSimulatorArguments(t, directory, "-typecheck", "-parse-as-library", "-I", directory)
+	requireXcrun(t, "public runner interface cannot be reused by a separate hosted/native module", append(clientArguments, client)...)
 }
 
 func TestComponentsUIKitContracts(t *testing.T) {
-	checks := map[string][]string{
+	requireTokenMap(t, map[string][]string{
 		"GofastrNative.swift": {
 			`public func openURL(_ url: URL) -> Bool`, `public func checkpoint()`, `MobileLocalRoute.normalize(url)`, `host.queue.sync`, `self.host.backend.render(route, "{}")`,
 			`host.open(screen.route, values: queryValues)`, `host.render(screen.route, values: queryValues)`, `refreshedValues(queryValues, authoritative: model.values)`, `selection.wire`, `selection.reset()`, `selection.reconcile(model.list?.rows ?? [])`,
@@ -138,18 +67,7 @@ func TestComponentsUIKitContracts(t *testing.T) {
 			`MobileNavigationMetadata.maximumDepth`, `MobileNavigationMetadata.maximumTabs`, `hasUncertainEditor`, `MobileRestorationSafety.canOpen`, `view.isUserInteractionEnabled = false`,
 			`"compose": "square.and.pencil"`, `"share": "square.and.arrow.up"`, `UIImage(systemName: "square.grid.2x2")`,
 		},
-	}
-	for name, required := range checks {
-		source, err := Sources.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, token := range required {
-			if !strings.Contains(string(source), token) {
-				t.Errorf("%s lost component/lifecycle contract: %s", name, token)
-			}
-		}
-	}
+	}, "%s lost component/lifecycle contract")
 }
 
 const componentChecks = `

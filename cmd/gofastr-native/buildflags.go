@@ -123,11 +123,11 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "--wait must not be negative")
 		return 2
 	}
-	if err := validateCameraUsage(*f.cameraUsage); err != nil {
+	if err := validateUsage("camera-usage", *f.cameraUsage, "disables native camera access"); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	if err := validateMicrophoneUsage(*f.microphoneUsage); err != nil {
+	if err := validateUsage("microphone-usage", *f.microphoneUsage, "disables microphone access"); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}

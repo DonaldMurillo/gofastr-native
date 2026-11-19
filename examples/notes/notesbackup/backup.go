@@ -273,31 +273,10 @@ func (manager *Manager) Stage(ctx context.Context, document files.Document) (str
 	if err != nil {
 		return "", err
 	}
-	file, err := os.CreateTemp(manager.root, ".review-*")
-	if err != nil {
+	if err = privatefile.WriteFile(ctx, manager.root, ".review-*", filepath.Join(manager.root, "review.json"), encoded); err != nil {
 		return "", err
 	}
-	defer os.Remove(file.Name())
-	defer file.Close()
-	if err = privatefile.Harden(file.Name(), false); err != nil {
-		return "", err
-	}
-	if _, err = file.Write(encoded); err != nil {
-		return "", err
-	}
-	if err = file.Sync(); err != nil {
-		return "", err
-	}
-	if err = file.Close(); err != nil {
-		return "", err
-	}
-	if err = ctx.Err(); err != nil {
-		return "", err
-	}
-	if err = privatefile.Replace(file.Name(), filepath.Join(manager.root, "review.json")); err != nil {
-		return "", err
-	}
-	return token, privatefile.SyncDirectory(manager.root)
+	return token, nil
 }
 
 func (manager *Manager) load(ctx context.Context, token string) (Bundle, error) {

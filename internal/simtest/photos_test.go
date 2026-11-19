@@ -21,9 +21,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/photos"
-	"github.com/DonaldMurillo/gofastr-native/examples/notes/notesapp"
 	"github.com/DonaldMurillo/gofastr-native/render/webview/mobileui"
-	"github.com/DonaldMurillo/gofastr/framework/owner"
 )
 
 func TestNotesPhotosWebView(t *testing.T) {
@@ -33,21 +31,7 @@ func TestNotesPhotosWebView(t *testing.T) {
 }
 
 func runNotesPhotos(t *testing.T, platform mobileui.Platform) {
-	t.Cleanup(func() { owner.SetExtractor(nil) })
-	_, host, err := notesapp.BuildScreensWithPlatform(t.TempDir(), origin, platform)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := host.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := host.Stop(ctx); err != nil {
-			t.Error(err)
-		}
-	})
+	_, _, host := screensHost(t, platform)
 	directory := t.TempDir()
 	photoPath := filepath.Join(directory, "sample.png")
 	photo := image.NewRGBA(image.Rect(0, 0, 3000, 1800))

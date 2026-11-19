@@ -896,7 +896,7 @@ func TestDialogAndNotificationsClearTheirSurfaces(t *testing.T) {
 				}
 				return Layers(Fill(Paragraph(strings.Repeat("u", 500))), overlay)
 			})
-			box := h.tree.Find(func(n *view.Node) bool { _, ok := n.Widget().(surfaceBox); return ok })
+			box := h.tree.Find(func(n *view.Node) bool { _, ok := n.Widget().(SurfaceBox); return ok })
 			if box == nil {
 				t.Fatal("overlay has no surface")
 			}

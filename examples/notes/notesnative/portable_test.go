@@ -11,10 +11,7 @@ import (
 )
 
 func TestBackupReviewAndRestoreThroughSharedProtocol(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	connection := devicesHello(t)
 	settings := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/settings"})
 	found := false
@@ -55,10 +52,7 @@ func TestBackupReviewAndRestoreThroughSharedProtocol(t *testing.T) {
 }
 
 func TestConflictingEditorKeepsDraftAndCanSaveTextCopy(t *testing.T) {
-	if err := Start(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	startApp(t)
 	note, err := Save("", "Original", "Original text")
 	if err != nil {
 		t.Fatal(err)
@@ -89,11 +83,7 @@ func TestConflictingEditorKeepsDraftAndCanSaveTextCopy(t *testing.T) {
 }
 
 func TestRestoredDraftRetainsOriginalConflictBaseline(t *testing.T) {
-	directory := t.TempDir()
-	if err := Start(directory); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = Stop() })
+	directory := startApp(t)
 	note, err := Save("", "Original", "Original text")
 	if err != nil {
 		t.Fatal(err)

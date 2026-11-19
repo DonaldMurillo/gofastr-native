@@ -51,7 +51,7 @@ func (d Dialog) Element() view.Element {
 	actions := view.E(dialogActions{Flex{Dir: Horizontal, Gap: 1, Align: layout.Start, Justify: layout.End}}, buttons...)
 	// Visit actions first so a body's AutoFocuser cannot override Default.
 	content := view.E(dialogContent{}, actions, Label(""), body)
-	box := view.E(surfaceBox{Box{Border: BorderRounded, Title: d.Title, Padding: layout.Symmetric(0, 1), BorderStyle: d.BorderStyle, Style: Theme.Text}}, content)
+	box := view.E(SurfaceBox{Box{Border: BorderRounded, Title: d.Title, Padding: layout.Symmetric(0, 1), BorderStyle: d.BorderStyle, Style: Theme.Text}}, content)
 	return view.E(Modal{OnClose: d.OnClose}, Limit(width, 0, box))
 }
 

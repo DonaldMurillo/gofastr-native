@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 //go:embed templates
@@ -167,16 +167,9 @@ func newApp(pkgPath, pkgName, id, name, version string) (app, error) {
 	}, nil
 }
 
-func validateCameraUsage(value string) error {
-	if len(value) > 512 || !utf8.ValidString(value) || strings.ContainsFunc(value, unicode.IsControl) {
-		return errors.New("--camera-usage must be at most 512 UTF-8 bytes with no control characters; empty disables native camera access")
-	}
-	return nil
-}
-
-func validateMicrophoneUsage(value string) error {
-	if len(value) > 512 || !utf8.ValidString(value) || strings.ContainsFunc(value, unicode.IsControl) {
-		return errors.New("--microphone-usage must be at most 512 UTF-8 bytes with no control characters; empty disables microphone access")
+func validateUsage(flag, value, empty string) error {
+	if !uitext.Plain(value, 512) {
+		return fmt.Errorf("--%s must be at most 512 UTF-8 bytes with no control characters; empty %s", flag, empty)
 	}
 	return nil
 }

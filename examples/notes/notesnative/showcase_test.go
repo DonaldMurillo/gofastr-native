@@ -114,3 +114,36 @@ func showcaseCommand(t *testing.T, command nativeui.Command) nativeui.Reply {
 	}
 	return result
 }
+
+var baseCapabilities = map[nativeui.Capability]nativeui.Support{
+	nativeui.CapabilityNavigation:   nativeui.SupportAvailable,
+	nativeui.CapabilityEditor:       nativeui.SupportAvailable,
+	nativeui.CapabilityPresentation: nativeui.SupportAvailable,
+	"gofastr.media/v1":              nativeui.SupportAvailable,
+}
+
+func startApp(t *testing.T) string {
+	t.Helper()
+	directory := t.TempDir()
+	if err := Start(directory); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Stop() })
+	return directory
+}
+
+func hello(t *testing.T, renderer string, extra map[nativeui.Capability]nativeui.Support) string {
+	t.Helper()
+	capabilities := make(map[nativeui.Capability]nativeui.Support, len(baseCapabilities)+len(extra))
+	for capability, support := range baseCapabilities {
+		capabilities[capability] = support
+	}
+	for capability, support := range extra {
+		capabilities[capability] = support
+	}
+	reply := showcaseCommand(t, nativeui.Command{Kind: "hello", Hello: &nativeui.Hello{Minimum: 1, Maximum: 1, Renderer: renderer, Capabilities: capabilities}})
+	if reply.Error != nil {
+		t.Fatal(reply.Error)
+	}
+	return reply.Connection
+}

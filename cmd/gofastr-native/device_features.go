@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
 func validateDeviceFeatures(a app, platform string) error {
@@ -20,7 +20,7 @@ func validateDeviceFeatures(a app, platform string) error {
 	if platform == "ios-sim" && (a.ReceiveShares || a.Widgets) && a.AppGroup == "" {
 		return errors.New("iOS share and widget extensions require --app-group")
 	}
-	if len(a.BiometricUsage) > 512 || !utf8.ValidString(a.BiometricUsage) || strings.ContainsFunc(a.BiometricUsage, unicode.IsControl) {
+	if !uitext.Plain(a.BiometricUsage, 512) {
 		return errors.New("--biometric-usage must be at most 512 UTF-8 bytes without control characters")
 	}
 	if a.BiometricUsage != "" && !a.SecureStorage {

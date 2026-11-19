@@ -70,11 +70,7 @@ func (runtime *Runtime) releaseFiles(session *runtimeSession) {
 	if session.files == nil {
 		return
 	}
-	runtime.presentationMu.Lock()
-	if runtime.presentationOwners[session.connection] == session.files.id {
-		delete(runtime.presentationOwners, session.connection)
-	}
-	runtime.presentationMu.Unlock()
+	runtime.releaseOwned(session, session.files.id)
 	session.files = nil
 }
 

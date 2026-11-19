@@ -172,4 +172,4 @@ const connected = async (handle, options = {}) => {
   fixture.depart = () => { root.remove(); fixture.mutate(); window.dispatchEvent({ type: 'gofastr:navigate' }); };
   return fixture;
 };
-module.exports = { Target, Element, harness, connected, flush, plain };
+module.exports = { Target, Element, Form, harness, connected, flush, plain };
