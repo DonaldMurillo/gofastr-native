@@ -287,7 +287,7 @@ func TestExtensionScaffoldUIKitAdaptersTypecheck(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		definitions = append(definitions, compiledExtension{manifest, path})
+		definitions = append(definitions, compiledExtension{manifest: manifest, directory: path})
 	}
 	extensions, err := copyIOSExtensions(runner, definitions, filepath.Join(directory, "renderer"))
 	if err != nil {

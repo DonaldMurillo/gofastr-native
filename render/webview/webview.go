@@ -112,6 +112,10 @@ func New(screens *nativeui.App, platform mobileui.Platform, options ...nativeui.
 	}
 	renderer := &Renderer{screens: screens, platform: platform, runtime: runtime}
 	for _, definition := range screens.Extensions() {
+		if !definition.Manifest.HasWebView() {
+			// Native-only library: its capabilities stay unadvertised here.
+			continue
+		}
 		name, err := webassets.Module(definition)
 		if err != nil {
 			return nil, err

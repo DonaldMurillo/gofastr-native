@@ -93,8 +93,13 @@ saved local source, but playback never restarts automatically.
 
 ## Live collection read lifecycle
 
-`live.js` watches only the current connected, visible, live list and never an
-editor (even a mixed form/list definition). Watch commands send
+`live.js` watches the current connected, visible, live screen and never an
+editor (even a mixed form/list definition). A list is read as described below.
+A screen without a list has no rows to patch: a changed reply fetches the
+route's markup again and swaps it into the same root and form. The swap keeps
+the mounted component containers, so their adapters get an update instead of
+a remount, and it restores focus and scroll. If the route now resolves
+elsewhere, the renderer navigates instead. Watch commands send
 `dataVersion: Screen.Live.Version` and current query values without selection
 operands. A changed reply causes a replaceable read-only `open` of the current
 query, not an action or automatic navigation. The new screen instance authorizes

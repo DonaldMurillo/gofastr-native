@@ -53,7 +53,7 @@ func gobindOut(t *testing.T) string {
 	return gobindPackageOut(t, notesPkg)
 }
 
-func gobindPackageOut(t *testing.T, pkg string) string {
+func gobindPackageOut(t *testing.T, packages ...string) string {
 	t.Helper()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, executableName("gobind"))
@@ -61,7 +61,7 @@ func gobindPackageOut(t *testing.T, pkg string) string {
 		t.Skipf("cannot build gobind (offline module cache?): %v\n%s", err, out)
 	}
 	out := filepath.Join(dir, "out")
-	cmd := exec.Command(bin, "-lang=java,objc", "-outdir", out, pkg)
+	cmd := exec.Command(bin, append([]string{"-lang=java,objc", "-outdir", out}, packages...)...)
 	if b, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("gobind: %v\n%s", err, b)
 	}

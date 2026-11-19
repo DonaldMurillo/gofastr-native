@@ -77,6 +77,9 @@ type app struct {
 	Widgets         bool
 	AppGroup        string
 	Extensions      []compiledExtension
+	// WebViewFeatures are the browser features ("camera", "geolocation")
+	// that WebView adapters in the app declare. Android WebView builds only.
+	WebViewFeatures []string
 
 	// Build profile (release.go). The defaults reproduce the debug,
 	// simulator output every template rendered before profiles existed.

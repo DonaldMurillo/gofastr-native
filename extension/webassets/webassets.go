@@ -62,7 +62,15 @@ func source(definition extension.Definition) (string, string, error) {
 
 // Register belongs in the extension library's package init, never app startup
 // after another host has already built its immutable behavior manifest.
+//
+// A library without a WebView adapter is validated and otherwise ignored.
 func Register(definition extension.Definition) {
+	if !definition.Manifest.HasWebView() {
+		if _, err := extension.New(definition); err != nil {
+			panic(err)
+		}
+		return
+	}
 	name, wrapped, err := source(definition)
 	if err != nil {
 		panic(err)

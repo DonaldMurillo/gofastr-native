@@ -5,20 +5,8 @@ This repository holds two Go modules, tagged separately:
 - `github.com/DonaldMurillo/gofastr-native`, tagged `vX.Y.Z`
 - `github.com/DonaldMurillo/gofastr-native/tui`, tagged `tui/vX.Y.Z`
 
-Both are experimental. Until 1.0, any minor or patch release can change the API.
 
 ## Unreleased
-
-### Phone apps (`gofastr-native`)
-
-- `examples/chordharp` plays on iOS. The UIKit view draws the same grid,
-  strumplate and rhythm bar as the Android view, follows the same touch
-  rules (momentary pads, Latch, strums that pluck every zone crossed,
-  repeating tempo buttons), and plays the Go synthesizer through an audio
-  queue. VoiceOver reaches the bar's controls by name and can play the
-  pads and strumplate directly. Checked on the iOS 26.5 simulator in
-  portrait with one finger. Not yet checked: landscape, multi-touch,
-  VoiceOver itself, the sound by ear, and a physical iPhone.
 
 ### Internal
 
@@ -39,6 +27,57 @@ Both are experimental. Until 1.0, any minor or patch release can change the API.
   it on error), and every executable Swift check in `render/ios` now
   shares one 90-second compile-and-run deadline instead of only the
   reliability check having one.
+
+## v0.1.0 (2026-11-18)
+
+### Phone apps (`gofastr-native`)
+
+- `extension/capture` records and streams Android camera video with GPS,
+  camera direction and acceleration. The native renderer's adapter runs in a
+  foreground service and keeps recording in the background; the WebView
+  adapter uses WebCodecs and pauses there. `whip.Publish` streams over WHIP.
+  Recordings are split into segment files, with loop recording under a
+  storage budget, locks by hand, from the notification or on an impact, and
+  recovery of recordings whose process died. Checked on one Android 14
+  emulator only. See [video capture](docs/capture.md).
+- `examples/capture` exercises capture on both renderers, and
+  `examples/dashcam` is a dash cam with loop recording, impact locks and a
+  locked clips list.
+- Showing or hiding the camera preview during a recording rebuilds the
+  camera session, which leaves the recording without frames for 170 to
+  250 ms on the emulator. Leaving the app and coming back costs two such
+  pauses.
+- Compiled extensions can ask for runtime permissions through
+  `GofastrActivity.requestExtensionPermissions`. The answer reaches the
+  extension even when Android recreates the activity while the dialog is
+  open.
+- `whip.Publish` adds a dependency on Pion WebRTC (MIT).
+- The Android renderer no longer detaches the visible screen on each live
+  refresh. Before, a camera preview on a live screen went black because its
+  surface was recreated every update.
+- `examples/capture` no longer reloads its Recordings screen nonstop: the
+  screen's live version now matches the one its watch compares.
+- `examples/chordharp` plays on iOS. The UIKit view draws the same grid,
+  strumplate and rhythm bar as the Android view, follows the same touch
+  rules (momentary pads, Latch, strums that pluck every zone crossed,
+  repeating tempo buttons), and plays the Go synthesizer through an audio
+  queue. VoiceOver reaches the bar's controls by name and can play the
+  pads and strumplate directly. Checked on the iOS 26.5 simulator in
+  portrait with one finger. Not yet checked: landscape, multi-touch,
+  VoiceOver itself, the sound by ear, and a physical iPhone.
+
+
+Capture ran on one Android 14 x86-64 emulator with its virtual scene camera
+and simulated GPS and sensors, and the WebView adapter also ran in headless
+Chromium. Nothing in this release ran on a physical phone or a real camera.
+Paths covered by Go tests or code review only: a second Start while the
+device still runs a replaced session, a permission answer after the activity
+is recreated, storage write failures on the device, and late audio or camera
+callbacks. See [video capture](docs/capture.md) for the full list.
+
+### Terminal apps (`tui`)
+
+No changes. Tagged with the phone module, as every release is.
 
 ## v0.0.1 (2026-11-08)
 

@@ -10,7 +10,12 @@
 package {{.ID}};
 
 import android.app.Activity;
-import android.content.Intent;
+{{if or .WebViewCamera .WebViewMicrophone .WebViewGeolocation}}import android.content.pm.PackageManager;
+import android.webkit.GeolocationPermissions;
+import android.webkit.PermissionRequest;
+import java.util.ArrayList;
+import java.util.List;
+{{end}}import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Base64;
@@ -49,7 +54,11 @@ public final class MainActivity extends Activity {
 
     private WebView web;
     private ValueCallback<Uri[]> fileChoice;
-    // Bridged requests block in Go; never on the UI thread.
+{{if or .WebViewCamera .WebViewMicrophone .WebViewGeolocation}}    // At most one page request of each kind waits for the Android dialog.
+    private PermissionRequest mediaRequest;
+    private GeolocationPermissions.Callback locationCallback;
+    private String locationOrigin;
+{{end}}    // Bridged requests block in Go; never on the UI thread.
     private final ExecutorService bridgeThreads = Executors.newCachedThreadPool();
 
     @Override
@@ -59,7 +68,9 @@ public final class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
-{{if .Debuggable}}        // chrome://inspect on the desktop attaches DevTools.
+{{if or .WebViewCamera .WebViewMicrophone}}        // The camera preview is a muted <video> the page starts itself.
+        s.setMediaPlaybackRequiresUserGesture(false);
+{{end}}{{if .Debuggable}}        // chrome://inspect on the desktop attaches DevTools.
         WebView.setWebContentsDebuggingEnabled(true);
 {{end}}        web.setWebViewClient(new GoClient());
         web.setWebChromeClient(new WebChromeClient() {
@@ -70,7 +81,16 @@ public final class MainActivity extends Activity {
                 catch (android.content.ActivityNotFoundException e) { fileChoice = null; callback.onReceiveValue(null); }
                 return true;
             }
-        });
+{{if or .WebViewCamera .WebViewMicrophone}}            @Override public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(() -> mediaPermission(request));
+            }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (mediaRequest == request) mediaRequest = null;
+            }
+{{end}}{{if .WebViewGeolocation}}            @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                runOnUiThread(() -> locationPermission(origin, callback));
+            }
+{{end}}        });
         setContentView(web);
         final String dataDir = getFilesDir().getAbsolutePath() + "/app";
         // Migrations run in start: keep them off the main thread.
@@ -104,7 +124,69 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static boolean trusted(Uri url) {
+{{if or .WebViewCamera .WebViewMicrophone .WebViewGeolocation}}    // The app's own pages may use the camera, microphone and location the
+    // build declared; nothing else is granted. Android asks the user first.
+    private static final int MEDIA_PERMISSIONS = 502, LOCATION_PERMISSIONS = 503;
+
+    private boolean granted(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private static String androidPermission(String resource) {
+{{if .WebViewCamera}}        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) return android.Manifest.permission.CAMERA;
+{{end}}{{if .WebViewMicrophone}}        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) return android.Manifest.permission.RECORD_AUDIO;
+{{end}}        return null;
+    }
+
+    private void mediaPermission(PermissionRequest request) {
+        if (!trusted(request.getOrigin())) { request.deny(); return; }
+        List<String> missing = new ArrayList<>();
+        for (String resource : request.getResources()) {
+            String permission = androidPermission(resource);
+            if (permission != null && !granted(permission)) missing.add(permission);
+        }
+        if (missing.isEmpty()) { answerMedia(request); return; }
+        if (mediaRequest != null) mediaRequest.deny();
+        mediaRequest = request;
+        requestPermissions(missing.toArray(new String[0]), MEDIA_PERMISSIONS);
+    }
+
+    /** Grants the resources whose Android permission is held, or denies. */
+    private void answerMedia(PermissionRequest request) {
+        List<String> allowed = new ArrayList<>();
+        for (String resource : request.getResources()) {
+            String permission = androidPermission(resource);
+            if (permission != null && granted(permission)) allowed.add(resource);
+        }
+        if (allowed.isEmpty()) request.deny();
+        else request.grant(allowed.toArray(new String[0]));
+    }
+
+    private void locationPermission(String origin, GeolocationPermissions.Callback callback) {
+        if (!trusted(Uri.parse(origin))) { callback.invoke(origin, false, false); return; }
+        if (granted(android.Manifest.permission.ACCESS_FINE_LOCATION) || granted(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            callback.invoke(origin, true, false);
+            return;
+        }
+        if (locationCallback != null) locationCallback.invoke(locationOrigin, false, false);
+        locationCallback = callback;
+        locationOrigin = origin;
+        requestPermissions(new String[] {android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_PERMISSIONS);
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == MEDIA_PERMISSIONS && mediaRequest != null) {
+            PermissionRequest request = mediaRequest; mediaRequest = null;
+            answerMedia(request);
+        } else if (requestCode == LOCATION_PERMISSIONS && locationCallback != null) {
+            GeolocationPermissions.Callback callback = locationCallback; locationCallback = null;
+            boolean allowed = granted(android.Manifest.permission.ACCESS_FINE_LOCATION) || granted(android.Manifest.permission.ACCESS_COARSE_LOCATION);
+            callback.invoke(locationOrigin, allowed, false);
+        }
+    }
+
+{{end}}    private static boolean trusted(Uri url) {
         return "https".equals(url.getScheme()) && HOST.equals(url.getHost()) &&
             (url.getPort() == -1 || url.getPort() == 443) && url.getUserInfo() == null;
     }

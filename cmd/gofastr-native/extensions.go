@@ -18,8 +18,9 @@ import (
 )
 
 type compiledExtension struct {
-	manifest  extension.Manifest
-	directory string
+	manifest   extension.Manifest
+	directory  string
+	importPath string
 }
 
 func discoverExtensions(r *runner, packagePath string) ([]compiledExtension, error) {
@@ -37,14 +38,26 @@ func discoverPlatformExtensions(r *runner, packagePath, target string) ([]compil
 	if err != nil {
 		return nil, err
 	}
-	return discoverExtensionManifests(content)
+	definitions, err := discoverExtensionManifests(content)
+	if err != nil || target != "ios" {
+		return definitions, err
+	}
+	// Android-only libraries have no UIKit adapter; iOS reports them missing.
+	kept := definitions[:0]
+	for _, definition := range definitions {
+		if definition.manifest.HasIOS() {
+			kept = append(kept, definition)
+		}
+	}
+	return kept, nil
 }
 
 func discoverExtensionManifests(content []byte) ([]compiledExtension, error) {
 	decoder := json.NewDecoder(bytes.NewReader(content))
 	var directories []string
+	importPaths := map[string]string{}
 	for {
-		var dependency struct{ Dir string }
+		var dependency struct{ Dir, ImportPath string }
 		if err := decoder.Decode(&dependency); errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
@@ -52,6 +65,7 @@ func discoverExtensionManifests(content []byte) ([]compiledExtension, error) {
 		}
 		if dependency.Dir != "" {
 			directories = append(directories, dependency.Dir)
+			importPaths[dependency.Dir] = dependency.ImportPath
 		}
 	}
 	sort.Strings(directories)
@@ -75,20 +89,26 @@ func discoverExtensionManifests(content []byte) ([]compiledExtension, error) {
 		if previous, exists := seen[manifest.Name]; exists {
 			return nil, fmt.Errorf("%s: extension identity %q also declared in %s; use distinct versioned names", path, manifest.Name, previous)
 		}
-		if previous, exists := factories[manifest.IOS.Factory]; exists {
+		if previous, exists := factories[manifest.IOS.Factory]; exists && manifest.HasIOS() {
 			return nil, fmt.Errorf("%s: Swift factory %q also owned by %s; rename one factory and its manifest entry", path, manifest.IOS.Factory, previous)
 		}
 		if len(result) >= 16 {
 			return nil, fmt.Errorf("%s: compiled extension limit is 16; remove unused extension imports", path)
 		}
-		seen[manifest.Name], factories[manifest.IOS.Factory] = path, manifest.Name
+		seen[manifest.Name] = path
+		if manifest.HasIOS() {
+			factories[manifest.IOS.Factory] = manifest.Name
+		}
 		for _, capability := range manifest.Capabilities {
 			if previous, exists := capabilities[capability]; exists {
 				return nil, fmt.Errorf("%s: capability %q also owned by %s; each capability must have one compiled owner", path, capability, previous)
 			}
 			capabilities[capability] = manifest.Name
 		}
-		assets := append(append([]string(nil), manifest.IOS.Sources...), manifest.WebView.Script)
+		assets := append([]string(nil), manifest.IOS.Sources...)
+		if manifest.HasWebView() {
+			assets = append(assets, manifest.WebView.Script)
+		}
 		if manifest.Android != nil {
 			assets = append(assets, manifest.Android.Sources...)
 		}
@@ -97,7 +117,7 @@ func discoverExtensionManifests(content []byte) ([]compiledExtension, error) {
 				return nil, fmt.Errorf("%s: asset %q for %s: %w; bundle a nonempty regular asset (at most 512 KiB) without symlinks", path, source, manifest.Name, err)
 			}
 		}
-		result = append(result, compiledExtension{manifest, directory})
+		result = append(result, compiledExtension{manifest, directory, importPaths[directory]})
 	}
 	sort.Slice(result, func(first, second int) bool { return result[first].manifest.Name < result[second].manifest.Name })
 	return result, nil
