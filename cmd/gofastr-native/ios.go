@@ -133,7 +133,7 @@ func buildIOSFor(r *runner, a app, out string, t iosTarget, signer iosSigner, re
 		// The Go runtime inside the framework resolves DNS and verifies
 		// certificates through these; a static framework does not carry
 		// its link flags, so the final link names them.
-		"-framework", "Foundation", "-framework", "Security", "-framework", "CoreFoundation", "-lresolv",
+		"-framework", "Contacts", "-framework", "ContactsUI", "-framework", "Foundation", "-framework", "Security", "-framework", "CoreFoundation", "-lresolv",
 		"-o", filepath.Join(appDir, a.Exe)}
 	args = append(args, sources...)
 	if err := r.run("compile the Swift host and link the Go framework", "xcrun", args...); err != nil {

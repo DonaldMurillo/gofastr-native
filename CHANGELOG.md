@@ -10,6 +10,9 @@ This repository holds two Go modules, tagged separately:
 
 ### Added
 
+- iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
+  optional user location, a gallery screen and `--location --location-usage`
+  opt-in purpose text.
 - Typed foreground iOS location services in `device/location`: permission
   status, when-in-use authorization, current position and bounded tracking.
   Native builds opt in with `--location --location-usage`; no background

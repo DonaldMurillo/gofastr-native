@@ -78,3 +78,11 @@ simulated position and drives all four actions through the UI. iOS 26.5
 simulator acceptance passed with visible current and tracking coordinates.
 First-use prompts, denial UI and physical-device location checks are NOT RUN;
 see [location acceptance limits](location.md#checks-and-acceptance).
+
+## Contact picker
+
+The iOS [contact picker](contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.

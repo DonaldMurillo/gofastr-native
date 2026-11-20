@@ -5,6 +5,15 @@ is left. Updated with the work; the dates are in the [implementation log](agent-
 
 ## External presentation prototype
 
+The iOS-only [maps component](../maps.md) adds retained MapKit maps, keyed pins,
+route-only callout navigation and purpose-gated when-in-use location. Go validation,
+Foundation decoding and simulator compilation are automated; physical location,
+device permission UX and VoiceOver acceptance remain NOT RUN.
+Simulator XCUITest acceptance passed on iPhone 17/iOS 27.0: three labelled pins,
+callout-to-detail navigation and a preauthorized simulated user-location annotation
+plus first-time when-in-use authorization across renderer suspension
+(four tests, zero failures). Physical-device gates remain.
+
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop
@@ -196,3 +205,11 @@ Follow the [milestones and acceptance gates](mobile-roadmap.md#build-order-and-a
 The [component slice](mobile-components.md) implements the first controls,
 collection, tab, and swipe contracts; uncapped repository paging, richer sheets,
 and complete device/accessibility acceptance remain roadmap work.
+
+## Contact picker
+
+The iOS [contact picker](../contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.

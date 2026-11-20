@@ -190,3 +190,11 @@ acceptance must verify those, plus cold launch, VoiceOver, IME and real playback
 - Scope: `ios/services`. Swift JSON encoding can escape base64 slashes and
   control text, expanding an admitted 1 MiB file plus 64 KiB text beyond 1.6 MiB.
   Next time, bound the wire envelope separately from decoded content limits.
+
+## Contact picker
+
+The iOS [contact picker](../../../docs/contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.
