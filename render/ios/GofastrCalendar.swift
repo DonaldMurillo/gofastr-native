@@ -169,11 +169,13 @@ final class GofastrCalendar {
         guard let from = request.from.flatMap(MobileCalendarEvent.date), let to = request.to.flatMap(MobileCalendarEvent.date) else { throw MobileCalendarFailure.invalid }
         let predicate = store.predicateForEvents(withStart: from, end: to, calendars: nil)
         let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var events: [MobileCalendarEvent] = []
         store.enumerateEvents(matching: predicate) { event, stop in
             guard let identifier = event.eventIdentifier, let start = event.startDate, let end = event.endDate else { return }
             let value = MobileCalendarEvent(identifier: identifier, title: event.title ?? "", start: formatter.string(from: start), end: formatter.string(from: end), allDay: event.isAllDay, location: event.location, notes: event.notes)
-            guard (try? value.validate(result: true)) != nil, start < to, end >= from else { return }
+            guard (try? value.validate(result: true)) != nil, let wireStart = MobileCalendarEvent.date(value.start),
+                  let wireEnd = MobileCalendarEvent.date(value.end), wireStart < to, wireEnd >= from else { return }
             events.append(value)
             if events.count >= request.effectiveLimit { stop.pointee = true }
         }
