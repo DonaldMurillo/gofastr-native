@@ -85,3 +85,41 @@ func TestDecodeGS1128(t *testing.T) {
 		})
 	}
 }
+
+func TestGS1128ChecksumIsNotData(t *testing.T) {
+	for _, tc := range []struct{ encoded, want string }{
+		{"\u00f11027", "]C11027"},
+		{"\u00f11097\u00f1", "]C11097\x1d"},
+	} {
+		t.Run(tc.encoded, func(t *testing.T) {
+			hints := map[gozxing.EncodeHintType]interface{}{gozxing.EncodeHintType_FORCE_CODE_SET: "C"}
+			code, err := oned.NewCode128Writer().Encode(tc.encoded, gozxing.BarcodeFormat_CODE_128, 400, 80, hints)
+			if err != nil {
+				t.Fatal(err)
+			}
+			img := image.NewGray(image.Rect(0, 0, code.GetWidth(), code.GetHeight()))
+			for y := 0; y < img.Rect.Dy(); y++ {
+				for x := 0; x < img.Rect.Dx(); x++ {
+					if !code.Get(x, y) {
+						img.SetGray(x, y, color.Gray{Y: 255})
+					}
+				}
+			}
+			bitmap, err := gozxing.NewBinaryBitmapFromImage(img)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, err := oned.NewCode128Reader().DecodeWithoutHints(bitmap)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if raw := decoded.GetRawBytes(); len(raw) < 4 || raw[len(raw)-2] != 102 {
+				t.Fatalf("expected FNC1-valued checksum before stop; codewords: %v", raw)
+			}
+			got, err := Decode(img)
+			if err != nil || got != (Result{Format: Code128, Text: tc.want}) {
+				t.Fatalf("got %q, error %v; want %q", got.Text, err, tc.want)
+			}
+		})
+	}
+}

@@ -4,6 +4,7 @@ package barcode
 import (
 	"errors"
 	"image"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/makiuchi-d/gozxing"
@@ -94,17 +95,25 @@ func Decode(img image.Image) (Result, error) {
 		if err != nil {
 			continue
 		}
-		if decoded.GetBarcodeFormat() == gozxing.BarcodeFormat_CODE_128 {
-			// Raw Code 128 codewords start with the start code, followed by FNC1 (102) for GS1-128.
-			if raw := decoded.GetRawBytes(); len(raw) > 1 && raw[1] == 102 {
-				hints[gozxing.DecodeHintType_ASSUME_GS1] = true
-				decoded, err = reader.Decode(bitmap, hints)
+		format, text := decoded.GetBarcodeFormat(), decoded.GetText()
+		if format == gozxing.BarcodeFormat_CODE_128 {
+			const fnc1 = 102
+			// Codewords include start, data, checksum, and stop.
+			if raw := decoded.GetRawBytes(); len(raw) >= 5 && raw[1] == fnc1 {
+				gs1, err := reader.Decode(bitmap, map[gozxing.DecodeHintType]interface{}{
+					gozxing.DecodeHintType_TRY_HARDER: true,
+					gozxing.DecodeHintType_ASSUME_GS1: true,
+				})
 				if err != nil {
 					return Result{}, err
 				}
+				text = gs1.GetText()
+				if raw[len(raw)-2] == fnc1 {
+					text = strings.TrimSuffix(text, "\x1d")
+				}
 			}
 		}
-		result := Result{Format: Format(decoded.GetBarcodeFormat().String()), Text: decoded.GetText()}
+		result := Result{Format: Format(format.String()), Text: text}
 		return result, result.Validate()
 	}
 	return Result{}, ErrNotFound
