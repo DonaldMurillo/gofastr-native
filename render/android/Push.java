@@ -104,14 +104,14 @@ public final class Push {
         try {
             String id=identifier(messageId);
             JSONObject message=new JSONObject();message.put("identifier",id);
-            title=bounded(title,200).replace('\n',' ').replace('\r',' ');body=bounded(body,MAX_DATA);
+            title=plain(bounded(title,200));body=bounded(body,MAX_DATA);
             if(!title.isEmpty())message.put("title",title);
             if(!body.isEmpty())message.put("body",body);
             String route=localRoute(data==null?null:data.get("route"));if(!route.isEmpty())message.put("route",route);
             JSONObject values=new JSONObject();int total=0;
             if(data!=null)for(Map.Entry<String,String> entry:new TreeMap<>(data).entrySet()){
                 String key=entry.getKey(),value=entry.getValue()==null?"":entry.getValue();
-                if(key==null || key.isEmpty() || key.length()>128 || reserved(key) || values.length()>=32 || key.indexOf('\0')>=0 || value.indexOf('\0')>=0)continue;
+                if(key==null || key.isEmpty() || key.length()>128 || reserved(key) || values.length()>=32 || !plain(key).equals(key) || value.indexOf('\0')>=0)continue;
                 if(total+key.length()+value.length()>MAX_DATA)break;
                 total+=key.length()+value.length();values.put(key,value);
             }
@@ -134,6 +134,12 @@ public final class Push {
         Map<String,String> data=new HashMap<>();
         for(String key:extras.keySet()){Object value=extras.get(key);if(value instanceof String)data.put(key,(String)value);}
         deliver(context,extras.getString("google.message_id"),data.get("gcm.notification.title"),data.get("gcm.notification.body"),data,false);
+    }
+
+    private static String plain(String value) {
+        StringBuilder out=new StringBuilder(value.length());
+        for(int i=0;i<value.length();i++){char c=value.charAt(i);out.append(Character.isISOControl(c)?' ':c);}
+        return out.toString();
     }
 
     private static String bounded(String value, int maximum) {
