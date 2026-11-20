@@ -64,3 +64,11 @@ linking, actual Android 14 x86-64 behavior, and the existing WebView tests.
 macOS tests compile and execute Foundation wire fixtures and compile/sign both
 iOS extensions against the simulator SDK. These tests skip on Windows, so the
 iOS implementation still requires a Mac build and runtime acceptance.
+
+## Contact picker
+
+The iOS [contact picker](contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.
