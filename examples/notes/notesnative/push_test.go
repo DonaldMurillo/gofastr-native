@@ -17,6 +17,7 @@ func TestPushSettings(t *testing.T) {
 	for _, outcome := range []nativeui.ServiceResult{
 		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "authorized", Registered: true, Token: "aabb"}},
 		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "notDetermined"}},
+		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "authorized", Registered: true}},
 		{Status: nativeui.EffectDenied},
 		{Status: nativeui.EffectFailed},
 		{Status: nativeui.EffectFailed, Message: "APNs registration timed out."},
@@ -43,6 +44,12 @@ func TestPushSettings(t *testing.T) {
 		}
 		if rows[3].ID != "push-result" || !strings.HasPrefix(rows[3].Subtitle, string(outcome.Status)) || !strings.Contains(rows[3].Subtitle, outcome.Message) {
 			t.Fatal("outcome status or message not displayed separately")
+		}
+		if outcome.Push != nil && outcome.Push.Token == "" && !strings.Contains(rows[1].Subtitle, "None received") {
+			t.Fatal("missing token presented as registration")
+		}
+		if outcome.Push != nil && outcome.Push.Registered && !strings.Contains(rows[0].Subtitle, "OS remote registration: on") {
+			t.Fatal("OS registration flag not labelled")
 		}
 		if outcome.Push == nil && rows[0].Subtitle != "Not observed" {
 			t.Fatal("outcome status presented as permission")

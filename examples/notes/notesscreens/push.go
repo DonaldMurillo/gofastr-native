@@ -52,14 +52,24 @@ func pushSettings() []nativeui.Route {
 			value := result.Push
 			token, environment := value.Token, value.Environment
 			if token == "" {
-				token = "No token observed"
+				// The OS registration flag can stay on after a timed-out
+				// Register or a restart; only a delivered token proves APNs
+				// registration in this process.
+				token = "None received in this process; register to request one"
 			}
 			if environment == "" {
 				environment = "Not readable"
 			}
-			screen = pushScreen(fmt.Sprintf("%s; registered: %t", value.Permission, value.Registered), token, environment, outcome)
+			screen = pushScreen(fmt.Sprintf("%s; OS remote registration: %s", value.Permission, onOff(value.Registered)), token, environment, outcome)
 			return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/settings/push/result"}}, nil
 		}
 	}
 	return []nativeui.Route{route, {Path: "/settings/push/result", Screen: render}}
+}
+
+func onOff(value bool) string {
+	if value {
+		return "on"
+	}
+	return "off"
 }

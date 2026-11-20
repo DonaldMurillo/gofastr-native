@@ -40,6 +40,9 @@ and Push status display permission/token results in rows with accessibility IDs
 `native.row.push-permission`, `native.row.push-token`, and
 `native.row.push-environment`. A separate `native.row.push-result` row shows
 the operation status and any failure message, without treating it as permission.
+The permission row labels `registered` as the OS remote-registration flag, and
+the token row says when no token was received in this process, so a timed-out
+Register followed by Status does not read as a successful registration.
 Action IDs are `native.action.push-register`
 and `native.action.push-status`. Build with:
 
@@ -71,8 +74,8 @@ authorization and no-prompt status displayed authorized/registered state with
 no observed token. A simulated remote payload displayed a banner. A foreground
 payload displayed a banner without navigating. A warm default tap from the
 background opened push settings in the same process after renderer resume.
-Token issuance, cold-launch taps, and hardware delivery
-remain **NOT RUN**.
+On an iOS 27.0 simulator, a cold-launch default tap opened the routed note.
+Token issuance and hardware delivery remain **NOT RUN**.
 
 ## Device service overview
 
