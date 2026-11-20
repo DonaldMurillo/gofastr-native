@@ -11,6 +11,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/extension"
 	renderandroid "github.com/DonaldMurillo/gofastr-native/render/android"
+	renderfcm "github.com/DonaldMurillo/gofastr-native/render/android/fcm"
 )
 
 func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
@@ -40,6 +41,26 @@ func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
 		sources = append(sources, dst)
 	}
 	var factories []string
+	if a.PushConfig != "" {
+		entries, err := renderfcm.Sources.ReadDir(".")
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			dst := filepath.Join(dir, "renderer", "fcm", entry.Name())
+			if err := r.do("copy Android push provider "+entry.Name(), func() error {
+				content, err := renderfcm.Sources.ReadFile(entry.Name())
+				if err != nil {
+					return err
+				}
+				return writeSource(dst, content)
+			}); err != nil {
+				return nil, err
+			}
+			sources = append(sources, dst)
+		}
+		factories = append(factories, "        dev.gofastr.nativeui.fcm.FcmPush.install();\n")
+	}
 	seen := map[string]bool{}
 	for index, definition := range a.Extensions {
 		adapter := definition.manifest.Android

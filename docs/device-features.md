@@ -10,6 +10,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
+| Remote push | `ServiceRequest.Push` | Firebase Cloud Messaging and a private inbox | Not implemented |
 
 The same Go-only demo runs on both platforms:
 
@@ -39,6 +40,10 @@ Widgets display only explicitly published public snapshots. Add the widget
 through the system launcher/gallery after publishing. Updating the stored
 snapshot requests a system reload; the completion does not prove that the OS
 has displayed it. Clear the snapshot when signing out or removing its content.
+
+Android push needs a Firebase project and libraries the owner downloads under
+Google's terms; the demo's Push notifications screen registers, reads and
+acknowledges messages. See [push notifications](push.md).
 
 See [share-in](share-in.md), [secure storage](secure-storage.md), and
 [widgets](widgets.md) for bounds, platform behavior, and validation gates.

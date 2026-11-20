@@ -11,6 +11,15 @@ func validateDeviceFeatures(a app, platform string) error {
 	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
 	}
+	if (a.PushConfig == "") != (a.PushLibraries == "") {
+		return errors.New("--push-config and --push-libraries are used together")
+	}
+	if a.PushConfig != "" && a.Renderer != "native" {
+		return errors.New("push notifications require --renderer native")
+	}
+	if a.PushConfig != "" && strings.HasPrefix(platform, "ios") {
+		return errors.New("push notifications are available on Android only; iOS push is not implemented")
+	}
 	if a.Widgets && a.URLScheme == "" {
 		return errors.New("--widgets requires --url-scheme for widget navigation")
 	}

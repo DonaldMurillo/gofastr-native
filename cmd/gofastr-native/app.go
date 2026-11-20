@@ -75,6 +75,12 @@ type app struct {
 	SecureStorage   bool
 	BiometricUsage  string
 	Widgets         bool
+	// PushConfig is google-services.json and PushLibraries the directory
+	// push-libraries filled; both set enables FCM push on Android.
+	PushConfig      string
+	PushLibraries   string
+	PushPermissions string // merged library manifest entries, generated XML
+	PushComponents  string
 	AppGroup        string
 	Extensions      []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")

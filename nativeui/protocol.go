@@ -32,6 +32,7 @@ const (
 	CapabilitySecureStorage  Capability = "secure-storage/v1"
 	CapabilityWidgets        Capability = "widgets/v1"
 	CapabilityPrivacy        Capability = "privacy/v1"
+	CapabilityPush           Capability = "push/v1"
 )
 
 // Support distinguishes a service from an explicitly disclosed fallback.
@@ -105,7 +106,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityWidgets, CapabilityPrivacy:
+	case CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityWidgets, CapabilityPrivacy, CapabilityPush:
 		return true
 	default:
 		return false

@@ -32,6 +32,8 @@ renderers share the same Go [image preview definitions](../image-previews.md).
 
 Notes also exposes typed reminder scheduling/status/cancellation, rich note and
 attachment sharing, explicit clipboard writes, and private voice recordings.
+Android builds can opt into FCM [push notifications](../push.md); delivery
+through Firebase servers and iOS push are not yet validated or implemented.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go

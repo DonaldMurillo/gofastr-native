@@ -18,6 +18,7 @@ type buildFlags struct {
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
+	pushConfig, pushLibraries                                       *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
 	wait                                                            *time.Duration
 }
@@ -41,6 +42,8 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		biometricUsage:  fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:         fs.Bool("widgets", false, "package a home-screen widget"),
 		appGroup:        fs.String("app-group", "", "iOS app-group identifier"),
+		pushConfig:      fs.String("push-config", "", "Firebase google-services.json enabling Android push notifications"),
+		pushLibraries:   fs.String("push-libraries", "", "directory filled by gofastr-native push-libraries"),
 		dry:             fs.Bool("dry-run", false, "print the steps only"),
 		debugTrace:      fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
 		device:          fs.String("device", "", "simulator / device / AVD"),
@@ -169,6 +172,16 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
+	for _, value := range []struct{ flag, dst *string }{{f.pushConfig, &a.PushConfig}, {f.pushLibraries, &a.PushLibraries}} {
+		if *value.flag != "" {
+			absolute, err := filepath.Abs(*value.flag)
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return app{}, 2
+			}
+			*value.dst = absolute
+		}
+	}
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2

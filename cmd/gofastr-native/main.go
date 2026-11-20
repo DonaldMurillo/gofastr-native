@@ -38,6 +38,7 @@ Usage:
                         [--route /path] [--depth 4] [--max-screens 200] [--json] [--dry-run]
   gofastr-native build  --platform ios-sim|android-emu|ios-device --pkg <bind package> [flags]
   gofastr-native run    --platform ios-sim|android-emu|ios-device --pkg <bind package> [flags]
+  gofastr-native push-libraries --out <dir> --accept-licenses
 
 Flags (build, run):
   --platform    ios-sim (iOS simulator, needs a Mac with Xcode installed)
@@ -63,6 +64,9 @@ Flags (build, run):
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
   --widgets     package a home-screen widget; requires --url-scheme
   --app-group   iOS app-group identifier for share and widget extensions
+  --push-config  Firebase google-services.json; enables Android FCM push
+                (native renderer; with --push-libraries)
+  --push-libraries  directory filled by gofastr-native push-libraries
   --dry-run     print every step without running it
   --debug-trace enable redacted Go runtime traces in instrumented native apps
                 (debug builds only; see docs/debugging.md)
@@ -123,6 +127,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return extensionCommand(ctx, rest, stdout, stderr)
 	case "init":
 		return initCommand(ctx, rest, stdout, stderr)
+	case "push-libraries":
+		return pushLibrariesCommand(ctx, rest, stdout, stderr)
 	case "dev":
 		return devCommand(ctx, rest, stdout, stderr)
 	case "inspect":
