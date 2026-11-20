@@ -10,6 +10,7 @@ struct MobileServiceRequest: Codable {
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
     let location: MobileLocationRequest?
+    var calendar: MobileCalendarRequest? = nil
     let widget: MobileWidgetRequest?
     let contacts: MobileContactsRequest?
     let authentication: MobileAuthenticationRequest?
@@ -18,7 +19,7 @@ struct MobileServiceRequest: Codable {
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil].filter({ $0 }).count == 1 else {
+              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
@@ -33,6 +34,7 @@ struct MobileServiceRequest: Codable {
         try widget?.validate()
         try scan?.validate()
         try authentication?.validate()
+        try calendar?.validate()
     }
 }
 
@@ -390,6 +392,7 @@ struct MobileServiceResult: Codable {
     var incomingShare: MobileIncomingShareItem?
     var secureStorage: MobileSecureStorageResult?
     var location: MobileLocationResult?
+    var calendar: MobileCalendarResult?
     var widget: MobileWidgetState?
     var contacts: MobileContactSelection?
     var scan: MobileScanResult?
@@ -408,6 +411,7 @@ struct MobileServiceResult: Codable {
             if let contacts, let data = try? JSONEncoder().encode(contacts), let encoded = try? JSONSerialization.jsonObject(with: data) { value["contacts"] = encoded }
             if let scan { value["scan"] = scan.wire }
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
+            if let calendar { value["calendar"] = calendar.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }
             if let location { value["location"] = location.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }

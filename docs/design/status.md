@@ -214,6 +214,12 @@ and recovers retired live reads without replaying writes or replacing inputs.
 
 ## Next steps
 
+Calendar events: bounded `device/calendar` add/read/status contract and opt-in
+iOS EventKit adapter; Android unavailable. The device-features example passed
+an iPhone 17 / iOS 26.5 simulator UI test with pregranted calendar access:
+add a sample event, report full authorization, and show its title/start after
+reading the next seven days. Permission prompts/hardware acceptance: NOT RUN.
+
 Follow the [milestones and acceptance gates](mobile-roadmap.md#build-order-and-acceptance-gates):
 
 1. Finish the remaining M2 Back/IME/accessibility gates over the shared editor/runtime.

@@ -16,6 +16,8 @@ type buildFlags struct {
 	fs            *flag.FlagSet
 	location      *bool
 	locationUsage *string
+	calendar      *bool
+	calendarUsage *string
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
@@ -30,6 +32,8 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		fs:              fs,
 		location:        fs.Bool("location", false, "enable foreground iOS location services"),
 		locationUsage:   fs.String("location-usage", "", "iOS when-in-use location purpose text"),
+		calendar:        fs.Bool("calendar", false, "enable iOS calendar events"),
+		calendarUsage:   fs.String("calendar-usage", "Add and read calendar events you choose.", "calendar permission purpose text"),
 		platform:        fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
 		pkg:             fs.String("pkg", "", "bind package"),
 		id:              fs.String("id", "", "bundle / application id"),
@@ -166,6 +170,10 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2
+	}
+	a.Calendar = *f.calendar
+	if a.Calendar {
+		a.CalendarUsage = strings.TrimSpace(*f.calendarUsage)
 	}
 	a.HostTemplate = *f.hostTemplate
 	a.Renderer = *f.renderer

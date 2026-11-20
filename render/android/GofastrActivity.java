@@ -93,6 +93,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
                 caps.put("browser/v1", "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
+                caps.put("calendar/v1", "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");
                 caps.put("sign-in-with-apple/v1", "unavailable");

@@ -89,7 +89,7 @@ func inspectProfiles() []inspectProfile {
 	// secure storage and widgets off.
 	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy")
 	uikit["location/v1"] = "unavailable"
-	for _, name := range []string{"browser", "audio", "incoming-shares", "secure-storage", "widgets", "location"} {
+	for _, name := range []string{"browser", "audio", "incoming-shares", "secure-storage", "widgets", "location", "calendar"} {
 		android[name+"/v1"] = "unavailable"
 	}
 	// render/webview/webview.js in a browser without the device services
@@ -114,7 +114,7 @@ func inspectProfiles() []inspectProfile {
 var (
 	inspectCapabilities = []string{"navigation/v1", "editor/v1", "drafts/v1", "share/v1", "haptics/v1", "sheets/v1", "announcement/v1", "presentation/v1",
 		"files/v1", "photos/v1", "camera/v1", "notifications/v1", "sharing/v1", "browser/v1", "clipboard/v1", "audio/v1", "live/v1", "incoming-shares/v1",
-		"secure-storage/v1", "widgets/v1", "location/v1", "privacy/v1"}
+		"calendar/v1", "secure-storage/v1", "widgets/v1", "location/v1", "privacy/v1"}
 	inspectCodes = []string{"protocol", "busy", "expired", "unsupported", "pending", "superseded", "stale", "invalid_request", "internal", "unknown",
 		"conflict", "validation", "not_found", "forbidden", "draft", "cancelled", "unsaved_changes", "save_pending", "save_unknown", "stale_completion", "invalid_outcome"}
 	inspectFieldKinds = []string{"text", "multiline", "toggle", "date", "time", "select"}

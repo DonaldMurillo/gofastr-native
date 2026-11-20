@@ -28,8 +28,11 @@ func validateDeviceFeatures(a app, platform string) error {
 	if a.SignInWithApple && (a.Renderer != "native" || platform != "ios-sim" && platform != "ios-device") {
 		return errors.New("--sign-in-with-apple requires the native iOS renderer")
 	}
-	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
+	if (a.Calendar || a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
+	}
+	if a.Calendar && (strings.TrimSpace(a.CalendarUsage) == "" || !uitext.Plain(a.CalendarUsage, 512)) {
+		return errors.New("--calendar requires a plain nonempty --calendar-usage of at most 512 bytes")
 	}
 	if a.Widgets && a.URLScheme == "" {
 		return errors.New("--widgets requires --url-scheme for widget navigation")

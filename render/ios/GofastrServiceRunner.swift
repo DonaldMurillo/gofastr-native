@@ -17,6 +17,8 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
     private var dismissing = false
     private var scheduling = false
     private var cancellingSchedule = false
+    private let calendar = GofastrCalendar()
+    private var calendarActive = false
     private let secureStorage = GofastrSecureStorage()
     private var secureStorageActive = false
     private let location = GofastrLocation(isForeground: { UIApplication.shared.applicationState != .background })
@@ -36,6 +38,7 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
         return ["browser/v1": "available", "contacts/v1": "available", "notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
                 "scanner/v1": MobileScannerController.available ? "available" : "unavailable",
+                "calendar/v1": GofastrCalendar.enabled ? "available" : "unavailable",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "location/v1": GofastrLocation.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
@@ -80,6 +83,7 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
         guard Thread.isMainThread else { DispatchQueue.main.async { self.cancel() }; return }
         guard let token = settlement.active else { return }
         if let scanner = (controller as? UINavigationController)?.viewControllers.first as? MobileScannerController { scanner.cancel(); return }
+        if calendarActive { calendar.cancel(); return }
         if secureStorageActive { secureStorage.cancel(); return }
         if locationActive { location.cancel(); return }
         if let authentication { authentication.cancel(); return }
@@ -93,6 +97,14 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
             locationActive = true
             location.perform(locationRequest) { [weak self] result in
                 self?.locationActive = false
+                self?.finish(token, result)
+            }
+            return
+        }
+        if let request = request.calendar {
+            calendarActive = true
+            calendar.perform(request) { [weak self] result in
+                self?.calendarActive = false
                 self?.finish(token, result)
             }
             return
