@@ -3,8 +3,11 @@
 The Android-only [contacts extension](../contacts.md) adds system row selection
 for one phone number or email address without broad contacts permission. Gallery
 has a Choose contact demo displaying the selected name and phone number. iOS
-and WebView are not implemented. Device/provider, cancellation and accessibility
-acceptance: NOT RUN; no emulator or hardware acceptance is claimed.
+and WebView are not implemented. Android 14 x86-64 emulator checks passed seeded
+phone selection/display, Back cancellation retaining the selection, and picker
+reopening; no runtime crash was logged. The debug APK installed and its signature
+verified. Email, denied access, physical devices/providers and accessibility
+acceptance: NOT RUN.
 
 What the project covers today, what has been checked and on what, and what
 is left. Updated with the work; the dates are in the [implementation log](agent-notes.md).

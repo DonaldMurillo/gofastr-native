@@ -22,5 +22,19 @@ The Gallery Device tab has a Contacts demo with a **Choose contact** button.
 Its selected name and number remain in memory only. iOS and WebView adapters
 are not implemented; those renderers cannot open the capability-gated demo.
 
-Provider, permission and cancellation behavior on a device, TalkBack and IME
-acceptance: NOT RUN. SDK compilation is not device acceptance.
+Android 14 x86-64 emulator acceptance covered a seeded system contact, phone
+selection, display of its exact name and number, Back cancellation retaining
+the selection, and reopening after cancellation. The crash buffer and filtered
+runtime error log were empty. The debug APK installed successfully and passed
+signature verification. Run the Gallery-only flow with:
+
+```sh
+python scripts/android_smoke.py --contacts --serial emulator-5554 --package dev.gofastr.gallerynative --out dist/contacts-acceptance
+```
+
+The script adds a uniquely named synthetic contact and leaves existing app data
+and contacts intact. Screenshots and UI XML cover before, picker, after-select
+and after-cancel states. The Notes `--services` flow remains independent.
+
+Email selection, denied access, physical providers/devices, TalkBack and IME
+acceptance: NOT RUN. Emulator acceptance does not establish those gates.
