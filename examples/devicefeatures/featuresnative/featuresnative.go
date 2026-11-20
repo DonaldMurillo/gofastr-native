@@ -138,11 +138,12 @@ func newApp() (*nativeui.App, error) {
 		inboxMu.Unlock()
 		return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/features/scanned"}}, nil
 	}
-	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
+			{ID: "location", Title: "Location", Destination: "/features/location"},
 		}}}, nil
 	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
 		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
@@ -177,7 +178,8 @@ func newApp() (*nativeui.App, error) {
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
-	)
+	}
+	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 }
 
 func preview(value string) string {

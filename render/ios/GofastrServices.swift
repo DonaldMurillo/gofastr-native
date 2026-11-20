@@ -4,27 +4,47 @@ struct MobileServiceRequest: Codable {
     let id: String
     let notification: MobileNotificationRequest?
     let share: MobileShareRequest?
+    var browser: MobileBrowserRequest? = nil
     let clipboard: MobileClipboardRequest?
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
+    let location: MobileLocationRequest?
     let widget: MobileWidgetRequest?
+    let contacts: MobileContactsRequest?
     let commit: Bool?
     var scan: MobileScanRequest? = nil
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, scan != nil].filter({ $0 }).count == 1 else {
+              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
+        try contacts?.validate()
         try notification?.validate()
         try share?.validate()
+        try browser?.validate()
         if let clipboard, clipboard.text.utf8.count > MobileServiceBounds.maximumText || clipboard.text.contains("\0") { throw MobileServiceFailure.tooLarge }
         try audio?.validate()
         try incomingShare?.validate()
         try secureStorage?.validate()
+        try location?.validate()
         try widget?.validate()
         try scan?.validate()
+    }
+}
+
+struct MobileBrowserRequest: Codable {
+    let url: String
+    let readerMode: Bool?
+    let dismissLabel: String?
+
+    func validate() throws {
+        guard url.utf8.count <= 2048,
+              !url.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) || CharacterSet.whitespacesAndNewlines.contains($0) }),
+              let parts = URLComponents(string: url), ["http", "https"].contains(parts.scheme ?? ""),
+              let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil,
+              parts.url != nil, ["", "done", "close", "cancel"].contains(dismissLabel ?? "") else { throw MobileServiceFailure.invalid }
     }
 }
 
@@ -301,7 +321,9 @@ struct MobileServiceResult: Codable {
     var durationMillis: Int?
     var incomingShare: MobileIncomingShareItem?
     var secureStorage: MobileSecureStorageResult?
+    var location: MobileLocationResult?
     var widget: MobileWidgetState?
+    var contacts: MobileContactSelection?
     var scan: MobileScanResult?
 
     var wire: [String: Any] {
@@ -314,9 +336,11 @@ struct MobileServiceResult: Codable {
             value["durationMillis"] = durationMillis
         }
         if status == "completed" {
+            if let contacts, let data = try? JSONEncoder().encode(contacts), let encoded = try? JSONSerialization.jsonObject(with: data) { value["contacts"] = encoded }
             if let scan { value["scan"] = scan.wire }
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }
+            if let location { value["location"] = location.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }
         }
         return value
@@ -380,3 +404,42 @@ struct MobileReadRecovery {
 
     mutating func reset() { attempted = false; transientAttempts = 0 }
 }
+
+struct MobileContactsRequest: Codable {
+    let multiple: Bool
+    let fields: [String]?
+    func validate() throws {
+        let values = fields ?? []
+        guard Set(values).count == values.count, values.allSatisfy({ ["phone", "email", "postal", "organization"].contains($0) }) else { throw MobileServiceFailure.invalid }
+    }
+    func accept(_ selection: MobileContactSelection) throws {
+        try validate()
+        guard !selection.contacts.isEmpty, selection.contacts.count <= 50, multiple || selection.contacts.count == 1 else { throw MobileServiceFailure.invalid }
+        let requested = Set(fields ?? [])
+        for contact in selection.contacts {
+            guard !contact.id.isEmpty, [contact.id, contact.givenName, contact.familyName, contact.organization ?? ""].allSatisfy({ Self.valid($0, maximum: 512) }),
+                  requested.contains("organization") || (contact.organization ?? "").isEmpty,
+                  requested.contains("phone") || (contact.phones ?? []).isEmpty,
+                  requested.contains("email") || (contact.emails ?? []).isEmpty,
+                  requested.contains("postal") || (contact.postal ?? []).isEmpty else { throw MobileServiceFailure.invalid }
+            for list in [contact.phones ?? [], contact.emails ?? []] {
+                guard list.count <= 20, list.allSatisfy({ Self.valid($0.label, maximum: 512) && Self.valid($0.value, maximum: 512) }) else { throw MobileServiceFailure.invalid }
+            }
+            guard (contact.postal ?? []).count <= 20, (contact.postal ?? []).allSatisfy({ Self.valid($0, maximum: 2048, multiline: true) }) else { throw MobileServiceFailure.invalid }
+        }
+    }
+    static func valid(_ text: String, maximum: Int, multiline: Bool = false) -> Bool {
+        text.utf8.count <= maximum && !text.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) && !(multiline && ($0 == "\n" || $0 == "\t")) }
+    }
+}
+struct MobileContactLabeled: Codable { let label: String; let value: String }
+struct MobileContact: Codable {
+    let id: String
+    let givenName: String
+    let familyName: String
+    var organization: String?
+    var phones: [MobileContactLabeled]?
+    var emails: [MobileContactLabeled]?
+    var postal: [String]?
+}
+struct MobileContactSelection: Codable { let contacts: [MobileContact] }
