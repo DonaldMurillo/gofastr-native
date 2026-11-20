@@ -61,8 +61,14 @@ also use shared Go requests with Android and iOS adapters. The Go-only
 foreground tracking requests, with `location/v1` protocol negotiation. Native
 CoreLocation support is opt-in through `--location --location-usage`, with
 when-in-use authorization only and no background updates. Swift wire and
-simulator SDK compilation checks cover the adapter. Simulator UI acceptance
-and physical-device checks are NOT RUN.
+simulator SDK compilation checks cover the adapter. The device-features demo
+shows status, authorization and position results with stable accessibility IDs.
+`GOFASTR_IOS_UI=1 GOWORK=off go test -v -count=1 -timeout=20m ./internal/iosuitest`
+builds and installs the demo, boots a fresh simulator, grants when-in-use
+location, sets simulated coordinates and exercises all four actions through
+the UI. iOS 26.5 simulator acceptance passed, including visible coordinates
+for current position and duration-bounded tracking. First-use permission
+prompts, denial UI and physical-device checks are NOT RUN.
 
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
