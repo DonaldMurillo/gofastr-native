@@ -32,6 +32,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Device features](device-features.md): share-in, secure storage, widgets.
 - [Files](files-services.md)
 - [Photos](photos-services.md)
+- [Barcode and QR scanning](barcode-scanning.md): Android camera photos and selected images.
 - [Secure storage](secure-storage.md)
 - [Share-in](share-in.md)
 - [Widgets](widgets.md)

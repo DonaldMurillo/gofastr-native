@@ -150,6 +150,34 @@ func TestCaptureExtensionCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	}
 }
 
+func TestBarcodeExtensionCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
+	sdk, err := findAndroidSDK(false)
+	if err != nil {
+		t.Skipf("Android SDK/JDK unavailable: %v", err)
+	}
+	application, err := newApp("github.com/DonaldMurillo/gofastr-native/examples/devicefeatures/featuresnative", "featuresnative", "dev.gofastr.featuresnative", "Device features", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	application.Renderer = "native"
+	a := application.forAndroid(sdk.api)
+	directory, sources := androidHostSources(t, &a)
+	if got := a.androidBindPackages(); len(got) != 2 || got[1] != "github.com/DonaldMurillo/gofastr-native/extension/barcode/barcodebind" {
+		t.Fatalf("bind packages = %v", got)
+	}
+	args := append([]string{"--release", "11", "-encoding", "UTF-8", "-classpath", sdk.androidJar, "-d", filepath.Join(directory, "classes")}, sources...)
+	if output, err := exec.Command(sdk.javac, args...).CombinedOutput(); err != nil {
+		t.Fatalf("barcode Android SDK compile: %v\n%s", err, output)
+	}
+	manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(manifest, []byte(`"android.permission.CAMERA"`)) {
+		t.Fatal("delegated camera capture should not declare CAMERA")
+	}
+}
+
 // The WebView shell of an app that uses capture declares and grants the
 // camera, location and microphone, and compiles against the SDK and the
 // app's generated bindings.

@@ -6,11 +6,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/barcode"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
+	"github.com/DonaldMurillo/gofastr-native/extension"
+	barcodeext "github.com/DonaldMurillo/gofastr-native/extension/barcode"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -124,11 +128,12 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
-	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+	return nativeui.NewWithExtensions(Root(), []extension.Definition{barcodeext.Definition()}, nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
+			{ID: "barcode", Title: "Barcode and QR scanner", Destination: "/features/barcode"},
 		}}}, nil
 	}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
@@ -158,7 +163,40 @@ func newApp() (*nativeui.App, error) {
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
+		barcodeRoute(),
 	)
+}
+
+func barcodeRoute() nativeui.Route {
+	scan := func(source barcode.Source) nativeui.Handle {
+		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
+			operation, err := barcodeext.Scan(barcode.Request{Source: source})
+			if err != nil {
+				return nativeui.Result{}, err
+			}
+			return nativeui.Result{Files: &nativeui.FileRequest{ID: "scan", Extension: operation}}, nil
+		}
+	}
+	return nativeui.Route{
+		Path: "/features/barcode",
+		Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{
+				Title: "Barcode and QR scanner", Text: "On Android, take a clear photo of one code or select an image. The scanner displays text without opening links.",
+				Actions: []nativeui.Action{
+					{ID: "scan-camera", Label: "Scan with camera", Primary: true},
+					{ID: "scan-image", Label: "Scan from image"},
+				},
+			}, nil
+		},
+		Actions: map[string]nativeui.Handle{"scan-camera": scan(barcode.Camera), "scan-image": scan(barcode.Image)},
+		Files: map[string]nativeui.FileRespond{"scan": func(_ context.Context, _ nativeui.Request, outcome nativeui.FileResult) (nativeui.Result, error) {
+			result, err := barcodeext.ReadResult(*outcome.File)
+			if err != nil {
+				return nativeui.Result{}, err
+			}
+			return nativeui.Result{Announcement: string(result.Format) + ": " + strconv.QuoteToASCII(preview(result.Text))}, nil
+		}},
+	}
 }
 
 func preview(value string) string {

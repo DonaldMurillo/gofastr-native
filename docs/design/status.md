@@ -91,6 +91,10 @@ See [the architecture, public APIs, validation, and limitations](presentation-pr
 and [the native host contract](../native-presentation.md), plus
 [implementation notes](agent-notes.md).
 
+Native Android also includes optional [barcode and QR scanning](../barcode-scanning.md)
+from a camera photo or selected image. UIKit and WebView do not have scanner
+adapters.
+
 The [shared-screen implementation](../shared-mobile-screens.md) documents the
 working APIs and limits. The [mobile presentation roadmap](mobile-roadmap.md)
 tracks remaining shared headless task behaviors, async correctness, and explicit

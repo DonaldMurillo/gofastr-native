@@ -45,6 +45,8 @@ under the selected output directory. Run installs only the selected app package.
   content URI. A worker bounds source bytes, samples decoding, applies orientation,
   and reencodes a JPEG without source metadata. Camera access can be disabled with
   `--camera-usage ''`.
+- The [barcode scanner](barcode-scanning.md) is an opt-in compiled extension
+  that reads one code from a system camera photo or selected image offline.
 - The media library owns its compiled factory. Keyed images and attachment cards
   update without replacing editors. Local audio has play/pause/seek controls and
   releases playback on backgrounding, navigation, or component removal.
