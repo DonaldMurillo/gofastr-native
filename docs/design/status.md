@@ -57,6 +57,10 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+[In-app purchases and subscriptions](../iap.md) use StoreKit 2 in the native
+iOS renderer. Android and WebView explicitly report the service as unsupported.
+The storefront demo includes a local StoreKit catalog and simulator UI tests.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

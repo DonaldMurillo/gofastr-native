@@ -94,6 +94,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");
+                caps.put("iap/v1", "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));

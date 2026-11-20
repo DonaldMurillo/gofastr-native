@@ -61,7 +61,9 @@ public final class GofastrWebViewServices: NSObject, WKScriptMessageHandlerWithR
             return
         }
         if kind == "capabilities", body.count == 1 {
-            replyHandler(GofastrServiceRunner.capabilities(), nil)
+            var capabilities = GofastrServiceRunner.capabilities()
+            capabilities["iap/v1"] = "unavailable"
+            replyHandler(capabilities, nil)
             return
         }
         guard kind == "perform", body.count == 2, let request = body["request"] as? [String: Any],
@@ -69,6 +71,10 @@ public final class GofastrWebViewServices: NSObject, WKScriptMessageHandlerWithR
               let data = try? JSONSerialization.data(withJSONObject: request), data.count <= 2 << 20,
               let encoded = String(data: data, encoding: .utf8), let runner else {
             replyHandler(nil, "Invalid native service request.")
+            return
+        }
+        if request["iap"] != nil {
+            replyHandler(["status": "unsupported", "message": "In-app purchases require the native iOS renderer."], nil)
             return
         }
         guard !active else {

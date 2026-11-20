@@ -27,7 +27,10 @@ public final class GofastrServiceRunner: NSObject {
 
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
+        let iap: String
+        if #available(iOS 15.0, *) { iap = "available" } else { iap = "unavailable" }
         return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+                "iap/v1": iap,
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
@@ -75,6 +78,19 @@ public final class GofastrServiceRunner: NSObject {
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if let iap = request.iap {
+            guard #available(iOS 15.0, *) else {
+                finish(token, MobileServiceResult(status: "unsupported", message: "In-app purchases require iOS 15 or later."))
+                return
+            }
+            durableServiceActive = true
+            Task { @MainActor in
+                let result = await GofastrStoreKit.shared.perform(iap, presenter: self.presenter)
+                self.durableServiceActive = false
+                self.finish(token, result)
+            }
+            return
+        }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in
