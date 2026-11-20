@@ -57,6 +57,10 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+`device/location` defines typed permission, current-position and bounded
+foreground tracking requests, with `location/v1` protocol negotiation. Native
+adapter, build opt-in and simulator UI acceptance are NOT RUN.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 
