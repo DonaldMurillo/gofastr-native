@@ -8,6 +8,16 @@ This repository holds two Go modules, tagged separately:
 
 ## Unreleased
 
+### Added
+
+- Typed foreground iOS location services in `device/location`: permission
+  status, when-in-use authorization, current position and bounded tracking.
+  Native builds opt in with `--location --location-usage`; no background
+  modes or always-permission prompts are added. The device-features demo
+  displays the results. Automated iOS 26.5 simulator UI acceptance covers
+  pregranted permission and simulated current/tracking coordinates.
+  First-use prompts, physical GPS and physical-device acceptance are NOT RUN.
+
 ### Internal
 
 - De-duplicated production and test code with no intended behavior change:

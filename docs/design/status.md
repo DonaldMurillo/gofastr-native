@@ -57,7 +57,7 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
-`device/location` defines typed permission, current-position and bounded
+[Location](../location.md) (`device/location`) defines typed permission, current-position and bounded
 foreground tracking requests, with `location/v1` protocol negotiation. Native
 CoreLocation support is opt-in through `--location --location-usage`, with
 when-in-use authorization only and no background updates. Swift wire and
