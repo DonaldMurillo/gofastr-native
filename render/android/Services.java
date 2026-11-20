@@ -119,6 +119,11 @@ public final class Services {
                     finish(value);
                 });
             }
+            else if(request.has("background")) {
+                if(!host.backgroundTasksEnabled()){finish(outcome("unsupported","Background tasks are disabled."));return;}
+                JSONObject operation=request.getJSONObject("background");
+                background(()->BackgroundJobs.perform(host,operation));
+            }
             else if(request.has("widget")) {
                 if(!host.widgetsEnabled()){finish(outcome("unsupported","Widgets are disabled."));return;}
                 HomeWidget.perform(host,request.getJSONObject("widget"),this::finish);

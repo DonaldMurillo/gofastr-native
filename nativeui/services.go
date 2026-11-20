@@ -7,6 +7,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/background"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -18,6 +19,7 @@ import (
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
+	Background    *background.Request    `json:"background,omitempty"`
 	ID            string                 `json:"id"`
 	Notification  *notifications.Request `json:"notification,omitempty"`
 	Share         *sharing.Request       `json:"share,omitempty"`
@@ -31,6 +33,7 @@ type ServiceRequest struct {
 
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
+	Background     *background.State   `json:"background,omitempty"`
 	Status         EffectStatus        `json:"status"`
 	Message        string              `json:"message,omitempty"`
 	Permission     string              `json:"permission,omitempty"`
@@ -50,7 +53,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Background != nil} {
 		if present {
 			operations++
 		}
@@ -69,6 +72,8 @@ func (request ServiceRequest) Validate() error {
 		return request.IncomingShare.Validate()
 	case request.SecureStorage != nil:
 		return request.SecureStorage.Validate()
+	case request.Background != nil:
+		return request.Background.Validate()
 	case request.Widget != nil:
 		return request.Widget.Validate()
 	default:
@@ -88,6 +93,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityIncomingShares
 	case request.SecureStorage != nil:
 		return CapabilitySecureStorage
+	case request.Background != nil:
+		return CapabilityBackground
 	case request.Widget != nil:
 		return CapabilityWidgets
 	default:
@@ -96,10 +103,10 @@ func (request ServiceRequest) capability() Capability {
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
-	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
+	if (outcome.Background != nil && request.Background == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
-	if outcome.Status != EffectCompleted && (outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil) {
+	if outcome.Status != EffectCompleted && (outcome.Background != nil || outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil) {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	for _, text := range []string{outcome.Message, outcome.Permission, outcome.Identifier} {
@@ -112,6 +119,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	switch outcome.Status {
 	case EffectCompleted:
+		if request.Background != nil {
+			if outcome.Background == nil {
+				return errors.New("nativeui: background result is required")
+			}
+			if err := request.Background.Accept(*outcome.Background); err != nil {
+				return err
+			}
+		}
 		if request.IncomingShare != nil {
 			if err := request.IncomingShare.Accept(outcome.IncomingShare); err != nil {
 				return err

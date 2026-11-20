@@ -3,6 +3,8 @@ package nativeui
 // Command is a local renderer request. Connection and instance IDs are issued
 // by Runtime; caller revisions order buffer checkpoints, not repository writes.
 type Command struct {
+	BackgroundTask string            `json:"backgroundTask,omitempty"`
+	BackgroundID   string            `json:"backgroundId,omitempty"`
 	Version        int               `json:"version"`
 	Kind           string            `json:"kind"`
 	Connection     string            `json:"connection,omitempty"`
@@ -44,21 +46,22 @@ type EditorState struct {
 // Reply is an observed command outcome. Expected failures stay structured even
 // across gomobile, where a Go error alone cannot carry field validation details.
 type Reply struct {
-	Version        int               `json:"version"`
-	Connection     string            `json:"connection,omitempty"`
-	Instance       string            `json:"instance,omitempty"`
-	RequestID      string            `json:"requestId,omitempty"`
-	Revision       uint64            `json:"revision"`
-	Contract       *Contract         `json:"contract,omitempty"`
-	Screen         *Screen           `json:"screen,omitempty"`
-	Response       *Response         `json:"response,omitempty"`
-	Editor         *EditorState      `json:"editor,omitempty"`
-	Error          *ActionError      `json:"error,omitempty"`
-	Effects        []EffectReceipt   `json:"effects,omitempty"`
-	EffectIDs      map[string]string `json:"effectIds,omitempty"`
-	PresentationID string            `json:"presentationId,omitempty"`
-	FileID         string            `json:"fileId,omitempty"`
-	ServiceID      string            `json:"serviceId,omitempty"`
-	DataVersion    string            `json:"dataVersion,omitempty"`
-	Changed        bool              `json:"changed"`
+	Background     *BackgroundOutcome `json:"background,omitempty"`
+	Version        int                `json:"version"`
+	Connection     string             `json:"connection,omitempty"`
+	Instance       string             `json:"instance,omitempty"`
+	RequestID      string             `json:"requestId,omitempty"`
+	Revision       uint64             `json:"revision"`
+	Contract       *Contract          `json:"contract,omitempty"`
+	Screen         *Screen            `json:"screen,omitempty"`
+	Response       *Response          `json:"response,omitempty"`
+	Editor         *EditorState       `json:"editor,omitempty"`
+	Error          *ActionError       `json:"error,omitempty"`
+	Effects        []EffectReceipt    `json:"effects,omitempty"`
+	EffectIDs      map[string]string  `json:"effectIds,omitempty"`
+	PresentationID string             `json:"presentationId,omitempty"`
+	FileID         string             `json:"fileId,omitempty"`
+	ServiceID      string             `json:"serviceId,omitempty"`
+	DataVersion    string             `json:"dataVersion,omitempty"`
+	Changed        bool               `json:"changed"`
 }

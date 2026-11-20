@@ -5,6 +5,13 @@ is left. Updated with the work; the dates are in the [implementation log](agent-
 
 ## External presentation prototype
 
+Android has opt-in [background tasks](../background-tasks.md) using platform
+JobScheduler with typed Go requests and registered cancellable handlers. Jobs
+can start the Go backend without an activity. The device-features demo exposes
+scheduling, status, cancellation, and a stored last-run timestamp. Emulator
+acceptance, reboot persistence, constraint enforcement, and physical-device
+acceptance for background tasks are NOT RUN. iOS and WebView are unsupported.
+
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop

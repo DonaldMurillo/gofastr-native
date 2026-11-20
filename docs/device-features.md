@@ -10,6 +10,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
+| Deferrable background work | `ServiceRequest.Background` | JobScheduler (opt-in `--background-tasks`) | Unsupported |
 
 The same Go-only demo runs on both platforms:
 
@@ -42,6 +43,11 @@ has displayed it. Clear the snapshot when signing out or removing its content.
 
 See [share-in](share-in.md), [secure storage](secure-storage.md), and
 [widgets](widgets.md) for bounds, platform behavior, and validation gates.
+
+[Background tasks](background-tasks.md) add Android-only Go handlers that can run
+without an activity. Add `--background-tasks` to the Android demo build above.
+The background screen records a durable timestamp; scheduling does not prove
+execution. Emulator acceptance for this feature is NOT RUN.
 
 ## Acceptance
 

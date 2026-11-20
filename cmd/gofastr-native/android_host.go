@@ -23,6 +23,13 @@ func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
 		return sources, nil
 	}
 	entries, err := renderandroid.Sources.ReadDir(".")
+	if a.BackgroundTasks {
+		service := filepath.Join(filepath.Dir(activity), "BackgroundService.java")
+		if err := r.do("generate background job binding", func() error { return writeRendered("templates/android/BackgroundService.java.tmpl", service, a) }); err != nil {
+			return nil, err
+		}
+		sources = append(sources, service)
+	}
 	if err != nil {
 		return nil, err
 	}
