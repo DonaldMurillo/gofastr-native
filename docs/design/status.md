@@ -183,3 +183,11 @@ Follow the [milestones and acceptance gates](mobile-roadmap.md#build-order-and-a
 The [component slice](mobile-components.md) implements the first controls,
 collection, tab, and swipe contracts; uncapped repository paging, richer sheets,
 and complete device/accessibility acceptance remain roadmap work.
+
+## Contact picker
+
+The iOS [contact picker](../contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.

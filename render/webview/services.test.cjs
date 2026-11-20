@@ -3,6 +3,36 @@ const { test } = require('node:test');
 const { harness, connected, flush, plain } = require('./test-dom.cjs');
 
 const request = (kind, value) => ({ id: 'declared-go-continuation', [kind]: value });
+test('contacts require a native host and preserve completed selections only', async () => {
+  const browser = harness();
+  assert.equal((await browser.adapter.capabilities())['contacts/v1'], 'unavailable');
+  let unsupported;
+  browser.open(request('contacts', { multiple: false }), async result => { unsupported = result; })
+    .querySelector('[data-gfw-service-perform]').click();
+  await flush();
+  assert.equal(unsupported.status, 'unsupported');
+  const selection = { contacts: [{ id: 'opaque', givenName: 'Ada', familyName: 'Lovelace' }] };
+  for (const result of [
+    { status: 'completed', contacts: selection },
+    { status: 'cancelled' },
+    { status: 'cancelled', contacts: selection },
+  ]) {
+    let observed, calls = 0;
+    const fixture = harness({ setup({ window }) {
+      window.__gofastrDeviceServices = {
+        async capabilities() { return { 'contacts/v1': 'available' }; },
+        async perform() { calls++; return result; },
+      };
+    } });
+    assert.equal((await fixture.adapter.capabilities())['contacts/v1'], 'available');
+    fixture.open(request('contacts', { multiple: false }), async value => { observed = plain(value); })
+      .querySelector('[data-gfw-service-perform]').click();
+    await flush();
+    assert.equal(calls, 1);
+    assert.equal(observed.status, result.contacts && result.status !== 'completed' ? 'failed' : result.status);
+    assert.deepEqual(observed.contacts, result.status === 'completed' ? selection : undefined);
+  }
+});
 const audioFile = () => {
   const bytes = Buffer.alloc(80);
   Buffer.from([26, 69, 223, 163]).copy(bytes);
