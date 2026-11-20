@@ -18,7 +18,8 @@ block, err := maps.Block("places", maps.Content{
 Put the block in `Screen.Components` and handle `err`. A region or at least one
 pin is required. Coordinates must be finite, latitude within [-90,90], longitude
 within [-180,180]. Region deltas are (0,180] and (0,360]. There may be at most
-200 pins, each with a unique `behavior.SafeToken` ID. Titles and subtitles are
+200 pins, each with a unique `behavior.SafeToken` ID of at most 64 bytes, so the
+prefixed event key fits the generic destination-key limit. Titles and subtitles are
 plain UTF-8 without controls, at most 256 and 1024 bytes respectively. Destinations
 are ordinary registered local routes, validated by the screen runtime.
 
@@ -53,5 +54,42 @@ Foundation payload decoding and compile/link the maps-enabled optimized UIKit
 source set for the iOS simulator. See `examples/gallery/gallerynative` for a
 Go-only map and detail routes.
 
+Simulator XCUITest acceptance passed on iPhone 17 with iOS 27.0: three tests,
+zero failures, covering all three labelled pins, City Hall callout navigation,
+and the system user-location annotation after a simulated location grant.
+The captured map showed three pins and the simulated user-position indicator.
+This does not establish physical-device location or permission-dialog behavior.
+
 NOT RUN: physical-device location, permission UX acceptance, VoiceOver, and
 hardware performance. Simulator compilation or launch is not evidence of these.
+
+### Simulator UI acceptance
+
+The UI-test-only project in `extension/maps/uitest` uses XCUITest against the
+separately installed CLI-built gallery, not an application target or signing
+team. Boot an iPhone simulator and run from the repository root:
+
+```sh
+GOFASTR_IOS_UITEST=1 \
+GOFASTR_IOS_DEVICE="<booted-simulator-udid>" \
+GOFASTR_IOS_UITEST_OUT="$HOME/maps-simulator/acceptance" \
+GOWORK=off go test ./extension/maps -run TestGalleryMapUI -v -count=1 -timeout=20m
+```
+
+The output directory must be outside the repository and must not already contain
+`Maps.xcresult`. The opt-in wrapper builds the gallery with `--location-usage`,
+installs it, grants location with `simctl privacy`, and sets a simulated position
+before launching. It runs `xcodebuild test` with the shared `MapsUITests` scheme,
+serially on the specified simulator. Normal Go test runs skip UI acceptance.
+The three tests check pin identifiers and labels, callout navigation to a detail
+screen, and a visible user-location annotation. The result bundle retains a map
+screenshot attachment; the wrapper also writes `map-screen.png` on success.
+
+To rerun only XCUITest against an already built and installed gallery:
+
+```sh
+xcodebuild test -project extension/maps/uitest/MapsUITests.xcodeproj \
+  -scheme MapsUITests -destination "platform=iOS Simulator,id=<booted-simulator-udid>" \
+  -parallel-testing-enabled NO -derivedDataPath "$HOME/maps-simulator/DerivedData" \
+  -resultBundlePath "$HOME/maps-simulator/Maps.xcresult" CODE_SIGNING_ALLOWED=NO
+```

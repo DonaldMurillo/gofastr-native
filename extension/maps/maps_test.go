@@ -17,6 +17,27 @@ func valid() maps.Content {
 }
 
 func TestValidation(t *testing.T) {
+	for _, length := range []int{64, 65} {
+		content := valid()
+		content.Pins[0].ID = strings.Repeat("p", length)
+		block, err := maps.Block("map", content)
+		if length == 65 {
+			if err == nil {
+				t.Fatal("overlong pin ID accepted")
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		registry, err := extension.New(maps.Definition())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := registry.ValidateComponent(block); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for name, change := range map[string]func(*maps.Content){
 		"empty":             func(c *maps.Content) { c.Pins = nil },
 		"latitude":          func(c *maps.Content) { c.Pins[0].Latitude = 91 },

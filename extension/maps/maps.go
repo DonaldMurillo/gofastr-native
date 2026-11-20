@@ -14,8 +14,10 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/extension"
 )
 
+// Name is the compiled component capability.
 const Name = "gofastr.maps/v1"
 
+// Region describes the initial map center and span in degrees.
 type Region struct {
 	Latitude       float64 `json:"latitude"`
 	Longitude      float64 `json:"longitude"`
@@ -23,6 +25,7 @@ type Region struct {
 	LongitudeDelta float64 `json:"longitudeDelta"`
 }
 
+// Pin is a keyed annotation with an optional local navigation destination.
 type Pin struct {
 	ID          string  `json:"id"`
 	Title       string  `json:"title"`
@@ -32,6 +35,7 @@ type Pin struct {
 	Destination string  `json:"destination,omitempty"`
 }
 
+// Content is an immutable map presentation snapshot.
 type Content struct {
 	Region            *Region `json:"region,omitempty"`
 	Pins              []Pin   `json:"pins"`
@@ -41,12 +45,14 @@ type Content struct {
 //go:embed gofastr-native.extension.json GofastrMaps.swift
 var assets embed.FS
 
+// Definition returns the compiled iOS adapter and authoritative Go validation.
 func Definition() extension.Definition {
 	data, _ := assets.ReadFile(extension.ManifestName)
 	manifest, _ := extension.ParseManifest(data)
 	return extension.Definition{Manifest: manifest, Assets: assets, ValidateComponent: validate}
 }
 
+// Block validates and freezes content and its navigation event allowlist.
 func Block(id string, content Content) (extension.Component, error) {
 	data, err := json.Marshal(content)
 	if err != nil {
@@ -62,6 +68,7 @@ func Block(id string, content Content) (extension.Component, error) {
 func bounded(value, min, max float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= min && value <= max
 }
+
 func text(value string, limit int) bool {
 	if !utf8.ValidString(value) || len(value) > limit {
 		return false
@@ -73,6 +80,7 @@ func text(value string, limit int) bool {
 	}
 	return true
 }
+
 func validate(component extension.Component) error {
 	if component.Name != Name || !behavior.SafeToken(component.ID) {
 		return errors.New("maps: invalid identity")
@@ -91,7 +99,7 @@ func validate(component extension.Component) error {
 	}
 	seen := map[string]bool{}
 	for _, p := range content.Pins {
-		if !behavior.SafeToken(p.ID) || seen[p.ID] || !bounded(p.Latitude, -90, 90) || !bounded(p.Longitude, -180, 180) || !text(p.Title, 256) || !text(p.Subtitle, 1024) || len(p.Destination) > 4096 {
+		if !behavior.SafeToken(p.ID) || len(p.ID) > 64 || seen[p.ID] || !bounded(p.Latitude, -90, 90) || !bounded(p.Longitude, -180, 180) || !text(p.Title, 256) || !text(p.Subtitle, 1024) || len(p.Destination) > 4096 {
 			return errors.New("maps: invalid pin")
 		}
 		seen[p.ID] = true
@@ -101,6 +109,7 @@ func validate(component extension.Component) error {
 	}
 	return nil
 }
+
 func destinations(content Content) map[string]string {
 	result := map[string]string{}
 	for _, p := range content.Pins {

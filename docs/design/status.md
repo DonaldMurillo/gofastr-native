@@ -9,6 +9,9 @@ The iOS-only [maps component](../maps.md) adds retained MapKit maps, keyed pins,
 route-only callout navigation and purpose-gated when-in-use location. Go validation,
 Foundation decoding and simulator compilation are automated; physical location,
 permission UX and VoiceOver acceptance remain NOT RUN.
+Simulator XCUITest acceptance passed on iPhone 17/iOS 27.0: three labelled pins,
+callout-to-detail navigation and a preauthorized simulated user-location annotation
+(three tests, zero failures). Physical-device and permission-dialog gates remain.
 
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
