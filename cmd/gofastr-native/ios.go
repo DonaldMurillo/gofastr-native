@@ -136,6 +136,15 @@ func buildIOSFor(r *runner, a app, out string, t iosTarget, signer iosSigner, re
 		"-framework", "Foundation", "-framework", "Security", "-framework", "CoreFoundation", "-lresolv",
 		"-o", filepath.Join(appDir, a.Exe)}
 	args = append(args, sources...)
+	if a.Push && !t.device {
+		entitlements := filepath.Join(work, "ios", "SimulatorPush.entitlements")
+		if err := r.do("embed simulator push entitlements", func() error {
+			return writeRendered("templates/ios/DeviceFeatures.entitlements.tmpl", entitlements, app{Push: true})
+		}); err != nil {
+			return "", err
+		}
+		args = append(args, "-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__entitlements", "-Xlinker", entitlements)
+	}
 	if err := r.run("compile the Swift host and link the Go framework", "xcrun", args...); err != nil {
 		return "", err
 	}
@@ -158,7 +167,9 @@ func buildIOSFor(r *runner, a app, out string, t iosTarget, signer iosSigner, re
 	if a.AppGroup != "" || a.SecureStorage {
 		entitlements := filepath.Join(work, "ios", "Host.entitlements")
 		if err := r.do("generate simulator app-group and private Keychain entitlements", func() error {
-			return writeRendered("templates/ios/DeviceFeatures.entitlements.tmpl", entitlements, a)
+			signing := a
+			signing.Push = false
+			return writeRendered("templates/ios/DeviceFeatures.entitlements.tmpl", entitlements, signing)
 		}); err != nil {
 			return "", err
 		}

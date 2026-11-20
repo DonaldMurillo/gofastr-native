@@ -38,6 +38,7 @@ func buildIOSExtensions(r *runner, a app, work, appDir, sdk string, t iosTarget,
 		ext := a
 		ext.ID, ext.Exe = a.ID+"."+f.name, f.name
 		ext.SecureStorage = false
+		ext.Push = false
 		directory := filepath.Join(work, "ios-"+f.name)
 		bundle := filepath.Join(appDir, "PlugIns", f.name+".appex")
 		if err := r.do("prepare "+f.name+" extension bundle", func() error {

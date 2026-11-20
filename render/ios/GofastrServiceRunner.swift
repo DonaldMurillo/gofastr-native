@@ -28,6 +28,7 @@ public final class GofastrServiceRunner: NSObject {
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
         return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+                "push/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrPush") as? Bool == true ? "available" : "unavailable",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
@@ -75,6 +76,15 @@ public final class GofastrServiceRunner: NSObject {
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if let push = request.push {
+            guard Self.capabilities()["push/v1"] == "available" else { finish(token, MobileServiceResult(status: "unsupported")); return }
+            durableServiceActive = true
+            GofastrPush.perform(push) { [weak self] result in
+                self?.durableServiceActive = false
+                self?.finish(token, result)
+            }
+            return
+        }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in
@@ -293,6 +303,93 @@ private final class MobileServiceDismissalDelegate: NSObject, UIAdaptivePresenta
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) { cancel() }
 }
 
+public enum GofastrPush {
+    private static var token = ""
+    private static var active: UUID?
+    private static var completion: ((MobileServiceResult) -> Void)?
+
+    public static func prepare() {
+        MobileNotificationRouter.shared.installDelegate()
+    }
+
+    public static func didRegister(deviceToken: Data) {
+        DispatchQueue.main.async {
+            guard !deviceToken.isEmpty, deviceToken.count <= 256 else {
+                settle(MobileServiceResult(status: "failed", message: "Invalid APNs token."))
+                return
+            }
+            token = deviceToken.map { String(format: "%02x", $0) }.joined()
+            guard let generation = active else { return }
+            observe { state in
+                guard active == generation else { return }
+                settle(MobileServiceResult(status: "completed", push: state))
+            }
+        }
+    }
+
+    public static func didFailToRegister(error: Error) {
+        DispatchQueue.main.async {
+            token = ""
+            settle(MobileServiceResult(status: "failed", message: "APNs registration failed."))
+        }
+    }
+
+    static func perform(_ request: MobilePushRequest, completion: @escaping (MobileServiceResult) -> Void) {
+        precondition(Thread.isMainThread)
+        guard active == nil else { completion(MobileServiceResult(status: "failed", message: "APNs registration is active.")); return }
+        if request.operation == "unregister" {
+            UIApplication.shared.unregisterForRemoteNotifications()
+            token = ""
+        }
+        guard request.operation == "register" else {
+            observe { completion(MobileServiceResult(status: "completed", push: $0)) }
+            return
+        }
+        let generation = UUID()
+        active = generation
+        self.completion = completion
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
+            guard active == generation else { return }
+            settle(MobileServiceResult(status: "failed", message: "APNs registration timed out."))
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { allowed, error in
+            DispatchQueue.main.async {
+                guard active == generation else { return }
+                if error != nil { settle(MobileServiceResult(status: "failed", message: "Notification authorization failed.")); return }
+                guard allowed else { settle(MobileServiceResult(status: "denied")); return }
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+        }
+    }
+
+    private static func settle(_ result: MobileServiceResult) {
+        let callback = completion
+        completion = nil
+        active = nil
+        callback?(result)
+    }
+
+    private static func observe(_ completion: @escaping (MobilePushState) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                let permission: String
+                switch settings.authorizationStatus {
+                case .notDetermined: permission = "notDetermined"
+                case .denied: permission = "denied"
+                case .authorized: permission = "authorized"
+                case .provisional: permission = "provisional"
+                case .ephemeral: permission = "ephemeral"
+                @unknown default: permission = "notDetermined"
+                }
+                let registered = UIApplication.shared.isRegisteredForRemoteNotifications
+                let profile = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
+                let environment = profile.flatMap { try? Data(contentsOf: $0, options: .mappedIfSafe) }.flatMap { MobilePushState.environment(profile: $0) }
+                completion(MobilePushState(permission: permission, registered: registered, token: registered && !token.isEmpty ? token : nil, environment: environment))
+            }
+        }
+    }
+}
+
 final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = MobileNotificationRouter()
     static let prefix = "gofastr.notification."
@@ -305,6 +402,12 @@ final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate
     func install(_ openRoute: @escaping (String) -> Bool) {
         precondition(Thread.isMainThread)
         self.openRoute = openRoute
+        installDelegate()
+        flush()
+    }
+
+    func installDelegate() {
+        precondition(Thread.isMainThread)
         let center = UNUserNotificationCenter.current()
         if center.delegate !== self { previous = center.delegate; center.delegate = self }
         if observer == nil {
@@ -320,10 +423,9 @@ final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        guard response.notification.request.identifier.hasPrefix(Self.prefix),
-              response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              let route = response.notification.request.content.userInfo[Self.routeKey] as? String,
-              MobileNotificationRequest.localRoute(route) else {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+              let route = MobilePushRoute.route(remote: response.notification.request.trigger is UNPushNotificationTrigger,
+                  identifier: response.notification.request.identifier, userInfo: response.notification.request.content.userInfo) else {
             if let previous, previous.responds(to: #selector(userNotificationCenter(_:didReceive:withCompletionHandler:))) {
                 previous.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
             } else { completionHandler() }
@@ -338,7 +440,7 @@ final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        if notification.request.identifier.hasPrefix(Self.prefix) { completionHandler([.banner, .sound]) }
+        if MobilePushRoute.shouldPresent(remote: notification.request.trigger is UNPushNotificationTrigger, identifier: notification.request.identifier, userInfo: notification.request.content.userInfo) { completionHandler([.banner, .sound]) }
         else if let previous, previous.responds(to: #selector(userNotificationCenter(_:willPresent:withCompletionHandler:))) {
             previous.userNotificationCenter?(center, willPresent: notification, withCompletionHandler: completionHandler)
         } else { completionHandler([]) }

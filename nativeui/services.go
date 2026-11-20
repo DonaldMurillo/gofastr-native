@@ -9,6 +9,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -18,6 +19,7 @@ import (
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
+	Push          *push.Request          `json:"push,omitempty"`
 	ID            string                 `json:"id"`
 	Notification  *notifications.Request `json:"notification,omitempty"`
 	Share         *sharing.Request       `json:"share,omitempty"`
@@ -31,6 +33,7 @@ type ServiceRequest struct {
 
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
+	Push           *push.State         `json:"push,omitempty"`
 	Status         EffectStatus        `json:"status"`
 	Message        string              `json:"message,omitempty"`
 	Permission     string              `json:"permission,omitempty"`
@@ -50,7 +53,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Push != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
 		if present {
 			operations++
 		}
@@ -59,6 +62,8 @@ func (request ServiceRequest) Validate() error {
 		return errors.New("nativeui: exactly one named device service is required")
 	}
 	switch {
+	case request.Push != nil:
+		return request.Push.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -78,6 +83,8 @@ func (request ServiceRequest) Validate() error {
 
 func (request ServiceRequest) capability() Capability {
 	switch {
+	case request.Push != nil:
+		return CapabilityPush
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -96,6 +103,12 @@ func (request ServiceRequest) capability() Capability {
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
+	if outcome.Push != nil && request.Push == nil {
+		return errors.New("nativeui: service result contains unrelated device content")
+	}
+	if outcome.Push != nil && outcome.Status != EffectCompleted {
+		return errors.New("nativeui: unsuccessful service cannot return device content")
+	}
 	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
@@ -112,6 +125,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	switch outcome.Status {
 	case EffectCompleted:
+		if request.Push != nil {
+			if outcome.Push == nil {
+				return errors.New("nativeui: push result is required")
+			}
+			if err := request.Push.Accept(*outcome.Push); err != nil {
+				return err
+			}
+		}
 		if request.IncomingShare != nil {
 			if err := request.IncomingShare.Accept(outcome.IncomingShare); err != nil {
 				return err

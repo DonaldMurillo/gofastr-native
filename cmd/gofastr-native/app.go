@@ -75,6 +75,7 @@ type app struct {
 	SecureStorage   bool
 	BiometricUsage  string
 	Widgets         bool
+	Push            bool
 	AppGroup        string
 	Extensions      []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")

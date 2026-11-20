@@ -10,6 +10,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
@@ -27,6 +28,7 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "share", Share: &sharing.Request{Title: "Files", Text: "Share these", Files: []files.Document{file}}},
 			{ID: "reminder", Notification: &notifications.Request{Operation: notifications.Schedule, Identifier: "notes:1", Title: "Reminder", Route: "/notes/1", Date: "2027-03-14", Time: "03:30"}},
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
+			{ID: "push", Push: &push.Request{Operation: push.Register}},
 		},
 		"audio":  audio.Document{File: file, DurationMillis: 1},
 		"result": nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
@@ -136,6 +138,35 @@ enum ServiceChecks {
         let decoder = JSONDecoder()
         let fixture = try decoder.decode(ServiceFixtures.self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
         for request in fixture.requests { try request.validate() }
+        precondition(fixture.requests[4].push?.operation == "register")
+        let push = MobilePushRequest(operation: "register")
+        try push.accept(MobilePushState(permission: "authorized", registered: true, token: "abcdef", environment: "development"))
+        try MobilePushRequest(operation: "status").accept(MobilePushState(permission: "notDetermined", registered: false))
+        rejected { try MobilePushRequest(operation: "").validate() }
+        rejected { try push.accept(MobilePushState(permission: "", registered: false)) }
+        rejected { try push.accept(MobilePushState(permission: "authorized", registered: false, token: "ab")) }
+        for token in ["AABB", "z0", "a", String(repeating: "ab", count: 257)] {
+            rejected { try push.accept(MobilePushState(permission: "authorized", registered: true, token: token)) }
+        }
+        rejected { try MobilePushRequest(operation: "unregister").accept(MobilePushState(permission: "authorized", registered: true)) }
+        let pushResult = MobileServiceResult(status: "completed", push: MobilePushState(permission: "authorized", registered: true, token: "aabb"))
+        let pushJSON = try JSONSerialization.data(withJSONObject: pushResult.wire)
+        let decodedPush = try decoder.decode(MobileServiceResult.self, from: pushJSON)
+        precondition(decodedPush.push?.token == "aabb")
+        precondition(MobilePushState.environment(profile: Data()) == nil)
+        let profile = Data(#"<?xml version="1.0"?><plist version="1.0"><dict><key>Entitlements</key><dict><key>aps-environment</key><string>production</string></dict></dict></plist>"#.utf8)
+        precondition(MobilePushState.environment(profile: profile) == "production")
+        precondition(MobileServiceResult(status: "failed", push: pushResult.push).wire["push"] == nil)
+        precondition(MobilePushRoute.route(remote: true, identifier: "remote", userInfo: ["gofastr.route": "/settings/push"]) == "/settings/push")
+        precondition(MobilePushRoute.route(remote: false, identifier: "foreign", userInfo: ["gofastr.route": "/settings/push"]) == nil)
+        precondition(MobilePushRoute.route(remote: false, identifier: "gofastr.notification.test", userInfo: ["gofastr.route": "/notes/1"]) == "/notes/1")
+        precondition(MobilePushRoute.route(remote: true, identifier: "", userInfo: [:]) == nil)
+        precondition(!MobilePushRoute.shouldPresent(remote: true, identifier: "gofastr.notification.remote", userInfo: [:]))
+        precondition(MobilePushRoute.shouldPresent(remote: false, identifier: "gofastr.notification.local", userInfo: [:]))
+        precondition(MobilePushRoute.shouldPresent(remote: true, identifier: "", userInfo: ["gofastr.route": "/settings/push"]))
+        for route in ["", "//host/path", "https://host/path", "/a/../b", "/%2e%2e/b", "/%2fhost", "/bad\\route", "/a#b", "/a b", "/a%00b", "/bad%"] {
+            precondition(MobilePushRoute.route(remote: true, identifier: "", userInfo: ["gofastr.route": route]) == nil)
+        }
         precondition(fixture.requests[0].commit == nil, "false commit is omitted by canonical Go JSON")
         precondition(fixture.requests[3].commit == true)
         precondition(fixture.reply.serviceId == "opaque-service" && fixture.reply.dataVersion == "epoch:2" && fixture.reply.changed == true)

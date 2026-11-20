@@ -1,5 +1,52 @@
 import Foundation
 
+struct MobilePushRequest: Codable {
+    let operation: String
+    func validate() throws {
+        guard ["register", "unregister", "status"].contains(operation) else { throw MobileServiceFailure.invalid }
+    }
+    func accept(_ state: MobilePushState) throws {
+        try validate()
+        guard ["notDetermined", "denied", "authorized", "provisional", "ephemeral"].contains(state.permission),
+              state.environment == nil || ["development", "production", ""].contains(state.environment!),
+              operation != "unregister" || !state.registered,
+              state.registered || (state.token ?? "").isEmpty else { throw MobileServiceFailure.invalid }
+        let token = state.token ?? ""
+        guard token.isEmpty || (token.utf8.count >= 2 && token.utf8.count <= 512 && token.utf8.count % 2 == 0 && token.allSatisfy({ "0123456789abcdef".contains($0) })) else { throw MobileServiceFailure.invalid }
+    }
+}
+
+struct MobilePushState: Codable {
+    let permission: String
+    let registered: Bool
+    var token: String?
+    var environment: String?
+
+    static func environment(profile: Data) -> String? {
+        guard profile.count <= 4_194_304,
+              let start = profile.range(of: Data("<?xml".utf8)),
+              let end = profile.range(of: Data("</plist>".utf8), in: start.lowerBound..<profile.endIndex),
+              let root = try? PropertyListSerialization.propertyList(from: profile[start.lowerBound..<end.upperBound], format: nil) as? [String: Any],
+              let entitlements = root["Entitlements"] as? [String: Any],
+              let value = entitlements["aps-environment"] as? String,
+              ["development", "production"].contains(value) else { return nil }
+        return value
+    }
+}
+
+enum MobilePushRoute {
+    static func route(remote: Bool, identifier: String, userInfo: [AnyHashable: Any]) -> String? {
+        guard remote || identifier.hasPrefix("gofastr.notification."),
+              let route = userInfo["gofastr.route"] as? String,
+              (remote ? MobileWidgetSnapshot.localRoute(route) : MobileNotificationRequest.localRoute(route)) else { return nil }
+        return route
+    }
+
+    static func shouldPresent(remote: Bool, identifier: String, userInfo: [AnyHashable: Any]) -> Bool {
+        (!remote && identifier.hasPrefix("gofastr.notification.")) || route(remote: remote, identifier: identifier, userInfo: userInfo) != nil
+    }
+}
+
 struct MobileServiceRequest: Codable {
     let id: String
     let notification: MobileNotificationRequest?
@@ -9,11 +56,12 @@ struct MobileServiceRequest: Codable {
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
     let widget: MobileWidgetRequest?
+    var push: MobilePushRequest? = nil
     let commit: Bool?
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
+              [push != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try notification?.validate()
@@ -23,6 +71,7 @@ struct MobileServiceRequest: Codable {
         try incomingShare?.validate()
         try secureStorage?.validate()
         try widget?.validate()
+        try push?.validate()
     }
 }
 
@@ -300,6 +349,7 @@ struct MobileServiceResult: Codable {
     var incomingShare: MobileIncomingShareItem?
     var secureStorage: MobileSecureStorageResult?
     var widget: MobileWidgetState?
+    var push: MobilePushState?
 
     var wire: [String: Any] {
         var value: [String: Any] = ["status": status]
@@ -311,6 +361,7 @@ struct MobileServiceResult: Codable {
             value["durationMillis"] = durationMillis
         }
         if status == "completed" {
+            if let push, let data = try? JSONEncoder().encode(push), let encoded = try? JSONSerialization.jsonObject(with: data) { value["push"] = encoded }
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }

@@ -1,5 +1,76 @@
 # UIKit device services and live collections
 
+## Push notifications (iOS)
+
+Build a native app with `--push` to opt into `push/v1`. Without the
+Info.plist opt-in the capability is unavailable. Simulator entitlements include
+`aps-environment=development`; device signing requires an explicit App ID and a
+profile granting APNs, and preserves that profile's development/production value.
+The simulator embeds APNs entitlements in the executable's
+`__TEXT,__entitlements` section rather than its macOS code signature.
+
+`device/push.Request` supports `register`, `unregister`, and `status`.
+Register asks for alert, sound and badge permission, then registers with APNs.
+It settles once on the app-delegate token/failure callback or a 45-second timeout;
+denial returns denied without a token. Status never prompts or registers.
+Unregister stops remote registration and clears the in-memory token. It does
+not revoke notification permission. Generated native delegates forward callbacks
+to `GofastrPush.didRegister(deviceToken:)` and `didFailToRegister(error:)`;
+custom hosts must forward those callbacks and call `GofastrPush.prepare()`
+at launch before creating the window.
+
+Completed state includes permission, OS registration, and an optional lowercase
+hex token (1–256 bytes). A registered app may have no observed token after a
+process restart; explicitly register to obtain the current token. Never treat
+tokens as identity, log them, or assume they are permanent. Send updated tokens
+to an authenticated application server. Environment is optional, read from the
+embedded provisioning profile's APNs entitlement when readable; simulators may
+omit it.
+
+A default remote-notification tap with a validated local route in the top-level
+`gofastr.route` key uses the same pending/cold-tap navigation as local reminders.
+Foreground pushes with routes show banner and sound without navigating.
+Missing/invalid routes and non-default actions forward to the previous delegate.
+Routes remain subject to normal Go routing and authorization.
+
+For the Notes example, open Settings → Push notifications. Register for push
+and Push status display permission/token results in rows with accessibility IDs
+`native.row.push-permission`, `native.row.push-token`, and
+`native.row.push-environment`. Action IDs are `native.action.push-register`
+and `native.action.push-status`. Build with:
+
+```sh
+GOWORK=off go run ./cmd/gofastr-native build --platform ios-sim --renderer native --pkg ./examples/notes/notesnative --push --out dist/mobile/ios-push
+```
+
+Save this APNs payload as `payload.json`:
+
+```json
+{
+  "aps": {"alert": {"title": "Notes", "body": "Open push settings"}, "sound": "default"},
+  "gofastr.route": "/settings/push"
+}
+```
+
+Install and launch the built app on a booted simulator, background it, then send:
+
+```sh
+xcrun simctl push <udid> <bundle-id> payload.json
+```
+
+Tap the notification to open push settings. This exercises simulated payload
+delivery, not APNs token issuance or provider authentication.
+Real APNs delivery on hardware: **NOT RUN**.
+
+Simulator verification on iOS 26.5: Notes installed and launched; permission
+authorization and no-prompt status displayed authorized/registered state with
+no observed token. A simulated remote payload displayed a banner. A foreground
+payload displayed a banner without navigating. Default-tap navigation was
+visually inconclusive. Token issuance, cold-launch taps, and hardware delivery
+remain **NOT RUN**.
+
+## Device service overview
+
 Implementation notes, November 5, 2026. These are library/protocol verification
 notes, not real microphone, notification, or share-provider acceptance results.
 The frozen cross-worker contract is `../../../docs/mobile-services-plan.md`.

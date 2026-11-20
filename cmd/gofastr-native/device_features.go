@@ -8,6 +8,9 @@ import (
 )
 
 func validateDeviceFeatures(a app, platform string) error {
+	if a.Push && (a.Renderer != "native" || platform != "ios-sim" && platform != "ios-device") {
+		return errors.New("--push requires the iOS native renderer")
+	}
 	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
 	}
