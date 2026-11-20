@@ -36,7 +36,10 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
 
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
+        let iap: String
+        if #available(iOS 15.0, *) { iap = "available" } else { iap = "unavailable" }
         return ["browser/v1": "available", "contacts/v1": "available", "notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+                "iap/v1": iap,
                 "scanner/v1": MobileScannerController.available ? "available" : "unavailable",
                 "calendar/v1": GofastrCalendar.enabled ? "available" : "unavailable",
                 "push/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrPush") as? Bool == true ? "available" : "unavailable",
@@ -117,6 +120,19 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
             GofastrPush.perform(push) { [weak self] result in
                 self?.durableServiceActive = false
                 self?.finish(token, result)
+            }
+            return
+        }
+        if let iap = request.iap {
+            guard #available(iOS 15.0, *) else {
+                finish(token, MobileServiceResult(status: "unsupported", message: "In-app purchases require iOS 15 or later."))
+                return
+            }
+            durableServiceActive = true
+            Task { @MainActor in
+                let result = await GofastrStoreKit.shared.perform(iap, presenter: self.presenter)
+                self.durableServiceActive = false
+                self.finish(token, result)
             }
             return
         }

@@ -12,6 +12,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/device/iap"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/push"
@@ -42,6 +43,7 @@ type ServiceRequest struct {
 	Scan           *scanner.Request        `json:"scan,omitempty"`
 	Authentication *authentication.Request `json:"authentication,omitempty"`
 	Refresh        *refresh.Request        `json:"refresh,omitempty"`
+	IAP            *iap.Request            `json:"iap,omitempty"`
 	Commit         bool                    `json:"commit,omitempty"`
 }
 
@@ -63,6 +65,7 @@ type ServiceResult struct {
 	Scan           *scanner.Result        `json:"scan,omitempty"`
 	Authentication *authentication.Result `json:"authentication,omitempty"`
 	Refresh        *refresh.State         `json:"refresh,omitempty"`
+	IAP            *iap.Result            `json:"iap,omitempty"`
 }
 
 // ServiceRespond receives every validated outcome, including cancellation.
@@ -73,7 +76,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil} {
+	for _, present := range []bool{request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
 		if present {
 			operations++
 		}
@@ -110,6 +113,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Authentication.Validate()
 	case request.Refresh != nil:
 		return request.Refresh.Validate()
+	case request.IAP != nil:
+		return request.IAP.Validate()
 	default:
 		return request.Audio.Validate()
 	}
@@ -148,6 +153,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityOAuthWebLogin
 	case request.Refresh != nil:
 		return CapabilityBackgroundRefresh
+	case request.IAP != nil:
+		return CapabilityIAP
 	default:
 		return CapabilityAudio
 	}
@@ -169,10 +176,10 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	if outcome.Push != nil && outcome.Status != EffectCompleted {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
-	if (outcome.Calendar != nil && request.Calendar == nil) || (outcome.Contacts != nil && request.Contacts == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) || (outcome.Authentication != nil && request.Authentication == nil) || (outcome.Refresh != nil && request.Refresh == nil) {
+	if (outcome.Calendar != nil && request.Calendar == nil) || (outcome.Contacts != nil && request.Contacts == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) || (outcome.Authentication != nil && request.Authentication == nil) || (outcome.Refresh != nil && request.Refresh == nil) || (outcome.IAP != nil && request.IAP == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
-	if outcome.Status != EffectCompleted && (outcome.Contacts != nil || outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil || outcome.Authentication != nil || outcome.Calendar != nil || outcome.Refresh != nil) {
+	if outcome.Status != EffectCompleted && (outcome.Contacts != nil || outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil || outcome.Authentication != nil || outcome.Calendar != nil || outcome.Refresh != nil || outcome.IAP != nil) {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	for _, text := range []string{outcome.Message, outcome.Permission, outcome.Identifier} {
@@ -253,6 +260,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: background refresh result is required")
 			}
 			if err := request.Refresh.Accept(*outcome.Refresh); err != nil {
+				return err
+			}
+		}
+		if request.IAP != nil {
+			if outcome.IAP == nil {
+				return errors.New("nativeui: in-app purchase result is required")
+			}
+			if err := request.IAP.Accept(*outcome.IAP); err != nil {
 				return err
 			}
 		}

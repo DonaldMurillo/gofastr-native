@@ -107,6 +107,22 @@ test('injected host rejects string/foreign byte results without replaying a devi
   }
 });
 
+test('IAP is explicitly unsupported even with a native WebView bridge', async () => {
+  const outcomes = [];
+  const fixture = harness({ setup({ window }) {
+    window.__gofastrDeviceServices = {
+      async capabilities() { return { 'iap/v1': 'available' }; },
+      async perform() { assert.fail('WebView must never initiate a purchase'); },
+    };
+  } });
+  assert.equal((await fixture.adapter.capabilities())['iap/v1'], 'unavailable');
+  const dialog = fixture.open(request('iap', { operation: 'purchase', productId: 'demo.unlock' }), result => outcomes.push(plain(result)));
+  assert.match(dialog.querySelector('[data-gfw-service-status]').textContent, /native iOS/);
+  dialog.querySelector('[data-gfw-service-perform]').click();
+  await flush();
+  assert.deepEqual(outcomes, [{ status: 'unsupported', message: 'In-app purchases require the native iOS renderer.' }]);
+});
+
 test('unresponsive native capability discovery is bounded and does not call perform', async () => {
   const fixture = harness({ setup({ window }) { window.__gofastrDeviceServices = { capabilities: () => new Promise(() => {}), perform() { assert.fail('No load-time OS call'); } }; } });
   const discovery = fixture.adapter.capabilities();

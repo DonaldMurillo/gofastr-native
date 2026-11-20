@@ -246,6 +246,7 @@ final class MobileHost {
             DispatchQueue.main.async { self.connect(completion: completion) }
             return
         }
+        if #available(iOS 15.0, *) { Task { @MainActor in GofastrStoreKit.shared.start() } }
         let capabilities = [
             "navigation/v1": "available", "editor/v1": "available", "drafts/v1": "available",
             "share/v1": "available", "haptics/v1": "available", "sheets/v1": "available", "announcement/v1": "available",

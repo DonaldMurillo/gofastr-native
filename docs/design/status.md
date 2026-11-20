@@ -121,6 +121,9 @@ graceful cancellation or failure.
 [Background refresh](../background-refresh.md) schedules periodic Go work
 through `BGTaskScheduler` on iOS. It has no Android adapter. Simulator builds
 and contract tests pass; a physical-device run is NOT RUN.
+[In-app purchases and subscriptions](../iap.md) use StoreKit 2 in the native
+iOS renderer. Android and WebView explicitly report the service as unsupported.
+The storefront demo includes a local StoreKit catalog and simulator UI tests.
 
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.

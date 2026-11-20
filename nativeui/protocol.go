@@ -35,6 +35,7 @@ const (
 	CapabilityWidgets         Capability = "widgets/v1"
 	CapabilityContacts        Capability = "contacts/v1"
 	CapabilityScanner         Capability = "scanner/v1"
+	CapabilityIAP             Capability = "iap/v1"
 	CapabilityPrivacy         Capability = "privacy/v1"
 	CapabilitySignInWithApple Capability = "sign-in-with-apple/v1"
 	CapabilityOAuthWebLogin   Capability = "oauth-web-login/v1"
@@ -115,7 +116,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
+	case CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false

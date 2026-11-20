@@ -72,12 +72,13 @@ struct MobileServiceRequest: Codable {
     let authentication: MobileAuthenticationRequest?
     let refresh: MobileRefreshRequest?
     var push: MobilePushRequest? = nil
+    var iap: MobileIAPRequest?
     let commit: Bool?
     var scan: MobileScanRequest? = nil
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil].filter({ $0 }).count == 1 else {
+              [push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil, iap != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
@@ -95,6 +96,7 @@ struct MobileServiceRequest: Codable {
         try calendar?.validate()
         try refresh?.validate()
         try push?.validate()
+        try iap?.validate()
     }
 }
 
@@ -459,6 +461,7 @@ struct MobileServiceResult: Codable {
     var authentication: MobileAuthenticationResult?
     var refresh: MobileRefreshState?
     var push: MobilePushState?
+    var iap: MobileIAPResult?
 
     var wire: [String: Any] {
         var value: [String: Any] = ["status": status]
@@ -480,6 +483,7 @@ struct MobileServiceResult: Codable {
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }
             if let authentication, let data = try? JSONEncoder().encode(authentication), let encoded = try? JSONSerialization.jsonObject(with: data) { value["authentication"] = encoded }
             if let refresh { value["refresh"] = ["scheduled": refresh.scheduled] }
+            if let iap, let data = try? JSONEncoder().encode(iap), let encoded = try? JSONSerialization.jsonObject(with: data) { value["iap"] = encoded }
         }
         return value
     }
