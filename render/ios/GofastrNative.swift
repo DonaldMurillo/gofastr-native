@@ -357,6 +357,7 @@ public final class GofastrNativeRenderer {
             } else { return false }
         }
         let extensionCapabilities = MobileFileExtensions.capabilities().filter { $0.value == "available" }.map(\.key)
+            + MobileComponentExtensions.capabilities().filter { $0.value == "available" }.map(\.key)
         let target = host.queue.sync { () -> MobileScreen? in
             guard let encoded = try? self.host.backend.render(route, "{}"),
                   let response = try? JSONDecoder().decode(MobileResponse.self, from: Data(encoded.utf8)),

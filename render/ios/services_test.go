@@ -9,6 +9,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/browser"
+	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -30,9 +31,10 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
 			{ID: "browser", Browser: &browser.Request{URL: "https://example.com", ReaderMode: true, DismissLabel: "close"}},
 		},
-		"audio":  audio.Document{File: file, DurationMillis: 1},
-		"result": nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
-		"reply":  map[string]any{"version": 1, "instance": "instance", "revision": 0, "serviceId": "opaque-service", "dataVersion": "epoch:2", "changed": true},
+		"contacts": contacts.Selection{Contacts: []contacts.Contact{{ID: "opaque", GivenName: "Ada", FamilyName: "Lovelace", Phones: []contacts.Labeled{{Label: "mobile", Value: "+123"}}}}},
+		"audio":    audio.Document{File: file, DurationMillis: 1},
+		"result":   nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
+		"reply":    map[string]any{"version": 1, "instance": "instance", "revision": 0, "serviceId": "opaque-service", "dataVersion": "epoch:2", "changed": true},
 	}
 	encoded, err := json.Marshal(fixture)
 	if err != nil {
@@ -110,6 +112,7 @@ const serviceChecks = `
 import AVFoundation
 
 struct ServiceFixtures: Decodable {
+    let contacts: MobileContactSelection
     let requests: [MobileServiceRequest]
     let audio: MobileAudioDocument
     let result: MobileServiceResult
@@ -137,6 +140,17 @@ enum ServiceChecks {
     static func main() throws {
         let decoder = JSONDecoder()
         let fixture = try decoder.decode(ServiceFixtures.self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
+        let contactsRequest = MobileContactsRequest(multiple: false, fields: ["phone"])
+        try contactsRequest.accept(fixture.contacts)
+        let contactResult = MobileServiceResult(status: "completed", contacts: fixture.contacts)
+        let contactRoundTrip = try decoder.decode(MobileServiceResult.self, from: Data(contactResult.json.utf8))
+        try contactsRequest.accept(contactRoundTrip.contacts!)
+        precondition(contactRoundTrip.contacts!.contacts[0].phones![0].value == "+123")
+        rejected { try MobileContactsRequest(multiple: false, fields: ["bad"]).validate() }
+        rejected { try MobileContactsRequest(multiple: false, fields: ["phone", "phone"]).validate() }
+        rejected { try contactsRequest.accept(MobileContactSelection(contacts: [])) }
+        rejected { try contactsRequest.accept(MobileContactSelection(contacts: fixture.contacts.contacts + fixture.contacts.contacts)) }
+        rejected { try MobileContactsRequest(multiple: false, fields: []).accept(fixture.contacts) }
         for request in fixture.requests { try request.validate() }
         precondition(fixture.requests[0].commit == nil, "false commit is omitted by canonical Go JSON")
         precondition(fixture.requests[3].commit == true)
@@ -202,7 +216,7 @@ enum ServiceChecks {
         rejected { try MobileShareRequest(title: nil, text: nil, files: [half, half]).validate() }
         rejected { try MobileShareRequest(title: nil, text: nil, files: []).validate() }
         let maximumFile = MobileFileExport(name: "maximum.bin", mediaType: "application/octet-stream", data: Data(repeating: 255, count: 1_048_576).base64EncodedString())
-        let maximumShare = MobileServiceRequest(id: "maximum", notification: nil, share: MobileShareRequest(title: "Share", text: String(repeating: "\u{1}", count: 65_536), files: [maximumFile]), clipboard: nil, audio: nil, incomingShare: nil, secureStorage: nil, widget: nil, commit: nil)
+        let maximumShare = MobileServiceRequest(id: "maximum", notification: nil, share: MobileShareRequest(title: "Share", text: String(repeating: "\u{1}", count: 65_536), files: [maximumFile]), clipboard: nil, audio: nil, incomingShare: nil, secureStorage: nil, location: nil, widget: nil, contacts: nil, commit: nil)
         try maximumShare.validate()
         let maximumJSON = try JSONEncoder().encode(maximumShare)
         precondition(maximumJSON.count <= MobileServiceBounds.maximumJSON, "the bounded JSON envelope must allow escaped slashes and legal 64 KiB text plus a full 1 MiB file")

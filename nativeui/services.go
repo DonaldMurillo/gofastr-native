@@ -8,7 +8,9 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/browser"
+	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
@@ -20,6 +22,7 @@ import (
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
 	Browser       *browser.Request       `json:"browser,omitempty"`
+	Contacts      *contacts.Request      `json:"contacts,omitempty"`
 	ID            string                 `json:"id"`
 	Notification  *notifications.Request `json:"notification,omitempty"`
 	Share         *sharing.Request       `json:"share,omitempty"`
@@ -27,12 +30,14 @@ type ServiceRequest struct {
 	Audio         *audio.Request         `json:"audio,omitempty"`
 	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
+	Location      *location.Request      `json:"location,omitempty"`
 	Widget        *widgets.Request       `json:"widget,omitempty"`
 	Commit        bool                   `json:"commit,omitempty"`
 }
 
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
+	Contacts       *contacts.Selection `json:"contacts,omitempty"`
 	Status         EffectStatus        `json:"status"`
 	Message        string              `json:"message,omitempty"`
 	Permission     string              `json:"permission,omitempty"`
@@ -41,6 +46,7 @@ type ServiceResult struct {
 	DurationMillis int                 `json:"durationMillis,omitempty"`
 	IncomingShare  *sharein.Item       `json:"incomingShare,omitempty"`
 	SecureStorage  *securestore.Result `json:"secureStorage,omitempty"`
+	Location       *location.Result    `json:"location,omitempty"`
 	Widget         *widgets.State      `json:"widget,omitempty"`
 }
 
@@ -52,7 +58,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Browser != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil} {
 		if present {
 			operations++
 		}
@@ -63,6 +69,8 @@ func (request ServiceRequest) Validate() error {
 	switch {
 	case request.Browser != nil:
 		return request.Browser.Validate()
+	case request.Contacts != nil:
+		return request.Contacts.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -75,6 +83,8 @@ func (request ServiceRequest) Validate() error {
 		return request.SecureStorage.Validate()
 	case request.Widget != nil:
 		return request.Widget.Validate()
+	case request.Location != nil:
+		return request.Location.Validate()
 	default:
 		return request.Audio.Validate()
 	}
@@ -84,6 +94,8 @@ func (request ServiceRequest) capability() Capability {
 	switch {
 	case request.Browser != nil:
 		return CapabilityBrowser
+	case request.Contacts != nil:
+		return CapabilityContacts
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -96,16 +108,24 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilitySecureStorage
 	case request.Widget != nil:
 		return CapabilityWidgets
+	case request.Location != nil:
+		return CapabilityLocation
 	default:
 		return CapabilityAudio
 	}
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
-	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
+	if outcome.Location != nil && (request.Location == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unexpected location content")
+	}
+	if request.Location != nil && outcome.Permission != "" && !location.ValidPermission(location.Permission(outcome.Permission)) {
+		return errors.New("nativeui: invalid location permission")
+	}
+	if (outcome.Contacts != nil && request.Contacts == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
-	if outcome.Status != EffectCompleted && (outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil) {
+	if outcome.Status != EffectCompleted && (outcome.Contacts != nil || outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil) {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	for _, text := range []string{outcome.Message, outcome.Permission, outcome.Identifier} {
@@ -118,6 +138,19 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	switch outcome.Status {
 	case EffectCompleted:
+		if request.Contacts != nil {
+			if err := request.Contacts.Accept(outcome.Contacts); err != nil {
+				return err
+			}
+		}
+		if request.Location != nil {
+			if outcome.Location == nil {
+				return errors.New("nativeui: location result is required")
+			}
+			if err := request.Location.Accept(*outcome.Location); err != nil {
+				return err
+			}
+		}
 		if request.IncomingShare != nil {
 			if err := request.IncomingShare.Accept(outcome.IncomingShare); err != nil {
 				return err

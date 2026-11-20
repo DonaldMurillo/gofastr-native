@@ -123,7 +123,7 @@ final class RenderingProbe {
         rejects { _ = try component("missing", name: "") }
         rejects { _ = try component("routes", destinations: ["image.0": ""]) }
         rejects { _ = try component("routes", destinations: ["image.0": String(repeating: "x", count: 4097)]) }
-        rejects { _ = try component("routes", destinations: Dictionary(uniqueKeysWithValues: (0..<129).map { ("event.\($0)", "/allowed") })) }
+        rejects { _ = try component("routes", destinations: Dictionary(uniqueKeysWithValues: (0..<201).map { ("event.\($0)", "/allowed") })) }
         rejects { _ = try JSONDecoder().decode(MobileComponent.self, from: Data(#"{"id":"x","name":"gofastr.media/v1","payload":{}}"#.utf8)) }
         rejects { _ = try GofastrMediaPayload.decode(String(repeating: " ", count: limit + 1)) }
 
