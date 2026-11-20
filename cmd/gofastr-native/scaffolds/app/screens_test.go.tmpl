@@ -59,6 +59,17 @@ func TestEveryRouteRendersAndEveryActionDispatches(t *testing.T) {
 	}
 }
 
+func TestOpenDocs(t *testing.T) {
+	app := open(t, t.TempDir())
+	response, err := app.Dispatch(context.Background(), "/about", "docs", nil)
+	if err != nil || response.Service == nil || response.Service.Browser == nil {
+		t.Fatalf("browser action: %+v %v", response, err)
+	}
+	if err := response.Service.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEmptyTitleIsRejectedAndWritesNothing(t *testing.T) {
 	ctx := context.Background()
 	app := open(t, t.TempDir())

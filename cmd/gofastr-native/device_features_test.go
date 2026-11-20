@@ -12,6 +12,30 @@ import (
 	"testing"
 )
 
+func TestSignInWithAppleRequiresNativeIOSAndProvisionedEntitlement(t *testing.T) {
+	a := nativeApp(t)
+	a.SignInWithApple = true
+	if err := validateDeviceFeatures(a, "ios-sim"); err != nil {
+		t.Fatal(err)
+	}
+	if validateDeviceFeatures(a, "android-emu") == nil {
+		t.Fatal("Android accepted --sign-in-with-apple")
+	}
+	plist, err := render("templates/ios/Info.plist.tmpl", a)
+	if err != nil || !bytes.Contains(plist, []byte("<key>GofastrSignInWithApple</key><true/>")) {
+		t.Fatalf("missing app plist configuration: %v", err)
+	}
+	signed := entitlementSet{entSignInWithApple: []string{"Default"}}
+	f := newFakeProfile(a.ID)
+	if signed.allowedBy(parsedFake(t, f)) == nil {
+		t.Fatal("profile without Sign in with Apple grants the entitlement")
+	}
+	f.appleSignIn = []string{"Default"}
+	if err := signed.allowedBy(parsedFake(t, f)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 	a := nativeApp(t)
 	if err := validateDeviceFeatures(a, "android-emu"); err != nil {
@@ -54,6 +78,31 @@ func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 			t.Error("unsolicited feature", absent)
 		}
 	}
+	a.BackgroundRefresh = true
+	if validateDeviceFeatures(a, "android-emu") == nil {
+		t.Fatal("Android background refresh accepted")
+	}
+	if err := validateDeviceFeatures(a, "ios-device"); err != nil {
+		t.Fatal(err)
+	}
+	plist, _ := render("templates/ios/Info.plist.tmpl", a)
+	wellFormed(t, "Info.plist", plist)
+	host, _ := render("templates/ios/NativeApp.swift.tmpl", a)
+	for _, expected := range [][]byte{[]byte("<key>GofastrBackgroundRefresh</key><string>" + a.ID + ".refresh</string>"), []byte("BGTaskSchedulerPermittedIdentifiers"), []byte("<string>fetch</string>")} {
+		if !bytes.Contains(plist, expected) {
+			t.Errorf("Info.plist omits %s", expected)
+		}
+	}
+	if !bytes.Contains(host, []byte("GofastrBackgroundRefresh.register(ready: renderer.afterStart")) || !bytes.Contains(host, []byte(a.Prefix+"CancelBackgroundRefresh()")) {
+		t.Error("app delegate does not register background refresh")
+	}
+	plain = nativeApp(t)
+	plist, _ = render("templates/ios/Info.plist.tmpl", plain)
+	host, _ = render("templates/ios/NativeApp.swift.tmpl", plain)
+	if bytes.Contains(plist, []byte("UIBackgroundModes")) || bytes.Contains(host, []byte("BackgroundRefresh")) {
+		t.Error("unsolicited background refresh")
+	}
+	a.BackgroundRefresh = false
 	a.Renderer = "webview"
 	if validateDeviceFeatures(a, "android-emu") == nil {
 		t.Fatal("native flags accepted by WebView")

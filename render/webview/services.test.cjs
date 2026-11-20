@@ -3,6 +3,36 @@ const { test } = require('node:test');
 const { harness, connected, flush, plain } = require('./test-dom.cjs');
 
 const request = (kind, value) => ({ id: 'declared-go-continuation', [kind]: value });
+test('contacts require a native host and preserve completed selections only', async () => {
+  const browser = harness();
+  assert.equal((await browser.adapter.capabilities())['contacts/v1'], 'unavailable');
+  let unsupported;
+  browser.open(request('contacts', { multiple: false }), async result => { unsupported = result; })
+    .querySelector('[data-gfw-service-perform]').click();
+  await flush();
+  assert.equal(unsupported.status, 'unsupported');
+  const selection = { contacts: [{ id: 'opaque', givenName: 'Ada', familyName: 'Lovelace' }] };
+  for (const result of [
+    { status: 'completed', contacts: selection },
+    { status: 'cancelled' },
+    { status: 'cancelled', contacts: selection },
+  ]) {
+    let observed, calls = 0;
+    const fixture = harness({ setup({ window }) {
+      window.__gofastrDeviceServices = {
+        async capabilities() { return { 'contacts/v1': 'available' }; },
+        async perform() { calls++; return result; },
+      };
+    } });
+    assert.equal((await fixture.adapter.capabilities())['contacts/v1'], 'available');
+    fixture.open(request('contacts', { multiple: false }), async value => { observed = plain(value); })
+      .querySelector('[data-gfw-service-perform]').click();
+    await flush();
+    assert.equal(calls, 1);
+    assert.equal(observed.status, result.contacts && result.status !== 'completed' ? 'failed' : result.status);
+    assert.deepEqual(observed.contacts, result.status === 'completed' ? selection : undefined);
+  }
+});
 const audioFile = () => {
   const bytes = Buffer.alloc(80);
   Buffer.from([26, 69, 223, 163]).copy(bytes);
@@ -95,6 +125,37 @@ test('plain-browser reminders report unsupported without timers or notification 
   assert.match(dialog.querySelector('[data-gfw-service-status]').textContent, /No timer/);
   dialog.querySelector('[data-gfw-service-perform]').click(); await flush();
   assert.equal(outcome.status, 'unsupported');
+});
+
+test('browser requests settle unsupported once and release foreground ownership with or without a host', async () => {
+  for (const hosted of [false, true]) {
+    for (const browser of [{ url: 'https://example.com' }, {}]) {
+      const outcomes = [];
+      const fixture = harness({ setup({ window }) {
+        if (hosted) window.__gofastrDeviceServices = {
+          async capabilities() { return { 'browser/v1': 'available' }; },
+          perform() { assert.fail('Unsupported browser must not invoke a host'); }
+        };
+      } });
+      assert.equal((await fixture.adapter.capabilities())['browser/v1'], 'unavailable');
+      const dialog = fixture.open(request('browser', browser), async value => outcomes.push(plain(value)));
+      assert.match(dialog.querySelector('[data-gfw-service-status]').textContent, /No page was opened/);
+      const perform = dialog.querySelector('[data-gfw-service-perform]');
+      assert.equal(perform.textContent, 'Continue');
+      perform.click(); perform.click(); await flush();
+      assert.equal(outcomes.length, 1);
+      assert.equal(outcomes[0].status, 'unsupported');
+      assert.match(outcomes[0].message, /No page was opened/);
+      assert.equal(fixture.window.__gofastr_foreground.has(), false);
+      assert.equal(fixture.adapter.has(), false);
+    }
+  }
+});
+
+test('browser requests reject mixed service kinds without claiming the foreground', () => {
+  const fixture = harness();
+  assert.throws(() => fixture.open({ id: 'mixed', browser: { url: 'https://example.com' }, clipboard: { text: 'copy' } }), /no new issued identity/);
+  assert.equal(fixture.window.__gofastr_foreground.has(), false);
 });
 
 test('clipboard is write-only, explicit, once, and preserves local editor text', async () => {
