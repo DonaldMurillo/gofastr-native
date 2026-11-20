@@ -1,5 +1,23 @@
 # Status
 
+iOS native apps can opt into `push/v1` with `--push` for explicit APNs
+registration, token delivery to Go, no-prompt status, and unregistration.
+Validated remote notification routes share local reminders' pending/cold-tap
+path; foreground pushes do not navigate. Notes exposes push settings and a
+push-tap destination. See [iOS services](../../render/ios/docs/services.md).
+On an iOS 26.5 simulator, simulated remote delivery displayed a banner and
+foreground delivery did not navigate. A warm default tap opened push settings
+in the same process after renderer resume. Local reminder taps share that
+resume retry; their warm lifecycle is covered by executable Swift checks, not
+a simulator reminder tap.
+Status displayed authorized/registered state without an observed device token;
+Notes labels that as the OS registration flag with no token received.
+On an iOS 27.0 simulator, a cold-launch default tap (new process) opened the
+routed note, and a payload with a missing or external route opened the Notes
+list without navigating to it.
+APNs token issuance: **NOT RUN**.
+Real APNs delivery on hardware: **NOT RUN**.
+
 What the project covers today, what has been checked and on what, and what
 is left. Updated with the work; the dates are in the [implementation log](agent-notes.md).
 

@@ -1,5 +1,61 @@
 import Foundation
 
+struct MobilePushRequest: Codable {
+    let operation: String
+    func validate() throws {
+        guard ["register", "unregister", "status"].contains(operation) else { throw MobileServiceFailure.invalid }
+    }
+    func accept(_ state: MobilePushState) throws {
+        try validate()
+        guard ["notDetermined", "denied", "authorized", "provisional", "ephemeral"].contains(state.permission),
+              state.environment == nil || ["development", "production", ""].contains(state.environment!),
+              operation != "unregister" || !state.registered,
+              state.registered || (state.token ?? "").isEmpty else { throw MobileServiceFailure.invalid }
+        let token = state.token ?? ""
+        guard token.isEmpty || (token.utf8.count >= 2 && token.utf8.count <= 512 && token.utf8.count % 2 == 0 && token.allSatisfy({ "0123456789abcdef".contains($0) })) else { throw MobileServiceFailure.invalid }
+    }
+}
+
+struct MobilePushState: Codable {
+    let permission: String
+    let registered: Bool
+    var token: String?
+    var environment: String?
+
+    static func environment(profile: Data) -> String? {
+        guard profile.count <= 4_194_304,
+              let start = profile.range(of: Data("<?xml".utf8)),
+              let end = profile.range(of: Data("</plist>".utf8), in: start.lowerBound..<profile.endIndex),
+              let root = try? PropertyListSerialization.propertyList(from: profile[start.lowerBound..<end.upperBound], format: nil) as? [String: Any],
+              let entitlements = root["Entitlements"] as? [String: Any],
+              let value = entitlements["aps-environment"] as? String,
+              ["development", "production"].contains(value) else { return nil }
+        return value
+    }
+}
+
+final class MobileNotificationRouteQueue {
+    var pending: String?
+
+    func flush(_ openRoute: ((String) -> Bool)?) {
+        guard let route = pending, openRoute?(route) == true else { return }
+        pending = nil
+    }
+}
+
+enum MobilePushRoute {
+    static func route(remote: Bool, identifier: String, userInfo: [AnyHashable: Any]) -> String? {
+        guard remote || identifier.hasPrefix("gofastr.notification."),
+              let route = userInfo["gofastr.route"] as? String,
+              (remote ? MobileWidgetSnapshot.localRoute(route) : MobileNotificationRequest.localRoute(route)) else { return nil }
+        return route
+    }
+
+    static func shouldPresent(remote: Bool, identifier: String, userInfo: [AnyHashable: Any]) -> Bool {
+        (!remote && identifier.hasPrefix("gofastr.notification.")) || route(remote: remote, identifier: identifier, userInfo: userInfo) != nil
+    }
+}
+
 struct MobileServiceRequest: Codable {
     let id: String
     let notification: MobileNotificationRequest?
@@ -15,12 +71,13 @@ struct MobileServiceRequest: Codable {
     let contacts: MobileContactsRequest?
     let authentication: MobileAuthenticationRequest?
     let refresh: MobileRefreshRequest?
+    var push: MobilePushRequest? = nil
     let commit: Bool?
     var scan: MobileScanRequest? = nil
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil].filter({ $0 }).count == 1 else {
+              [push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
@@ -37,6 +94,7 @@ struct MobileServiceRequest: Codable {
         try authentication?.validate()
         try calendar?.validate()
         try refresh?.validate()
+        try push?.validate()
     }
 }
 
@@ -400,6 +458,7 @@ struct MobileServiceResult: Codable {
     var scan: MobileScanResult?
     var authentication: MobileAuthenticationResult?
     var refresh: MobileRefreshState?
+    var push: MobilePushState?
 
     var wire: [String: Any] {
         var value: [String: Any] = ["status": status]
@@ -413,6 +472,7 @@ struct MobileServiceResult: Codable {
         if status == "completed" {
             if let contacts, let data = try? JSONEncoder().encode(contacts), let encoded = try? JSONSerialization.jsonObject(with: data) { value["contacts"] = encoded }
             if let scan { value["scan"] = scan.wire }
+            if let push, let data = try? JSONEncoder().encode(push), let encoded = try? JSONSerialization.jsonObject(with: data) { value["push"] = encoded }
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
             if let calendar { value["calendar"] = calendar.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }

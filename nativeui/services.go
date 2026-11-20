@@ -14,6 +14,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -25,6 +26,7 @@ import (
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
+	Push           *push.Request           `json:"push,omitempty"`
 	Browser        *browser.Request        `json:"browser,omitempty"`
 	Contacts       *contacts.Request       `json:"contacts,omitempty"`
 	ID             string                  `json:"id"`
@@ -45,6 +47,7 @@ type ServiceRequest struct {
 
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
+	Push           *push.State            `json:"push,omitempty"`
 	Contacts       *contacts.Selection    `json:"contacts,omitempty"`
 	Status         EffectStatus           `json:"status"`
 	Message        string                 `json:"message,omitempty"`
@@ -70,7 +73,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil} {
+	for _, present := range []bool{request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil} {
 		if present {
 			operations++
 		}
@@ -85,6 +88,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Contacts.Validate()
 	case request.Scan != nil:
 		return request.Scan.Validate()
+	case request.Push != nil:
+		return request.Push.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -118,6 +123,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityContacts
 	case request.Scan != nil:
 		return CapabilityScanner
+	case request.Push != nil:
+		return CapabilityPush
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -155,6 +162,12 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	if outcome.Scan != nil && (request.Scan == nil || outcome.Status != EffectCompleted) {
 		return errors.New("nativeui: unexpected scanner content")
+	}
+	if outcome.Push != nil && request.Push == nil {
+		return errors.New("nativeui: service result contains unrelated device content")
+	}
+	if outcome.Push != nil && outcome.Status != EffectCompleted {
+		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	if (outcome.Calendar != nil && request.Calendar == nil) || (outcome.Contacts != nil && request.Contacts == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) || (outcome.Authentication != nil && request.Authentication == nil) || (outcome.Refresh != nil && request.Refresh == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
@@ -198,6 +211,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: calendar result required")
 			}
 			if err := request.Calendar.Accept(*outcome.Calendar); err != nil {
+				return err
+			}
+		}
+		if request.Push != nil {
+			if outcome.Push == nil {
+				return errors.New("nativeui: push result is required")
+			}
+			if err := request.Push.Accept(*outcome.Push); err != nil {
 				return err
 			}
 		}

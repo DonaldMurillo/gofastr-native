@@ -90,6 +90,7 @@ const (
 // provisioningProfile is the part of a decoded .mobileprovision the build
 // checks. It never holds the profile's raw contents.
 type provisioningProfile struct {
+	APSEnvironment  string
 	Name, UUID      string
 	TeamIDs         []string
 	Prefix          string
@@ -151,6 +152,7 @@ func parseProvisioningProfile(content []byte) (provisioningProfile, error) {
 		return p, errors.New("profile has no valid ExpirationDate")
 	}
 	entitlements := root.field("Entitlements")
+	p.APSEnvironment = strings.TrimSpace(entitlements.field("aps-environment").Text)
 	p.AppIdentifier = strings.TrimSpace(entitlements.field("application-identifier").Text)
 	p.TeamEntitled = strings.TrimSpace(entitlements.field("com.apple.developer.team-identifier").Text)
 	p.GetTaskAllow = entitlements.field("get-task-allow").boolean()
@@ -294,6 +296,10 @@ func (e entitlementSet) allowedBy(p provisioningProfile) error {
 		switch v := e[key].(type) {
 		case string:
 			switch key {
+			case "aps-environment":
+				if v != p.APSEnvironment || v != "development" && v != "production" {
+					problems = append(problems, key+" "+v+" not granted")
+				}
 			case entApplicationID:
 				if !patternMatches(p.AppIdentifier, v) {
 					problems = append(problems, key+" "+v+" not granted")

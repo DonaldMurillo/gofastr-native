@@ -39,6 +39,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ))
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        GofastrPush.prepare()
         GofastrCompiledExtensions.install()
 {{if .BackgroundRefresh}}        GofastrBackgroundRefresh.register(ready: renderer.afterStart, run: { timeoutMillis in
             var error: NSError?
@@ -64,7 +65,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         renderer.checkpoint()
     }
 
-    func applicationWillTerminate(_ application: UIApplication) {
+{{if .Push}}    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        GofastrPush.didRegister(deviceToken: deviceToken)
+    }
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        GofastrPush.didFailToRegister(error: error)
+    }
+{{end}}    func applicationWillTerminate(_ application: UIApplication) {
         renderer.stop()
     }
 }

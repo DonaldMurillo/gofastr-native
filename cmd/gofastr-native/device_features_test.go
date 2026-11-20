@@ -109,6 +109,55 @@ func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 	}
 }
 
+func TestPushOptIn(t *testing.T) {
+	a := nativeApp(t)
+	for _, name := range []string{"templates/ios/Info.plist.tmpl", "templates/ios/DeviceFeatures.entitlements.tmpl"} {
+		plain, err := render(name, a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(plain, []byte("GofastrPush")) || bytes.Contains(plain, []byte("aps-environment")) {
+			t.Fatal("push enabled without opt-in")
+		}
+		a.Push = true
+		content, err := render(name, a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wellFormed(t, name, content)
+		if !bytes.Contains(content, []byte("GofastrPush")) && !bytes.Contains(content, []byte("<key>aps-environment</key><string>development</string>")) {
+			t.Fatal("missing push opt-in")
+		}
+		a.Push = false
+	}
+	a.Push = true
+	var plan bytes.Buffer
+	if _, err := buildIOS(&runner{ctx: context.Background(), dryRun: true, out: &plan}, a, filepath.Join(t.TempDir(), "push")); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plan.String(), "__TEXT -Xlinker __entitlements") {
+		t.Fatal("simulator APNs entitlements are not embedded")
+	}
+	if err := validateDeviceFeatures(a, "ios-sim"); err != nil {
+		t.Fatal(err)
+	}
+	if validateDeviceFeatures(a, "android-emu") == nil {
+		t.Fatal("iOS-only push accepted on Android")
+	}
+	a.Renderer = "webview"
+	if validateDeviceFeatures(a, "ios-sim") == nil {
+		t.Fatal("native push accepted on WebView")
+	}
+	for _, environment := range []string{"development", "production"} {
+		if err := (entitlementSet{"aps-environment": environment}).allowedBy(provisioningProfile{APSEnvironment: environment}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if (entitlementSet{"aps-environment": "development"}).allowedBy(provisioningProfile{}) == nil {
+		t.Fatal("ungranted APNs entitlement accepted")
+	}
+}
+
 func TestIOSFeatureExtensionPlanKeepsExecutablesAndKeychainSeparate(t *testing.T) {
 	a := nativeApp(t)
 	a.ReceiveShares, a.Widgets, a.SecureStorage = true, true, true
