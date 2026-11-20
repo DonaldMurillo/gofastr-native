@@ -20,6 +20,18 @@
 {{range .AndroidExtensionPermissions}}    <uses-permission android:name="{{xml .}}" />
 {{end}}{{end}}
 
+{{if eq .Renderer "native"}}
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="vnd.android.cursor.dir/phone_v2" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="vnd.android.cursor.dir/email_v2" />
+        </intent>
+    </queries>
+{{end}}
     <application
         android:label="{{xml .Name}}"
         android:allowBackup="false"

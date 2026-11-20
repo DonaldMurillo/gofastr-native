@@ -20,6 +20,8 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/extension"
+	"github.com/DonaldMurillo/gofastr-native/extension/contacts"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -115,6 +117,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		tabRoot("/device", "device", "Device", "Device contracts. The capability matrix shows what this renderer advertised.", []nativeui.Row{
 			{ID: "capabilities", Title: "Capability matrix", Destination: "/device/capabilities"},
 			{ID: "files", Title: "Files", Subtitle: "Export and import", Icon: nativeui.IconFile, Destination: "/device/files"},
+			{ID: "contacts", Title: "Contacts", Subtitle: "Choose one phone number", Destination: "/device/contacts"},
 			{ID: "clipboard", Title: "Clipboard", Destination: "/device/clipboard"},
 			{ID: "share-text", Title: "System share", Destination: "/device/share-text"},
 			{ID: "protected", Title: "Protected screen", Destination: "/device/protected"},
@@ -125,6 +128,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 			return nativeui.Screen{Title: "Capability matrix", Text: Matrix(ctx)}, nil
 		}},
 		filesRoute(called),
+		contactsRoute(demo),
 		serviceRoute("/device/clipboard", "Clipboard", "Copies a fixed sentence to the clipboard. The result shows the status the OS reported.", "copy", "Copy text",
 			nativeui.CapabilityClipboard, nativeui.ServiceRequest{ID: "clipboard", Clipboard: &sharing.Clipboard{Text: "Copied from the GoFastr gallery."}}, called),
 		serviceRoute("/device/share-text", "System share", "Opens the system share sheet with a fixed sentence.", "share", "Share text",
@@ -144,7 +148,35 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		}},
 	}
 	routes = append(routes, navigationRoutes(called)...)
-	return nativeui.New(Root, routes...)
+	return nativeui.NewWithExtensions(Root, []extension.Definition{contacts.Definition()}, routes...)
+}
+
+func contactsRoute(demo *state) nativeui.Route {
+	request := contacts.Request{Title: "Choose contact", Kind: contacts.Phone}
+	return nativeui.Route{Path: "/device/contacts", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+		demo.mu.Lock()
+		text := demo.saved["contact"]
+		demo.mu.Unlock()
+		if text == "" {
+			text = "Choose one contact phone number. Only the selected name and number are read; nothing is saved to disk."
+		}
+		return nativeui.Screen{Title: "Contacts", Text: text, Requires: []nativeui.Requirement{{Capability: "contacts/v1"}}, Actions: []nativeui.Action{{ID: "choose", Label: "Choose contact", Primary: true}}}, nil
+	}, Actions: map[string]nativeui.Handle{"choose": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+		operation, err := contacts.Pick(request)
+		return nativeui.Result{Files: &nativeui.FileRequest{ID: "contact", Extension: operation}}, err
+	}}, Files: map[string]nativeui.FileRespond{"contact": func(_ context.Context, _ nativeui.Request, result nativeui.FileResult) (nativeui.Result, error) {
+		if result.Status != nativeui.EffectCompleted || result.File == nil {
+			return nativeui.Result{}, nil
+		}
+		contact, err := request.Contact(*result.File)
+		if err != nil {
+			return nativeui.Result{}, err
+		}
+		demo.mu.Lock()
+		demo.saved["contact"] = contact.Name + "\n" + contact.Phone
+		demo.mu.Unlock()
+		return nativeui.Result{Announcement: "Contact selected."}, nil
+	}}}
 }
 
 var tabs = []nativeui.Tab{

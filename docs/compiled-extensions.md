@@ -152,6 +152,13 @@ and release temporary resources. The adapter never submits Go commands, owns
 navigation, or closes/restores the foreground itself. The core dialog handles
 those responsibilities and the existing `file-result -> complete` settlement.
 
+## Contacts
+
+The [contacts extension](contacts.md) is an Android-only bounded acquisition
+library. Like photos it returns a validated document through the shared file
+continuation. It uses a system row picker without address-book permission;
+iOS and WebView adapters are not implemented. Gallery demonstrates phone selection.
+
 ## Photo support and compatibility
 
 | Target | Observed behavior |

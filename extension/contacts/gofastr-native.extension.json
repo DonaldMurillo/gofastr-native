@@ -1,0 +1,1 @@
+{"name":"gofastr.contacts/v1","capabilities":["contacts/v1"],"android":{"factory":"GofastrContactsExtension","sources":["GofastrContactsExtension.java"]}}
