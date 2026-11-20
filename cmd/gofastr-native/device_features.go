@@ -25,6 +25,9 @@ func validateDeviceFeatures(a app, platform string) error {
 	if a.Location && strings.TrimSpace(a.LocationUsage) == "" {
 		return errors.New("iOS location requires --location-usage for when-in-use authorization")
 	}
+	if a.SignInWithApple && (a.Renderer != "native" || platform != "ios-sim" && platform != "ios-device") {
+		return errors.New("--sign-in-with-apple requires the native iOS renderer")
+	}
 	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
 	}

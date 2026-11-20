@@ -12,6 +12,30 @@ import (
 	"testing"
 )
 
+func TestSignInWithAppleRequiresNativeIOSAndProvisionedEntitlement(t *testing.T) {
+	a := nativeApp(t)
+	a.SignInWithApple = true
+	if err := validateDeviceFeatures(a, "ios-sim"); err != nil {
+		t.Fatal(err)
+	}
+	if validateDeviceFeatures(a, "android-emu") == nil {
+		t.Fatal("Android accepted --sign-in-with-apple")
+	}
+	plist, err := render("templates/ios/Info.plist.tmpl", a)
+	if err != nil || !bytes.Contains(plist, []byte("<key>GofastrSignInWithApple</key><true/>")) {
+		t.Fatalf("missing app plist configuration: %v", err)
+	}
+	signed := entitlementSet{entSignInWithApple: []string{"Default"}}
+	f := newFakeProfile(a.ID)
+	if signed.allowedBy(parsedFake(t, f)) == nil {
+		t.Fatal("profile without Sign in with Apple grants the entitlement")
+	}
+	f.appleSignIn = []string{"Default"}
+	if err := signed.allowedBy(parsedFake(t, f)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 	a := nativeApp(t)
 	if err := validateDeviceFeatures(a, "android-emu"); err != nil {

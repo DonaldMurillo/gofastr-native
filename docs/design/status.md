@@ -94,6 +94,12 @@ the UI. iOS 26.5 simulator acceptance passed, including visible coordinates
 for current position and duration-bounded tracking. First-use permission
 prompts, denial UI and physical-device checks are NOT RUN.
 
+The same example demonstrates native UIKit
+[Sign in with Apple and OAuth](../authentication.md). Android and WebView
+do not provide these sign-in services. Successful login requires app and
+provider configuration; the simulator demo only exercises system UI and
+graceful cancellation or failure.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

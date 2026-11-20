@@ -22,6 +22,7 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
     private let location = GofastrLocation(isForeground: { UIApplication.shared.applicationState != .background })
     private var locationActive = false
     private var durableServiceActive = false
+    private var authentication: MobileAuthentication?
     private lazy var dismissalDelegate = MobileServiceDismissalDelegate { [weak self] in self?.cancel() }
 
     public init(presenter: UIViewController, openRoute: @escaping (String) -> Bool) {
@@ -39,6 +40,8 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
                 "location/v1": GofastrLocation.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
+                "sign-in-with-apple/v1": MobileAuthentication.appleEnabled ? "available" : "unavailable",
+                "oauth-web-login/v1": "available",
                 "audio/v1": purpose?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "available" : "unavailable"]
     }
 
@@ -79,6 +82,7 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
         if let scanner = (controller as? UINavigationController)?.viewControllers.first as? MobileScannerController { scanner.cancel(); return }
         if secureStorageActive { secureStorage.cancel(); return }
         if locationActive { location.cancel(); return }
+        if let authentication { authentication.cancel(); return }
         if durableServiceActive { return }
         if scheduling { cancellingSchedule = true; return }
         finish(token, MobileServiceResult(status: "cancelled", message: "Device service cancelled."))
@@ -119,7 +123,7 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
             finish(token, MobileServiceResult(status: "completed"))
             return
         }
-        guard let presenter, presenter.viewIfLoaded?.window != nil, presenter.presentedViewController == nil else {
+        guard let presenter, let window = presenter.viewIfLoaded?.window, presenter.presentedViewController == nil else {
             finish(token, MobileServiceResult(status: "failed", message: "The service has no available foreground presenter."))
             return
         }
@@ -135,6 +139,15 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
             controller = navigation
             presenter.present(navigation, animated: true)
             navigation.presentationController?.delegate = dismissalDelegate
+        }
+        else if let signIn = request.authentication {
+            let task = MobileAuthentication(anchor: window) { [weak self] result in
+                guard let self, self.settlement.active == token else { return }
+                self.authentication = nil
+                self.finish(token, result)
+            }
+            authentication = task
+            task.start(signIn)
         }
     }
 
@@ -382,14 +395,17 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
     deinit {
         if let directory { queue.async { try? FileManager.default.removeItem(at: directory) } }
         let presented = controller
+        let authentication = authentication
         let recording = (presented as? UINavigationController)?.viewControllers.first as? MobileAudioRecorderController
         if Thread.isMainThread {
             ((presented as? UINavigationController)?.viewControllers.first as? MobileScannerController)?.cancel()
+            authentication?.cancel()
             recording?.shutdown()
             MobileForegroundDismissal.dismiss(presented) {}
         } else {
             DispatchQueue.main.async {
                 ((presented as? UINavigationController)?.viewControllers.first as? MobileScannerController)?.cancel()
+                authentication?.cancel()
                 recording?.shutdown()
                 MobileForegroundDismissal.dismiss(presented) {}
             }

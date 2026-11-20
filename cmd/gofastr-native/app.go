@@ -77,6 +77,7 @@ type app struct {
 	Location        bool
 	LocationUsage   string
 	Widgets         bool
+	SignInWithApple bool
 	AppGroup        string
 	Extensions      []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")

@@ -136,6 +136,9 @@ func buildIOSDevice(r *runner, a app, out string, o releaseOptions) (string, err
 		}
 		b.profile = &profile
 		b.entitlements = deviceEntitlements(profile, id, s.teamID, a.AppGroup, b.keychain)
+		if id == a.ID && a.SignInWithApple {
+			b.entitlements[entSignInWithApple] = []string{"Default"}
+		}
 		if id != a.ID {
 			if _, leaked := b.entitlements[entKeychainGroups]; leaked {
 				return "", fmt.Errorf("%s would carry keychain-access-groups; extensions must never share the app's private Keychain group", id)

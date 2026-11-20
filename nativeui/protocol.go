@@ -12,30 +12,32 @@ const ProtocolVersion = 1
 type Capability string
 
 const (
-	CapabilityNavigation     Capability = "navigation/v1"
-	CapabilityEditor         Capability = "editor/v1"
-	CapabilityDrafts         Capability = "drafts/v1"
-	CapabilityShare          Capability = "share/v1"
-	CapabilityHaptics        Capability = "haptics/v1"
-	CapabilitySheets         Capability = "sheets/v1"
-	CapabilityAnnouncement   Capability = "announcement/v1"
-	CapabilityPresentation   Capability = "presentation/v1"
-	CapabilityFiles          Capability = "files/v1"
-	CapabilityPhotos         Capability = "photos/v1"
-	CapabilityCamera         Capability = "camera/v1"
-	CapabilityNotifications  Capability = "notifications/v1"
-	CapabilitySharing        Capability = "sharing/v1"
-	CapabilityBrowser        Capability = "browser/v1"
-	CapabilityClipboard      Capability = "clipboard/v1"
-	CapabilityAudio          Capability = "audio/v1"
-	CapabilityLive           Capability = "live/v1"
-	CapabilityIncomingShares Capability = "incoming-shares/v1"
-	CapabilitySecureStorage  Capability = "secure-storage/v1"
-	CapabilityLocation       Capability = "location/v1"
-	CapabilityWidgets        Capability = "widgets/v1"
-	CapabilityContacts       Capability = "contacts/v1"
-	CapabilityScanner        Capability = "scanner/v1"
-	CapabilityPrivacy        Capability = "privacy/v1"
+	CapabilityNavigation      Capability = "navigation/v1"
+	CapabilityEditor          Capability = "editor/v1"
+	CapabilityDrafts          Capability = "drafts/v1"
+	CapabilityShare           Capability = "share/v1"
+	CapabilityHaptics         Capability = "haptics/v1"
+	CapabilitySheets          Capability = "sheets/v1"
+	CapabilityAnnouncement    Capability = "announcement/v1"
+	CapabilityPresentation    Capability = "presentation/v1"
+	CapabilityFiles           Capability = "files/v1"
+	CapabilityPhotos          Capability = "photos/v1"
+	CapabilityCamera          Capability = "camera/v1"
+	CapabilityNotifications   Capability = "notifications/v1"
+	CapabilitySharing         Capability = "sharing/v1"
+	CapabilityBrowser         Capability = "browser/v1"
+	CapabilityClipboard       Capability = "clipboard/v1"
+	CapabilityAudio           Capability = "audio/v1"
+	CapabilityLive            Capability = "live/v1"
+	CapabilityIncomingShares  Capability = "incoming-shares/v1"
+	CapabilitySecureStorage   Capability = "secure-storage/v1"
+	CapabilityLocation        Capability = "location/v1"
+	CapabilityWidgets         Capability = "widgets/v1"
+	CapabilityContacts        Capability = "contacts/v1"
+	CapabilityScanner         Capability = "scanner/v1"
+	CapabilityPrivacy         Capability = "privacy/v1"
+	CapabilitySignInWithApple Capability = "sign-in-with-apple/v1"
+	CapabilityOAuthWebLogin   Capability = "oauth-web-login/v1"
 )
 
 // Support distinguishes a service from an explicitly disclosed fallback.
@@ -109,7 +111,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityBrowser, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityContacts, CapabilityScanner, CapabilityPrivacy:
+	case CapabilityBrowser, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityContacts, CapabilityScanner, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false
