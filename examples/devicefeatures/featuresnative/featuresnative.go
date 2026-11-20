@@ -208,7 +208,7 @@ func newApp() (*nativeui.App, error) {
 		}),
 		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			return nativeui.Screen{Title: "Background refresh", Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
-				{ID: "schedule", Label: "Schedule hourly refresh", Primary: true}, {ID: "status", Label: "Check schedule"}, {ID: "cancel", Label: "Cancel refresh"},
+				{ID: "schedule", Label: "Schedule", Primary: true}, {ID: "status", Label: "Check schedule"}, {ID: "cancel", Label: "Cancel refresh"},
 			}}, nil
 		}, Actions: map[string]nativeui.Handle{
 			"schedule": service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Schedule, IntervalMinutes: 60}}),
