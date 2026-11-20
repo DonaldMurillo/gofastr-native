@@ -10,10 +10,11 @@ struct MobileServiceRequest: Codable {
     let secureStorage: MobileSecureStorageRequest?
     let widget: MobileWidgetRequest?
     let commit: Bool?
+    var scan: MobileScanRequest? = nil
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
+              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, scan != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try notification?.validate()
@@ -23,6 +24,7 @@ struct MobileServiceRequest: Codable {
         try incomingShare?.validate()
         try secureStorage?.validate()
         try widget?.validate()
+        try scan?.validate()
     }
 }
 
@@ -300,6 +302,7 @@ struct MobileServiceResult: Codable {
     var incomingShare: MobileIncomingShareItem?
     var secureStorage: MobileSecureStorageResult?
     var widget: MobileWidgetState?
+    var scan: MobileScanResult?
 
     var wire: [String: Any] {
         var value: [String: Any] = ["status": status]
@@ -311,6 +314,7 @@ struct MobileServiceResult: Codable {
             value["durationMillis"] = durationMillis
         }
         if status == "completed" {
+            if let scan { value["scan"] = scan.wire }
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }

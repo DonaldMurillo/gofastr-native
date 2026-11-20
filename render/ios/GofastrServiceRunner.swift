@@ -28,6 +28,7 @@ public final class GofastrServiceRunner: NSObject {
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
         return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+                "scanner/v1": MobileScannerController.available ? "available" : "unavailable",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
@@ -68,6 +69,7 @@ public final class GofastrServiceRunner: NSObject {
     public func cancel() {
         guard Thread.isMainThread else { DispatchQueue.main.async { self.cancel() }; return }
         guard let token = settlement.active else { return }
+        if let scanner = (controller as? UINavigationController)?.viewControllers.first as? MobileScannerController { scanner.cancel(); return }
         if secureStorageActive { secureStorage.cancel(); return }
         if durableServiceActive { return }
         if scheduling { cancellingSchedule = true; return }
@@ -107,6 +109,15 @@ public final class GofastrServiceRunner: NSObject {
         }
         if let share = request.share { performShare(share, token: token, presenter: presenter) }
         else if let audio = request.audio { performAudio(audio, token: token, presenter: presenter) }
+        else if let scan = request.scan {
+            guard MobileScannerController.available else { finish(token, MobileServiceResult(status: "unsupported")); return }
+            let scanner = MobileScannerController(request: scan) { [weak self] result in self?.finish(token, result) }
+            let navigation = UINavigationController(rootViewController: scanner)
+            navigation.isModalInPresentation = true
+            controller = navigation
+            presenter.present(navigation, animated: true)
+            navigation.presentationController?.delegate = dismissalDelegate
+        }
     }
 
     private func finishDictionary(_ token: UUID, _ value: [String: Any]) {
@@ -276,10 +287,12 @@ public final class GofastrServiceRunner: NSObject {
         let presented = controller
         let recording = (presented as? UINavigationController)?.viewControllers.first as? MobileAudioRecorderController
         if Thread.isMainThread {
+            ((presented as? UINavigationController)?.viewControllers.first as? MobileScannerController)?.cancel()
             recording?.shutdown()
             MobileForegroundDismissal.dismiss(presented) {}
         } else {
             DispatchQueue.main.async {
+                ((presented as? UINavigationController)?.viewControllers.first as? MobileScannerController)?.cancel()
                 recording?.shutdown()
                 MobileForegroundDismissal.dismiss(presented) {}
             }
