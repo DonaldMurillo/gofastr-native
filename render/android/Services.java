@@ -23,9 +23,11 @@ import java.util.function.Consumer;
 public final class Services {
     private final GofastrActivity host;
     private final SecureStorage secureStorage;
+    private final Speech speech;
     private Consumer<JSONObject> result;
     private Consumer<Uri> picked;
     private Runnable permissionGranted;
+    private Runnable speechAfterPermission;
     private int activityCode;
     private File cameraFile,recordingFile;
     private MediaRecorder recorder;
@@ -33,10 +35,10 @@ public final class Services {
     private Runnable recordingLimit;
     private long recordingStarted;
     private int maximumDuration,maximumBytes;
-    private boolean recordingFinishing,disposed;
+    private boolean recordingFinishing,disposed,foreground;
     private boolean fileTask;
     private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406;
-    Services(GofastrActivity host){this.host=host;this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
+    Services(GofastrActivity host){this.host=host;this.secureStorage=new SecureStorage(host,host.workers);this.speech=new Speech(host);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
     private void finish(JSONObject outcome) {
@@ -106,6 +108,7 @@ public final class Services {
             }else if(request.has("share")) share(request.getJSONObject("share"));
             else if(request.has("notification")) notification(request.getJSONObject("notification"));
             else if(request.has("audio")) record(request.getJSONObject("audio"));
+            else if(request.has("speech")) speech(request.getJSONObject("speech"));
             else if(request.has("incomingShare")) {
                 if(!host.incomingSharesEnabled()){finish(outcome("unsupported","The share inbox is disabled."));return;}
                 IncomingShares.perform(host,request.getJSONObject("incomingShare"),this::finish);
@@ -181,6 +184,21 @@ public final class Services {
             recordingLimit=()->stopRecording(true);host.main.postDelayed(recordingLimit,maximumDuration*1000L);
         }catch(Exception e){releaseRecorder();failed(e);}
     }
+    private void speech(JSONObject request) {
+        if("recognize".equals(request.optString("operation"))) {
+            if(!host.canUseMicrophone() || !android.speech.SpeechRecognizer.isRecognitionAvailable(host)){
+                finish(outcome("unsupported","Speech recognition is not available for this build or device."));return;
+            }
+            if(host.checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
+                permissionGranted=()->{
+                    if(foreground)speech.run(request,this::finish);
+                    else speechAfterPermission=()->speech.run(request,this::finish);
+                };
+                host.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},MICROPHONE);return;
+            }
+        }
+        speech.run(request,this::finish);
+    }
     private void stopRecording(boolean keep) {
         if(recorder==null || recordingFinishing)return;recordingFinishing=true;
         if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);
@@ -197,8 +215,9 @@ public final class Services {
     }
     private void releaseRecorder(){if(recorder!=null){try{recorder.reset();recorder.release();}catch(Exception ignored){}recorder=null;}if(recordingFile!=null){recordingFile.delete();recordingFile=null;}}
     boolean back(){if(recordingDialog!=null){stopRecording(false);return true;}return busy();}
-    void pause(){if(recorder!=null)stopRecording(false);secureStorage.cancel();}
-    void dispose(){disposed=true;secureStorage.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
+    void resume(){foreground=true;Runnable speechStart=speechAfterPermission;speechAfterPermission=null;if(speechStart!=null)speechStart.run();}
+    void pause(){foreground=false;if(recorder!=null)stopRecording(false);speech.cancel();secureStorage.cancel();}
+    void dispose(){disposed=true;speechAfterPermission=null;speech.cancel();secureStorage.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
         if(code==SHARE){finish(outcome(status==Activity.RESULT_OK?"completed":"cancelled","Share sheet closed. Android does not confirm delivery."));return;}

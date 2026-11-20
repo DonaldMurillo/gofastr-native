@@ -34,6 +34,11 @@ const (
 	CapabilityPrivacy        Capability = "privacy/v1"
 )
 
+const (
+	CapabilityTextToSpeech      Capability = "text-to-speech/v1"
+	CapabilitySpeechRecognition Capability = "speech-recognition/v1"
+)
+
 // Support distinguishes a service from an explicitly disclosed fallback.
 type Support string
 
@@ -105,6 +110,8 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
+	case CapabilityTextToSpeech, CapabilitySpeechRecognition:
+		return true
 	case CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityWidgets, CapabilityPrivacy:
 		return true
 	default:

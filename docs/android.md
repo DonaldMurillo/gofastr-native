@@ -56,6 +56,9 @@ under the selected output directory. Run installs only the selected app package.
   explicit action. AAC/M4A recording is foreground-only, bounded by the request
   and the framework's 60 second / 1 MiB ceiling. Notes requests 512 KiB. Cancelled
   or backgrounded recordings do not become attachments.
+- [Speech services](#speech) speak text and transcribe one utterance using
+  installed Android providers. Recognition uses the same microphone opt-in
+  as recording and returns text, not audio.
 - Reminders use app-scoped notification channels and inexact alarms. Scheduling
   validates future local time and requests notification permission when needed.
   Status/cancel do not request permission. Stored alarms are restored after a
@@ -91,6 +94,41 @@ to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
 `connectedDevice`, joined with `|`. A library may ship only an Android adapter.
 The [capture library](capture.md) uses all of these for background video
 capture, location and camera direction, with live WHIP streaming.
+
+## Speech
+
+Return a `nativeui.ServiceRequest` with a `device/speech.Request` from an
+explicit action. Register its ID in the route's `Services` map:
+
+```go
+return nativeui.Result{Service: &nativeui.ServiceRequest{
+    ID: "dictation",
+    Speech: &speech.Request{Operation: speech.Recognize, Language: "en-US"},
+}}, nil
+```
+
+Use `speech.Speak` with `Text` to speak without microphone access.
+`Language` is an optional BCP 47 language tag. Spoken text and final
+transcripts must be nonblank and at most 4,000 UTF-8 bytes. A completed
+recognition returns the best final result as `ServiceResult.Transcript`.
+Synthesis completes after the provider reports playback finished; it returns
+no audio or transcript. Neither operation saves anything to app storage.
+
+These adapters are native Android only. Screen requirements can use
+`CapabilityTextToSpeech` or `CapabilitySpeechRecognition` to require provider
+availability. Availability is not a permission grant or a guarantee that a
+language is installed. Recognition asks for microphone permission when invoked
+and only if built with `--microphone-usage`. Both operations are cancellable and
+stop when the app is backgrounded. Recognition ends after one utterance or
+times out within 30 seconds. Providers may use their own online services.
+
+```sh
+GOWORK=off go run ./cmd/gofastr-native run --platform android-emu --renderer native \
+  --pkg ./examples/speech/speechnative --device Pixel_5_API_34 \
+  --microphone-usage 'Transcribe speech when the user taps Dictate.' \
+  --out dist/mobile/speech
+python scripts/android_speech_smoke.py --serial emulator-5554
+```
 
 ## Build compatibility
 

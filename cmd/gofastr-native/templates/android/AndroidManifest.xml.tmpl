@@ -20,6 +20,11 @@
 {{range .AndroidExtensionPermissions}}    <uses-permission android:name="{{xml .}}" />
 {{end}}{{end}}
 
+{{if eq .Renderer "native"}}    <queries>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+{{if .MicrophoneUsage}}        <intent><action android:name="android.speech.RecognitionService" /></intent>
+{{end}}    </queries>
+{{end}}
     <application
         android:label="{{xml .Name}}"
         android:allowBackup="false"

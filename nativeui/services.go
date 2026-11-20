@@ -12,6 +12,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/device/speech"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
 	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
@@ -23,6 +24,7 @@ type ServiceRequest struct {
 	Share         *sharing.Request       `json:"share,omitempty"`
 	Clipboard     *sharing.Clipboard     `json:"clipboard,omitempty"`
 	Audio         *audio.Request         `json:"audio,omitempty"`
+	Speech        *speech.Request        `json:"speech,omitempty"`
 	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
 	Widget        *widgets.Request       `json:"widget,omitempty"`
@@ -37,6 +39,7 @@ type ServiceResult struct {
 	Identifier     string              `json:"identifier,omitempty"`
 	File           *files.Document     `json:"file,omitempty"`
 	DurationMillis int                 `json:"durationMillis,omitempty"`
+	Transcript     string              `json:"transcript,omitempty"`
 	IncomingShare  *sharein.Item       `json:"incomingShare,omitempty"`
 	SecureStorage  *securestore.Result `json:"secureStorage,omitempty"`
 	Widget         *widgets.State      `json:"widget,omitempty"`
@@ -50,7 +53,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.Speech != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
 		if present {
 			operations++
 		}
@@ -71,6 +74,8 @@ func (request ServiceRequest) Validate() error {
 		return request.SecureStorage.Validate()
 	case request.Widget != nil:
 		return request.Widget.Validate()
+	case request.Speech != nil:
+		return request.Speech.Validate()
 	default:
 		return request.Audio.Validate()
 	}
@@ -90,12 +95,20 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilitySecureStorage
 	case request.Widget != nil:
 		return CapabilityWidgets
+	case request.Speech != nil:
+		if request.Speech.Operation == speech.Speak {
+			return CapabilityTextToSpeech
+		}
+		return CapabilitySpeechRecognition
 	default:
 		return CapabilityAudio
 	}
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
+	if outcome.Transcript != "" && (request.Speech == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: only successful speech recognition may return a transcript")
+	}
 	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
@@ -138,6 +151,11 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: successful recording requires audio content")
 			}
 			return request.Audio.Accept(*outcome.File, outcome.DurationMillis)
+		}
+		if request.Speech != nil {
+			if err := request.Speech.Accept(outcome.Transcript); err != nil {
+				return err
+			}
 		}
 	case EffectCancelled, EffectDenied, EffectUnsupported, EffectFailed:
 	default:

@@ -57,6 +57,10 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+[Speech services](../android.md#speech) provide foreground text-to-speech and
+single-utterance dictation through the native Android renderer. UIKit and
+WebView do not have these adapters.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

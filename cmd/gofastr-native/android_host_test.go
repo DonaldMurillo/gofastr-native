@@ -270,6 +270,34 @@ func TestNativeAndroidDryRunAndPermissionPackaging(t *testing.T) {
 	}
 }
 
+func TestAndroidSpeechServiceVisibility(t *testing.T) {
+	for _, tc := range []struct {
+		name, renderer, mic string
+		speak, recognize    bool
+	}{
+		{"native with microphone", "native", "Transcribe speech.", true, true},
+		{"native without microphone", "native", "", true, false},
+		{"WebView with microphone", "webview", "Record audio.", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := nativeApp(t).forAndroid(36)
+			a.Renderer, a.MicrophoneUsage = tc.renderer, tc.mic
+			manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for action, wanted := range map[string]bool{
+				"android.intent.action.TTS_SERVICE": tc.speak,
+				"android.speech.RecognitionService": tc.recognize,
+			} {
+				if bytes.Contains(manifest, []byte(action)) != wanted {
+					t.Errorf("expected %s visibility: %t", action, wanted)
+				}
+			}
+		})
+	}
+}
+
 func TestDefaultAndroidAVDPrefersPhoneToTV(t *testing.T) {
 	if got := preferredAndroidAVD([]string{"Homi_TV_API34", "Pixel_5_API_34"}); got != "Pixel_5_API_34" {
 		t.Fatalf("phone APK would boot incompatible TV image: %s", got)
