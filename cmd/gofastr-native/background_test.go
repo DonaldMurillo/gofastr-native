@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/DonaldMurillo/gofastr-native/extension"
 )
 
 func TestBackgroundFlagAndManifest(t *testing.T) {
@@ -22,6 +24,10 @@ func TestBackgroundFlagAndManifest(t *testing.T) {
 	if bytes.Contains(plain, []byte("BackgroundService")) {
 		t.Fatal("enabled by default")
 	}
+	const networkPermission = "android.permission.ACCESS_NETWORK_STATE"
+	if bytes.Contains(plain, []byte(networkPermission)) {
+		t.Fatal("network-state permission enabled by default")
+	}
 	a.BackgroundTasks = true
 	if err := validateDeviceFeatures(a, "android-emu"); err != nil {
 		t.Fatal(err)
@@ -36,6 +42,17 @@ func TestBackgroundFlagAndManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	wellFormed(t, "background manifest", manifest)
+	if bytes.Count(manifest, []byte(networkPermission)) != 1 {
+		t.Fatal("missing network-state permission")
+	}
+	a.Extensions = []compiledExtension{{manifest: extension.Manifest{Android: &extension.Android{Permissions: []string{networkPermission}}}}}
+	manifest, err = render("templates/android/AndroidManifest.xml.tmpl", a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Count(manifest, []byte(networkPermission)) != 1 {
+		t.Fatal("duplicate network-state permission")
+	}
 	for _, value := range []string{`android:name=".BackgroundService"`, `android:permission="android.permission.BIND_JOB_SERVICE"`, `android:exported="false"`} {
 		if !bytes.Contains(manifest, []byte(value)) {
 			t.Fatal("missing", value)

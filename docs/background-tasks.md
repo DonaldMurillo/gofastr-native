@@ -9,6 +9,9 @@ Enable packaging with `--background-tasks --renderer native` on Android.
 Disabled builds and WebView hosts do not advertise `background/v1`. iOS has no
 adapter and reports unsupported through the normal service capability contract.
 Passing the Android-only build flag for iOS is an error.
+Enabled builds declare `ACCESS_NETWORK_STATE`, required by JobScheduler for
+network-constrained jobs on Android 14 and later when targeting API 34 or later.
+This is a normal permission and needs no runtime permission prompt.
 
 Register compiled handlers before creating the runtime:
 

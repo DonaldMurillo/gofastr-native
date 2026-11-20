@@ -15,6 +15,7 @@
 {{end}}{{end}}{{if eq .Renderer "native"}}
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+{{if .BackgroundTasks}}    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />{{end}}
 {{if .MicrophoneUsage}}    <uses-permission android:name="android.permission.RECORD_AUDIO" />{{end}}
 {{if and .SecureStorage .BiometricUsage}}    <uses-permission android:name="android.permission.USE_BIOMETRIC" />{{end}}
 {{range .AndroidExtensionPermissions}}    <uses-permission android:name="{{xml .}}" />
