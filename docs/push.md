@@ -71,9 +71,10 @@ it opens `route` through the same local-path guard as deep links. A repeated
 under its stable identifier first.
 
 Notification messages behave differently when the app is in the background:
-Android's FCM client shows them itself, and their data reaches the inbox only
-when the user opens that notification. Use data messages when every message
-must reach the inbox.
+Android's FCM client shows them itself and opening one starts the app without
+storing it. The launcher activity is exported, so its extras cannot prove that
+FCM sent them and are not read into the inbox. Use data messages when every
+message must reach the inbox.
 
 ## Validation
 

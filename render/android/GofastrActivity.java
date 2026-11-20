@@ -178,7 +178,6 @@ public abstract class GofastrActivity extends Activity {
     private String routeFrom(Intent intent) {
         if(intent==null) return "";
         if(intent.getBooleanExtra("gofastr.reminder", false) || intent.getBooleanExtra("gofastr.push", false)) return localRoute(intent.getStringExtra("route"));
-        if(Push.available() && intent.getStringExtra("google.message_id")!=null){Push.fromLaunch(this,intent);return localRoute(intent.getStringExtra("route"));}
         if(!Intent.ACTION_VIEW.equals(intent.getAction()))return "";
         android.net.Uri uri=intent.getData();
         if(uri==null || urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";

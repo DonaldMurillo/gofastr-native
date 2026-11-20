@@ -129,14 +129,6 @@ public final class Push {
         } catch(Exception e) { android.util.Log.e("gofastr-native","push delivery failed",e); return ""; }
     }
 
-    /** Copies the data of a notification message the system showed while the app was in the background. */
-    static void fromLaunch(Context context, Intent intent) {
-        Bundle extras=intent.getExtras();if(extras==null)return;
-        Map<String,String> data=new HashMap<>();
-        for(String key:extras.keySet()){Object value=extras.get(key);if(value instanceof String)data.put(key,(String)value);}
-        deliver(context,extras.getString("google.message_id"),data.get("gcm.notification.title"),data.get("gcm.notification.body"),data,false);
-    }
-
     private static int utf8(String value) { return value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length; }
 
     private static String plain(String value) {
