@@ -9,11 +9,12 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
-func pushScreen(permission, token, environment string) nativeui.Screen {
+func pushScreen(permission, token, environment, result string) nativeui.Screen {
 	return nativeui.Screen{Title: "Push notifications", List: &nativeui.List{Rows: []nativeui.Row{
 		{ID: "push-permission", Title: "Permission", Subtitle: permission, Disabled: true},
 		{ID: "push-token", Title: "APNs token", Subtitle: token, Disabled: true},
 		{ID: "push-environment", Title: "Environment", Subtitle: environment, Disabled: true},
+		{ID: "push-result", Title: "Result", Subtitle: result, Disabled: true},
 	}}, Actions: []nativeui.Action{
 		{ID: "push-register", Label: "Register for push", Primary: true},
 		{ID: "push-status", Label: "Push status"},
@@ -22,7 +23,7 @@ func pushScreen(permission, token, environment string) nativeui.Screen {
 
 func pushSettings() []nativeui.Route {
 	var mu sync.Mutex
-	screen := pushScreen("Not checked", "Not checked", "Not checked")
+	screen := pushScreen("Not checked", "Not checked", "Not checked", "Not requested")
 	render := func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -31,7 +32,7 @@ func pushSettings() []nativeui.Route {
 		return result, nil
 	}
 	route := nativeui.Route{Path: "/settings/push", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return pushScreen("Not checked", "Not checked", "Not checked"), nil
+		return pushScreen("Not checked", "Not checked", "Not checked", "Not requested"), nil
 	}, Actions: map[string]nativeui.Handle{}, Services: map[string]nativeui.ServiceRespond{}}
 	for id, operation := range map[string]string{"push-register": push.Register, "push-status": push.Status} {
 		route.Actions[id] = func(context.Context, nativeui.Request) (nativeui.Result, error) {
@@ -40,8 +41,12 @@ func pushSettings() []nativeui.Route {
 		route.Services[id] = func(ctx context.Context, request nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
 			mu.Lock()
 			defer mu.Unlock()
+			outcome := string(result.Status)
+			if result.Message != "" {
+				outcome += " - " + result.Message
+			}
 			if result.Status != nativeui.EffectCompleted {
-				screen = pushScreen(string(result.Status), "Unavailable", "Unavailable")
+				screen = pushScreen("Not observed", "Unavailable", "Unavailable", outcome)
 				return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/settings/push/result"}}, nil
 			}
 			value := result.Push
@@ -52,7 +57,7 @@ func pushSettings() []nativeui.Route {
 			if environment == "" {
 				environment = "Not readable"
 			}
-			screen = pushScreen(fmt.Sprintf("%s; registered: %t", value.Permission, value.Registered), token, environment)
+			screen = pushScreen(fmt.Sprintf("%s; registered: %t", value.Permission, value.Registered), token, environment, outcome)
 			return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/settings/push/result"}}, nil
 		}
 	}

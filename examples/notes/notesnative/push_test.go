@@ -1,6 +1,7 @@
 package notesnative
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/push"
@@ -18,6 +19,7 @@ func TestPushSettings(t *testing.T) {
 		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "notDetermined"}},
 		{Status: nativeui.EffectDenied},
 		{Status: nativeui.EffectFailed},
+		{Status: nativeui.EffectFailed, Message: "APNs registration timed out."},
 	} {
 		opened := showcaseCommand(t, nativeui.Command{Kind: "open", Connection: connection, Route: "/settings/push"})
 		if opened.Error != nil {
@@ -38,6 +40,12 @@ func TestPushSettings(t *testing.T) {
 		}
 		if outcome.Push != nil && outcome.Push.Token != "" && rows[1].Subtitle != outcome.Push.Token {
 			t.Fatal("token not displayed")
+		}
+		if rows[3].ID != "push-result" || !strings.HasPrefix(rows[3].Subtitle, string(outcome.Status)) || !strings.Contains(rows[3].Subtitle, outcome.Message) {
+			t.Fatal("outcome status or message not displayed separately")
+		}
+		if outcome.Push == nil && rows[0].Subtitle != "Not observed" {
+			t.Fatal("outcome status presented as permission")
 		}
 	}
 }

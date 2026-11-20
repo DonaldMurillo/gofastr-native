@@ -32,11 +32,15 @@ A default remote-notification tap with a validated local route in the top-level
 Foreground pushes with routes show banner and sound without navigating.
 Missing/invalid routes and non-default actions forward to the previous delegate.
 Routes remain subject to normal Go routing and authorization.
+Pending taps retry after the renderer resumes, once navigation is active again;
+this applies to both remote pushes and local reminders.
 
 For the Notes example, open Settings → Push notifications. Register for push
 and Push status display permission/token results in rows with accessibility IDs
 `native.row.push-permission`, `native.row.push-token`, and
-`native.row.push-environment`. Action IDs are `native.action.push-register`
+`native.row.push-environment`. A separate `native.row.push-result` row shows
+the operation status and any failure message, without treating it as permission.
+Action IDs are `native.action.push-register`
 and `native.action.push-status`. Build with:
 
 ```sh
@@ -65,8 +69,9 @@ Real APNs delivery on hardware: **NOT RUN**.
 Simulator verification on iOS 26.5: Notes installed and launched; permission
 authorization and no-prompt status displayed authorized/registered state with
 no observed token. A simulated remote payload displayed a banner. A foreground
-payload displayed a banner without navigating. Default-tap navigation was
-visually inconclusive. Token issuance, cold-launch taps, and hardware delivery
+payload displayed a banner without navigating. A warm default tap from the
+background opened push settings in the same process after renderer resume.
+Token issuance, cold-launch taps, and hardware delivery
 remain **NOT RUN**.
 
 ## Device service overview
