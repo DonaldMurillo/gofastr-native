@@ -34,8 +34,10 @@ Notes also exposes typed reminder scheduling/status/cancellation, rich note and
 attachment sharing, explicit clipboard writes, and private voice recordings.
 Android also opens a user-controlled calendar event editor through calendar/v1;
 closing it does not confirm saving. iOS and WebView report unavailable.
-Calendar launch and return were checked on an Android 14 emulator. Account
-sign-in blocked editor field and save acceptance; accessibility is NOT RUN.
+Etar 1.0.57 on an Android API 34 emulator displayed the expected calendar title
+and next-hour one-hour slot, saved to an offline calendar with matching provider
+values, and returned completed. Google Calendar required sign-in; its editor/save
+acceptance and accessibility acceptance are NOT RUN.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go

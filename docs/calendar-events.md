@@ -21,8 +21,10 @@ Results contain only status and an explanatory message, never calendar content.
 iOS and WebView advertise unavailable and return unsupported.
 
 The gallery Device tab and Notes editor include Add to calendar actions.
-Android 14 emulator acceptance verified launching the installed calendar app and
-returning a completed result on Back. The calendar app required account sign-in,
-and the calendar provider contained no calendars. Editor field values and saving
-an event were NOT RUN. Physical-device and accessibility acceptance are NOT RUN.
-SDK compilation does not establish those outcomes.
+Android API 34 emulator acceptance with Etar 1.0.57 verified the Gallery event
+title and a one-hour slot starting at the next full hour. Saving to an Etar
+offline calendar produced a calendar-provider row with the expected title and
+epoch-millisecond start/end values. Returning to Gallery showed completed.
+Google Calendar required account sign-in; its editor/save acceptance is NOT RUN.
+Physical-device and accessibility acceptance are NOT RUN. SDK compilation does
+not establish those outcomes.
