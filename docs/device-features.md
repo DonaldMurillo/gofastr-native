@@ -7,11 +7,19 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 
 | Feature | Go request | Android adapter | iOS adapter |
 | --- | --- | --- | --- |
+| In-app browser | `ServiceRequest.Browser` | Unavailable | SFSafariViewController (`browser/v1`) |
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
 
-The same Go-only demo runs on both platforms:
+The browser is a separate, user-initiated service in `device/browser`. It accepts
+only bounded absolute HTTP/HTTPS URLs without credentials. Reader mode and
+Done/Close/Cancel labels are optional; dismissal reports completed, not page-load
+success. Android and WebView do not fall back to opening an external browser.
+Try **About → Open docs** in the native Starter example. See the
+[UIKit service notes](../render/ios/docs/services.md#in-app-browser).
+
+The same Go-only share-in, storage and widgets demo runs on both platforms:
 
 ```powershell
 go run ./cmd/gofastr-native build --platform android-emu --renderer native --pkg ./examples/devicefeatures/featuresnative --receive-shares --secure-storage --biometric-usage 'Authenticate to use the demo secret.' --widgets --url-scheme gofastr-features --out dist/mobile/device-features

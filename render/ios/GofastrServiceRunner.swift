@@ -1,8 +1,9 @@
 import UIKit
 import UserNotifications
 import AVFoundation
+import SafariServices
 
-public final class GofastrServiceRunner: NSObject {
+public final class GofastrServiceRunner: NSObject, SFSafariViewControllerDelegate {
     private weak var presenter: UIViewController?
     private let openRoute: (String) -> Bool
     private let queue = DispatchQueue(label: "gofastr.native.services", qos: .userInitiated)
@@ -27,7 +28,7 @@ public final class GofastrServiceRunner: NSObject {
 
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
-        return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+        return ["browser/v1": "available", "notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
@@ -106,7 +107,27 @@ public final class GofastrServiceRunner: NSObject {
             return
         }
         if let share = request.share { performShare(share, token: token, presenter: presenter) }
+        else if let browser = request.browser { performBrowser(browser, presenter: presenter) }
         else if let audio = request.audio { performAudio(audio, token: token, presenter: presenter) }
+    }
+
+    private func performBrowser(_ request: MobileBrowserRequest, presenter: UIViewController) {
+        precondition(Thread.isMainThread)
+        guard let url = URL(string: request.url) else { return }
+        let configuration = SFSafariViewController.Configuration()
+        configuration.entersReaderIfAvailable = request.readerMode ?? false
+        let browser = SFSafariViewController(url: url, configuration: configuration)
+        browser.dismissButtonStyle = request.dismissLabel == "close" ? .close : request.dismissLabel == "cancel" ? .cancel : .done
+        browser.delegate = self
+        browser.view.accessibilityIdentifier = "gofastr.browser"
+        controller = browser
+        presenter.present(browser, animated: true)
+    }
+
+    public func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+        precondition(Thread.isMainThread)
+        guard self.controller === controller, let token = settlement.active else { return }
+        finish(token, MobileServiceResult(status: "completed"))
     }
 
     private func finishDictionary(_ token: UUID, _ value: [String: Any]) {

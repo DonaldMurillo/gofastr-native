@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/browser"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -27,6 +28,7 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "share", Share: &sharing.Request{Title: "Files", Text: "Share these", Files: []files.Document{file}}},
 			{ID: "reminder", Notification: &notifications.Request{Operation: notifications.Schedule, Identifier: "notes:1", Title: "Reminder", Route: "/notes/1", Date: "2027-03-14", Time: "03:30"}},
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
+			{ID: "browser", Browser: &browser.Request{URL: "https://example.com", ReaderMode: true, DismissLabel: "close"}},
 		},
 		"audio":  audio.Document{File: file, DurationMillis: 1},
 		"result": nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
@@ -138,6 +140,17 @@ enum ServiceChecks {
         for request in fixture.requests { try request.validate() }
         precondition(fixture.requests[0].commit == nil, "false commit is omitted by canonical Go JSON")
         precondition(fixture.requests[3].commit == true)
+        precondition(fixture.requests[4].browser?.readerMode == true)
+        for url in ["", "/relative", "file:///etc/passwd", "https://user@example.com", "https:///path", "https://example.com/\n", String(repeating: "x", count: 2049)] {
+            do {
+                try MobileBrowserRequest(url: url, readerMode: nil, dismissLabel: nil).validate()
+                preconditionFailure("invalid browser URL accepted")
+            } catch {}
+        }
+        do {
+            try MobileBrowserRequest(url: "https://example.com", readerMode: nil, dismissLabel: "other").validate()
+            preconditionFailure("invalid browser label accepted")
+        } catch {}
         precondition(fixture.reply.serviceId == "opaque-service" && fixture.reply.dataVersion == "epoch:2" && fixture.reply.changed == true)
         let roundTrip = try decoder.decode(MobileServiceResult.self, from: Data(fixture.result.json.utf8))
         precondition(roundTrip.file == fixture.audio.file && roundTrip.durationMillis == 1)

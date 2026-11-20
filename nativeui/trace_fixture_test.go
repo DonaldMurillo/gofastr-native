@@ -98,7 +98,7 @@ func allCapabilities() map[nativeui.Capability]nativeui.Support {
 	capabilities := map[nativeui.Capability]nativeui.Support{}
 	for _, capability := range []nativeui.Capability{nativeui.CapabilityNavigation, nativeui.CapabilityEditor, nativeui.CapabilityDrafts, nativeui.CapabilityShare,
 		nativeui.CapabilityHaptics, nativeui.CapabilitySheets, nativeui.CapabilityAnnouncement, nativeui.CapabilityPresentation, nativeui.CapabilityFiles,
-		nativeui.CapabilitySecureStorage, nativeui.CapabilityClipboard, nativeui.CapabilitySharing, nativeui.CapabilityLive} {
+		nativeui.CapabilitySecureStorage, nativeui.CapabilityClipboard, nativeui.CapabilitySharing, nativeui.CapabilityBrowser, nativeui.CapabilityLive} {
 		capabilities[capability] = nativeui.SupportAvailable
 	}
 	return capabilities

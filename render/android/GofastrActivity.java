@@ -91,6 +91,7 @@ public abstract class GofastrActivity extends Activity {
                 Map<String,String> caps = new LinkedHashMap<>();
                 for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
+                caps.put("browser/v1", "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");
