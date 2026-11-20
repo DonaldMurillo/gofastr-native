@@ -5,6 +5,11 @@ is left. Updated with the work; the dates are in the [implementation log](agent-
 
 ## External presentation prototype
 
+The iOS-only [maps component](../maps.md) adds retained MapKit maps, keyed pins,
+route-only callout navigation and purpose-gated when-in-use location. Go validation,
+Foundation decoding and simulator compilation are automated; physical location,
+permission UX and VoiceOver acceptance remain NOT RUN.
+
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop

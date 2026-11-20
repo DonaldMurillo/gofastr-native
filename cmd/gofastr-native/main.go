@@ -57,6 +57,7 @@ Flags (build, run):
   --camera-usage  camera purpose text (default: user-initiated photo capture;
                 empty disables native camera access)
   --microphone-usage  optional microphone purpose text; empty disables recording
+  --location-usage    optional iOS location purpose text; empty disables map location
   --url-scheme  optional application-specific deep-link scheme (native renderer)
   --receive-shares  accept shared text and files into the app's private inbox
   --secure-storage  enable Keychain/Keystore storage and authentication

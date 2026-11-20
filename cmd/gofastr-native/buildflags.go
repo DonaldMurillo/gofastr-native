@@ -17,6 +17,7 @@ type buildFlags struct {
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
+	locationUsage                                                   *string
 	appGroup, device, shot, existingApp, require                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
 	wait                                                            *time.Duration
@@ -35,6 +36,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		renderer:        fs.String("renderer", "webview", "webview or native (iOS/Android)"),
 		cameraUsage:     fs.String("camera-usage", defaultCameraUsage, "iOS camera purpose string; empty disables native camera"),
 		microphoneUsage: fs.String("microphone-usage", "", "iOS microphone purpose string; empty disables recording"),
+		locationUsage:   fs.String("location-usage", "", "iOS location purpose string; empty disables map location"),
 		urlScheme:       fs.String("url-scheme", "", "application-specific deep-link scheme (native renderer)"),
 		receiveShares:   fs.Bool("receive-shares", false, "enable the private incoming-share inbox"),
 		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
@@ -131,6 +133,10 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+	if err := validateUsage("location-usage", *f.locationUsage, "disables map location"); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
 	if *f.hostTemplate != "" {
 		resolved, err := filepath.Abs(*f.hostTemplate)
 		if err != nil {
@@ -166,6 +172,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.DebugTrace = *f.debugTrace
 	a.CameraUsage = strings.TrimSpace(*f.cameraUsage)
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
+	a.LocationUsage = strings.TrimSpace(*f.locationUsage)
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup

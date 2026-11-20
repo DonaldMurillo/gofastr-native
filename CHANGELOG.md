@@ -8,6 +8,11 @@ This repository holds two Go modules, tagged separately:
 
 ## Unreleased
 
+### Added
+
+- iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
+  optional user location, a gallery screen and `--location-usage` purpose text.
+
 ### Internal
 
 - De-duplicated production and test code with no intended behavior change:
