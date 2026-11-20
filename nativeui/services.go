@@ -9,6 +9,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -26,6 +27,7 @@ type ServiceRequest struct {
 	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
 	Widget        *widgets.Request       `json:"widget,omitempty"`
+	Scan          *scanner.Request       `json:"scan,omitempty"`
 	Commit        bool                   `json:"commit,omitempty"`
 }
 
@@ -40,6 +42,7 @@ type ServiceResult struct {
 	IncomingShare  *sharein.Item       `json:"incomingShare,omitempty"`
 	SecureStorage  *securestore.Result `json:"secureStorage,omitempty"`
 	Widget         *widgets.State      `json:"widget,omitempty"`
+	Scan           *scanner.Result     `json:"scan,omitempty"`
 }
 
 // ServiceRespond receives every validated outcome, including cancellation.
@@ -50,7 +53,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Scan != nil} {
 		if present {
 			operations++
 		}
@@ -59,6 +62,8 @@ func (request ServiceRequest) Validate() error {
 		return errors.New("nativeui: exactly one named device service is required")
 	}
 	switch {
+	case request.Scan != nil:
+		return request.Scan.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -78,6 +83,8 @@ func (request ServiceRequest) Validate() error {
 
 func (request ServiceRequest) capability() Capability {
 	switch {
+	case request.Scan != nil:
+		return CapabilityScanner
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -96,6 +103,9 @@ func (request ServiceRequest) capability() Capability {
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
+	if outcome.Scan != nil && (request.Scan == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unexpected scanner content")
+	}
 	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
@@ -112,6 +122,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	switch outcome.Status {
 	case EffectCompleted:
+		if request.Scan != nil {
+			if outcome.Scan == nil {
+				return errors.New("nativeui: scanner result is required")
+			}
+			if err := request.Scan.Accept(*outcome.Scan); err != nil {
+				return err
+			}
+		}
 		if request.IncomingShare != nil {
 			if err := request.IncomingShare.Accept(outcome.IncomingShare); err != nil {
 				return err

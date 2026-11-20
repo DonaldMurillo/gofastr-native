@@ -31,6 +31,7 @@ const (
 	CapabilityIncomingShares Capability = "incoming-shares/v1"
 	CapabilitySecureStorage  Capability = "secure-storage/v1"
 	CapabilityWidgets        Capability = "widgets/v1"
+	CapabilityScanner        Capability = "scanner/v1"
 	CapabilityPrivacy        Capability = "privacy/v1"
 )
 
@@ -105,7 +106,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityWidgets, CapabilityPrivacy:
+	case CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityWidgets, CapabilityScanner, CapabilityPrivacy:
 		return true
 	default:
 		return false
