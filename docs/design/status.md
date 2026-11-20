@@ -14,6 +14,15 @@ callout-to-detail navigation and a preauthorized simulated user-location annotat
 plus first-time when-in-use authorization across renderer suspension
 (four tests, zero failures). Physical-device gates remain.
 
+The typed `browser/v1` service opens SFSafariViewController in native iOS,
+with optional Reader mode and dismiss label. Starter includes About → Open docs
+and a returned-status screen. Android and WebView advertise unavailable.
+Go validation and Swift wire checks pass. The opt-in XCTest UI test passed three
+consecutive runs on iOS 26.5: it verifies Safari presentation, Done dismissal and
+the Go completed continuation screen. The test waits for hittable Safari chrome
+and taps the Done control's center coordinate. Physical-device and VoiceOver
+acceptance: NOT RUN.
+
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop

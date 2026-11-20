@@ -127,6 +127,37 @@ test('plain-browser reminders report unsupported without timers or notification 
   assert.equal(outcome.status, 'unsupported');
 });
 
+test('browser requests settle unsupported once and release foreground ownership with or without a host', async () => {
+  for (const hosted of [false, true]) {
+    for (const browser of [{ url: 'https://example.com' }, {}]) {
+      const outcomes = [];
+      const fixture = harness({ setup({ window }) {
+        if (hosted) window.__gofastrDeviceServices = {
+          async capabilities() { return { 'browser/v1': 'available' }; },
+          perform() { assert.fail('Unsupported browser must not invoke a host'); }
+        };
+      } });
+      assert.equal((await fixture.adapter.capabilities())['browser/v1'], 'unavailable');
+      const dialog = fixture.open(request('browser', browser), async value => outcomes.push(plain(value)));
+      assert.match(dialog.querySelector('[data-gfw-service-status]').textContent, /No page was opened/);
+      const perform = dialog.querySelector('[data-gfw-service-perform]');
+      assert.equal(perform.textContent, 'Continue');
+      perform.click(); perform.click(); await flush();
+      assert.equal(outcomes.length, 1);
+      assert.equal(outcomes[0].status, 'unsupported');
+      assert.match(outcomes[0].message, /No page was opened/);
+      assert.equal(fixture.window.__gofastr_foreground.has(), false);
+      assert.equal(fixture.adapter.has(), false);
+    }
+  }
+});
+
+test('browser requests reject mixed service kinds without claiming the foreground', () => {
+  const fixture = harness();
+  assert.throws(() => fixture.open({ id: 'mixed', browser: { url: 'https://example.com' }, clipboard: { text: 'copy' } }), /no new issued identity/);
+  assert.equal(fixture.window.__gofastr_foreground.has(), false);
+});
+
 test('clipboard is write-only, explicit, once, and preserves local editor text', async () => {
   const writes = [], outcomes = [];
   const fixture = harness({ setup({ context }) { context.navigator.clipboard = { async writeText(text) { writes.push(text); }, readText() { assert.fail('No clipboard reads'); } }; } });

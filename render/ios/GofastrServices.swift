@@ -4,6 +4,7 @@ struct MobileServiceRequest: Codable {
     let id: String
     let notification: MobileNotificationRequest?
     let share: MobileShareRequest?
+    var browser: MobileBrowserRequest? = nil
     let clipboard: MobileClipboardRequest?
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
@@ -15,18 +16,33 @@ struct MobileServiceRequest: Codable {
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil].filter({ $0 }).count == 1 else {
+              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
         try notification?.validate()
         try share?.validate()
+        try browser?.validate()
         if let clipboard, clipboard.text.utf8.count > MobileServiceBounds.maximumText || clipboard.text.contains("\0") { throw MobileServiceFailure.tooLarge }
         try audio?.validate()
         try incomingShare?.validate()
         try secureStorage?.validate()
         try location?.validate()
         try widget?.validate()
+    }
+}
+
+struct MobileBrowserRequest: Codable {
+    let url: String
+    let readerMode: Bool?
+    let dismissLabel: String?
+
+    func validate() throws {
+        guard url.utf8.count <= 2048,
+              !url.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) || CharacterSet.whitespacesAndNewlines.contains($0) }),
+              let parts = URLComponents(string: url), ["http", "https"].contains(parts.scheme ?? ""),
+              let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil,
+              parts.url != nil, ["", "done", "close", "cancel"].contains(dismissLabel ?? "") else { throw MobileServiceFailure.invalid }
     }
 }
 

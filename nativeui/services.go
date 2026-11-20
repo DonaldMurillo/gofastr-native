@@ -7,6 +7,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/browser"
 	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
@@ -20,6 +21,7 @@ import (
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
+	Browser       *browser.Request       `json:"browser,omitempty"`
 	Contacts      *contacts.Request      `json:"contacts,omitempty"`
 	ID            string                 `json:"id"`
 	Notification  *notifications.Request `json:"notification,omitempty"`
@@ -56,7 +58,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil} {
+	for _, present := range []bool{request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil} {
 		if present {
 			operations++
 		}
@@ -65,6 +67,8 @@ func (request ServiceRequest) Validate() error {
 		return errors.New("nativeui: exactly one named device service is required")
 	}
 	switch {
+	case request.Browser != nil:
+		return request.Browser.Validate()
 	case request.Contacts != nil:
 		return request.Contacts.Validate()
 	case request.Notification != nil:
@@ -88,6 +92,8 @@ func (request ServiceRequest) Validate() error {
 
 func (request ServiceRequest) capability() Capability {
 	switch {
+	case request.Browser != nil:
+		return CapabilityBrowser
 	case request.Contacts != nil:
 		return CapabilityContacts
 	case request.Notification != nil:
