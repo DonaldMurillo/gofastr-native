@@ -1,8 +1,12 @@
 import UIKit
+import Contacts
+import ContactsUI
 import UserNotifications
 import AVFoundation
+import SafariServices
 
-public final class GofastrServiceRunner: NSObject {
+public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSafariViewControllerDelegate {
+    private var contactsRequest: MobileContactsRequest?
     private weak var presenter: UIViewController?
     private let openRoute: (String) -> Bool
     private let queue = DispatchQueue(label: "gofastr.native.services", qos: .userInitiated)
@@ -15,6 +19,8 @@ public final class GofastrServiceRunner: NSObject {
     private var cancellingSchedule = false
     private let secureStorage = GofastrSecureStorage()
     private var secureStorageActive = false
+    private let location = GofastrLocation(isForeground: { UIApplication.shared.applicationState != .background })
+    private var locationActive = false
     private var durableServiceActive = false
     private var authentication: MobileAuthentication?
     private lazy var dismissalDelegate = MobileServiceDismissalDelegate { [weak self] in self?.cancel() }
@@ -28,8 +34,10 @@ public final class GofastrServiceRunner: NSObject {
 
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
-        return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+        return ["browser/v1": "available", "contacts/v1": "available", "notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+                "scanner/v1": MobileScannerController.available ? "available" : "unavailable",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
+                "location/v1": GofastrLocation.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
                 "sign-in-with-apple/v1": MobileAuthentication.appleEnabled ? "available" : "unavailable",
@@ -71,7 +79,9 @@ public final class GofastrServiceRunner: NSObject {
     public func cancel() {
         guard Thread.isMainThread else { DispatchQueue.main.async { self.cancel() }; return }
         guard let token = settlement.active else { return }
+        if let scanner = (controller as? UINavigationController)?.viewControllers.first as? MobileScannerController { scanner.cancel(); return }
         if secureStorageActive { secureStorage.cancel(); return }
+        if locationActive { location.cancel(); return }
         if let authentication { authentication.cancel(); return }
         if durableServiceActive { return }
         if scheduling { cancellingSchedule = true; return }
@@ -79,6 +89,14 @@ public final class GofastrServiceRunner: NSObject {
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if let locationRequest = request.location {
+            locationActive = true
+            location.perform(locationRequest) { [weak self] result in
+                self?.locationActive = false
+                self?.finish(token, result)
+            }
+            return
+        }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in
@@ -109,8 +127,19 @@ public final class GofastrServiceRunner: NSObject {
             finish(token, MobileServiceResult(status: "failed", message: "The service has no available foreground presenter."))
             return
         }
-        if let share = request.share { performShare(share, token: token, presenter: presenter) }
+        if let contacts = request.contacts { performContacts(contacts, token: token, presenter: presenter) }
+        else if let share = request.share { performShare(share, token: token, presenter: presenter) }
+        else if let browser = request.browser { performBrowser(browser, presenter: presenter) }
         else if let audio = request.audio { performAudio(audio, token: token, presenter: presenter) }
+        else if let scan = request.scan {
+            guard MobileScannerController.available else { finish(token, MobileServiceResult(status: "unsupported")); return }
+            let scanner = MobileScannerController(request: scan) { [weak self] result in self?.finish(token, result) }
+            let navigation = UINavigationController(rootViewController: scanner)
+            navigation.isModalInPresentation = true
+            controller = navigation
+            presenter.present(navigation, animated: true)
+            navigation.presentationController?.delegate = dismissalDelegate
+        }
         else if let signIn = request.authentication {
             let task = MobileAuthentication(anchor: window) { [weak self] result in
                 guard let self, self.settlement.active == token else { return }
@@ -122,6 +151,25 @@ public final class GofastrServiceRunner: NSObject {
         }
     }
 
+    private func performBrowser(_ request: MobileBrowserRequest, presenter: UIViewController) {
+        precondition(Thread.isMainThread)
+        guard let url = URL(string: request.url) else { return }
+        let configuration = SFSafariViewController.Configuration()
+        configuration.entersReaderIfAvailable = request.readerMode ?? false
+        let browser = SFSafariViewController(url: url, configuration: configuration)
+        browser.dismissButtonStyle = request.dismissLabel == "close" ? .close : request.dismissLabel == "cancel" ? .cancel : .done
+        browser.delegate = self
+        browser.view.accessibilityIdentifier = "gofastr.browser"
+        controller = browser
+        presenter.present(browser, animated: true)
+    }
+
+    public func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+        precondition(Thread.isMainThread)
+        guard self.controller === controller, let token = settlement.active else { return }
+        finish(token, MobileServiceResult(status: "completed"))
+    }
+
     private func finishDictionary(_ token: UUID, _ value: [String: Any]) {
         guard settlement.active == token else { return }
         durableServiceActive = false
@@ -130,6 +178,66 @@ public final class GofastrServiceRunner: NSObject {
             finish(token, MobileServiceResult(status: "failed")); return
         }
         finish(token, result)
+    }
+
+    private func performContacts(_ request: MobileContactsRequest, token: UUID, presenter: UIViewController) {
+        contactsRequest = request
+        let picker = CNContactPickerViewController()
+        let keys = ["phone": CNContactPhoneNumbersKey, "email": CNContactEmailAddressesKey, "postal": CNContactPostalAddressesKey, "organization": CNContactOrganizationNameKey]
+        picker.displayedPropertyKeys = (request.fields ?? []).compactMap { keys[$0] }
+        picker.delegate = self
+        controller = picker
+        presenter.present(picker, animated: true)
+        picker.presentationController?.delegate = dismissalDelegate
+    }
+
+    public override func responds(to selector: Selector!) -> Bool {
+        if selector == NSSelectorFromString("contactPicker:didSelectContacts:") {
+            return contactsRequest?.multiple == true
+        }
+        if selector == NSSelectorFromString("contactPicker:didSelectContact:") { return contactsRequest?.multiple != true }
+        return super.responds(to: selector)
+    }
+
+    public func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+        guard controller === picker else { return }
+        cancel()
+    }
+    public func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) { selectedContacts([contact], picker: picker) }
+    public func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) { selectedContacts(contacts, picker: picker) }
+
+    private func selectedContacts(_ contacts: [CNContact], picker: CNContactPickerViewController) {
+        guard controller === picker, let request = contactsRequest, let token = settlement.active else { return }
+        let fields = Set(request.fields ?? [])
+        func bounded(_ value: String, maximum: Int = 512, multiline: Bool = false) -> String {
+            var result = ""
+            for scalar in value.unicodeScalars {
+                if CharacterSet.controlCharacters.contains(scalar) && !(multiline && (scalar == "\n" || scalar == "\t")) { continue }
+                guard result.utf8.count + scalar.utf8.count <= maximum else { break }
+                result.unicodeScalars.append(scalar)
+            }
+            return result
+        }
+        let selection = MobileContactSelection(contacts: contacts.prefix(request.multiple ? 50 : 1).map { contact in
+            var value = MobileContact(id: bounded(contact.identifier), givenName: bounded(contact.givenName), familyName: bounded(contact.familyName))
+            if fields.contains("organization"), contact.isKeyAvailable(CNContactOrganizationNameKey) { value.organization = bounded(contact.organizationName) }
+            if fields.contains("phone"), contact.isKeyAvailable(CNContactPhoneNumbersKey) {
+                value.phones = contact.phoneNumbers.prefix(20).map { MobileContactLabeled(label: bounded(CNLabeledValue<NSString>.localizedString(forLabel: $0.label ?? "")), value: bounded($0.value.stringValue)) }
+            }
+            if fields.contains("email"), contact.isKeyAvailable(CNContactEmailAddressesKey) {
+                value.emails = contact.emailAddresses.prefix(20).map { MobileContactLabeled(label: bounded(CNLabeledValue<NSString>.localizedString(forLabel: $0.label ?? "")), value: bounded($0.value as String)) }
+            }
+            if fields.contains("postal"), contact.isKeyAvailable(CNContactPostalAddressesKey) {
+                value.postal = contact.postalAddresses.prefix(20).map { bounded(CNPostalAddressFormatter.string(from: $0.value, style: .mailingAddress), maximum: 2048, multiline: true) }
+            }
+            return value
+        })
+        do {
+            try request.accept(selection)
+            finish(token, MobileServiceResult(status: "completed", contacts: selection))
+        } catch {
+            finish(token, MobileServiceResult(status: "failed", message: "The contact selection is invalid."))
+        }
     }
 
     private func performShare(_ request: MobileShareRequest, token: UUID, presenter: UIViewController) {
@@ -290,11 +398,13 @@ public final class GofastrServiceRunner: NSObject {
         let authentication = authentication
         let recording = (presented as? UINavigationController)?.viewControllers.first as? MobileAudioRecorderController
         if Thread.isMainThread {
+            ((presented as? UINavigationController)?.viewControllers.first as? MobileScannerController)?.cancel()
             authentication?.cancel()
             recording?.shutdown()
             MobileForegroundDismissal.dismiss(presented) {}
         } else {
             DispatchQueue.main.async {
+                ((presented as? UINavigationController)?.viewControllers.first as? MobileScannerController)?.cancel()
                 authentication?.cancel()
                 recording?.shutdown()
                 MobileForegroundDismissal.dismiss(presented) {}

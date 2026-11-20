@@ -25,12 +25,16 @@ const (
 	CapabilityCamera          Capability = "camera/v1"
 	CapabilityNotifications   Capability = "notifications/v1"
 	CapabilitySharing         Capability = "sharing/v1"
+	CapabilityBrowser         Capability = "browser/v1"
 	CapabilityClipboard       Capability = "clipboard/v1"
 	CapabilityAudio           Capability = "audio/v1"
 	CapabilityLive            Capability = "live/v1"
 	CapabilityIncomingShares  Capability = "incoming-shares/v1"
 	CapabilitySecureStorage   Capability = "secure-storage/v1"
+	CapabilityLocation        Capability = "location/v1"
 	CapabilityWidgets         Capability = "widgets/v1"
+	CapabilityContacts        Capability = "contacts/v1"
+	CapabilityScanner         Capability = "scanner/v1"
 	CapabilityPrivacy         Capability = "privacy/v1"
 	CapabilitySignInWithApple Capability = "sign-in-with-apple/v1"
 	CapabilityOAuthWebLogin   Capability = "oauth-web-login/v1"
@@ -107,7 +111,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityWidgets, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
+	case CapabilityBrowser, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityContacts, CapabilityScanner, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false

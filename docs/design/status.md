@@ -5,6 +5,30 @@ is left. Updated with the work; the dates are in the [implementation log](agent-
 
 ## External presentation prototype
 
+The iOS-only [maps component](../maps.md) adds retained MapKit maps, keyed pins,
+route-only callout navigation and purpose-gated when-in-use location. Go validation,
+Foundation decoding and simulator compilation are automated; physical location,
+device permission UX and VoiceOver acceptance remain NOT RUN.
+Simulator XCUITest acceptance passed on iPhone 17/iOS 27.0: three labelled pins,
+callout-to-detail navigation and a preauthorized simulated user-location annotation
+plus first-time when-in-use authorization across renderer suspension
+(four tests, zero failures). Physical-device gates remain.
+
+The typed `browser/v1` service opens SFSafariViewController in native iOS,
+with optional Reader mode and dismiss label. Starter includes About → Open docs
+and a returned-status screen. Android and WebView advertise unavailable.
+Go validation and Swift wire checks pass. The opt-in XCTest UI test passed three
+consecutive runs on iOS 26.5: it verifies Safari presentation, Done dismissal and
+the Go completed continuation screen. The test waits for hittable Safari chrome
+and taps the Done control's center coordinate. Physical-device and VoiceOver
+acceptance: NOT RUN.
+
+The [typed barcode scanner](../scanner.md) adds `scanner/v1` to native iOS and a
+**Scan code** action to the device-features example. Simulator XCUITests cover
+the QR image/Vision fixture and cancellation through the real service wire.
+Hardware camera acceptance: **NOT RUN**; simulator checks do not establish
+physical barcode, permission, interruption or accessibility acceptance.
+
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop
@@ -56,6 +80,19 @@ mounted components, focus and scroll.
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
+
+[Location](../location.md) (`device/location`) defines typed permission, current-position and bounded
+foreground tracking requests, with `location/v1` protocol negotiation. Native
+CoreLocation support is opt-in through `--location --location-usage`, with
+when-in-use authorization only and no background updates. Swift wire and
+simulator SDK compilation checks cover the adapter. The device-features demo
+shows status, authorization and position results with stable accessibility IDs.
+`GOFASTR_IOS_UI=1 GOWORK=off go test -v -count=1 -timeout=20m ./internal/iosuitest`
+builds and installs the demo, boots a fresh simulator, grants when-in-use
+location, sets simulated coordinates and exercises all four actions through
+the UI. iOS 26.5 simulator acceptance passed, including visible coordinates
+for current position and duration-bounded tracking. First-use permission
+prompts, denial UI and physical-device checks are NOT RUN.
 
 The same example demonstrates native UIKit
 [Sign in with Apple and OAuth](../authentication.md). Android and WebView
@@ -189,3 +226,11 @@ Follow the [milestones and acceptance gates](mobile-roadmap.md#build-order-and-a
 The [component slice](mobile-components.md) implements the first controls,
 collection, tab, and swipe contracts; uncapped repository paging, richer sheets,
 and complete device/accessibility acceptance remain roadmap work.
+
+## Contact picker
+
+The iOS [contact picker](../contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.

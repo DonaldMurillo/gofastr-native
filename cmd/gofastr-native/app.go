@@ -74,6 +74,8 @@ type app struct {
 	ReceiveShares   bool
 	SecureStorage   bool
 	BiometricUsage  string
+	Location        bool
+	LocationUsage   string
 	Widgets         bool
 	SignInWithApple bool
 	AppGroup        string
