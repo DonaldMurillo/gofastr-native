@@ -15,8 +15,8 @@ or unsupported platforms.
 | --- | --- | --- |
 | `iap.Products` | `ProductIDs` (1–100 unique App Store IDs) | `Products` with localized names, descriptions and display prices; unknown product IDs can be absent |
 | `iap.Purchase` | `ProductID` | `PurchaseState` is `iap.Purchased` with a verified `Transaction`, or `iap.Pending` without one (for example, Ask to Buy) |
-| `iap.Entitlements` | None | `Transactions` from StoreKit current entitlements; excludes revoked, upgraded and consumable transactions |
-| `iap.Updates` | None | `Transactions` combining verified unfinished transactions and up to 100 recent verified StoreKit updates observed in this process |
+| `iap.Entitlements` | None | `Transactions` from StoreKit current entitlements; excludes revoked, upgraded and consumable transactions and requires a matching verified subscribed or grace-period status for auto-renewable subscriptions |
+| `iap.Updates` | None | `Transactions` combining verified unfinished transactions and up to 100 recent verified StoreKit updates observed in this process; excludes matching subscription transactions with unknown renewal state |
 | `iap.Finish` | `TransactionID` (decimal string) | Empty result; finishes a matching verified unfinished transaction, or does nothing if none remains |
 | `iap.SubscriptionStatus` | `ProductID` of an auto-renewable subscription | `Subscriptions` for the product's group, including renewal state, auto-renewal flag and verified transaction; the transaction may identify another tier |
 | `iap.Sync` | None | Empty result; asks the App Store to sync purchases, after which the app should re-read entitlements |
@@ -31,6 +31,9 @@ The native host listens to `Transaction.updates` at startup. `Updates` is a
 non-destructive snapshot, not a stream to Go. Poll when you need to reconcile
 access or delivery; observations can repeat. The recent cache is not persistent
 or a record of every App Store event. Unfinished transactions survive relaunch.
+Treat updates as reconciliation signals, not proof of access. An unknown
+subscription status is not an entitlement, including while Ask to Buy awaits
+approval in StoreKit testing.
 Deduplicate fulfillment by transaction ID, account for revocations/upgrades,
 and call `Finish` only **after** durably delivering the purchase. StoreKit
 verifies results on device; the API does not send signed receipts or replace

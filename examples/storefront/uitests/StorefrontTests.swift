@@ -35,6 +35,10 @@ final class StorefrontTests: XCTestCase {
 
         run("monthly", in: app, expecting: "Purchase pending.")
         let pending = try XCTUnwrap(session.allTransactions().first)
+        back(in: app)
+        run("entitlements", in: app, expecting: "Entitlements (0):")
+        back(in: app)
+        run("updates", in: app, expecting: "Updates (0):")
         try session.approveAskToBuyTransaction(identifier: pending.identifier)
         back(in: app)
         run("updates", in: app, expecting: "dev.gofastr.storefront.monthly")

@@ -66,6 +66,10 @@ final class GofastrStoreKit {
                 for await result in Transaction.currentEntitlements {
                     guard case .verified(let transaction) = result, transaction.revocationDate == nil,
                           !transaction.isUpgraded, transaction.productType != .consumable else { continue }
+                    if transaction.productType == .autoRenewable {
+                        guard let state = await Self.renewalState(of: transaction),
+                              state == .subscribed || state == .inGracePeriod else { continue }
+                    }
                     transactions.append(Self.wire(transaction))
                 }
                 return completed(MobileIAPResult(transactions: transactions))
@@ -75,7 +79,13 @@ final class GofastrStoreKit {
                     if case .verified(let transaction) = result { transactions[transaction.id] = transaction }
                 }
                 for transaction in recent { transactions[transaction.id] = transaction }
-                return completed(MobileIAPResult(transactions: transactions.values.sorted { $0.id < $1.id }.map(Self.wire)))
+                var updates: [MobileIAPTransaction] = []
+                for transaction in transactions.values.sorted(by: { $0.id < $1.id }) {
+                    if transaction.productType == .autoRenewable,
+                       let state = await Self.renewalState(of: transaction), Self.state(state) == "unknown" { continue }
+                    updates.append(Self.wire(transaction))
+                }
+                return completed(MobileIAPResult(transactions: updates))
             case .finish:
                 for await result in Transaction.unfinished {
                     if case .verified(let transaction) = result, String(transaction.id) == request.transactionId {
@@ -130,6 +140,14 @@ final class GofastrStoreKit {
 
     private static func timestamp(_ date: Date) -> Int64 {
         Int64(date.timeIntervalSince1970 * 1000)
+    }
+
+    private static func renewalState(of transaction: Transaction) async -> Product.SubscriptionInfo.RenewalState? {
+        guard let status = await transaction.subscriptionStatus,
+              case .verified(let current) = status.transaction, current.id == transaction.id,
+              current.productID == transaction.productID,
+              case .verified = status.renewalInfo else { return nil }
+        return status.state
     }
 
     private static func kind(_ type: Product.ProductType) -> String {
