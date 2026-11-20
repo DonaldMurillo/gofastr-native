@@ -95,6 +95,9 @@ func newApp() (*nativeui.App, error) {
 	}
 	respond := func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
 		message := "Device result: " + string(result.Status)
+		if result.Status != nativeui.EffectCompleted && result.Message != "" {
+			message += ". " + result.Message
+		}
 		if result.Status == nativeui.EffectCompleted {
 			switch {
 			case result.SecureStorage != nil:
