@@ -73,6 +73,8 @@ type app struct {
 	URLScheme       string
 	ReceiveShares   bool
 	SecureStorage   bool
+	Calendar        bool
+	CalendarUsage   string
 	BiometricUsage  string
 	Widgets         bool
 	AppGroup        string

@@ -1,5 +1,32 @@
 # UIKit device services and live collections
 
+## Calendar events
+
+The opt-in native build flag `--calendar` enables `calendar/v1`.
+`--calendar-usage` overrides the default purpose text used for
+`NSCalendarsFullAccessUsageDescription`,
+`NSCalendarsWriteOnlyAccessUsageDescription`, and legacy
+`NSCalendarsUsageDescription`. Disabled builds advertise unavailable;
+Android advertises unavailable and returns unsupported.
+
+`device/calendar.Request` supports status (no prompt), add, and read.
+On iOS 17+, add requests write-only access and read requests full access;
+older systems use legacy event access. Denied access returns a denied outcome.
+Adds save once to the default calendar for new events. EventKit work runs on
+a private serial queue. Cancellation before execution prevents a save; once
+execution starts the observed save outcome is returned, never replayed.
+
+Titles are required plain text, at most 200 UTF-8 bytes; locations are at most
+200 bytes and notes at most 2000 bytes without control characters. Dates use
+RFC3339 timestamps; end may equal start. Reads require an increasing range of
+at most 366 days and return at most 100 events (default 20). Invalid or oversized
+external records are omitted. Results carry event identifiers, never OS paths.
+Trace records contain capability/status metadata, not event content.
+
+Foundation executable wire checks and UIKit compilation cover the adapter.
+Simulator/hardware permission, save, read, lifecycle, and accessibility
+acceptance: NOT RUN.
+
 Implementation notes, November 5, 2026. These are library/protocol verification
 notes, not real microphone, notification, or share-provider acceptance results.
 The frozen cross-worker contract is `../../../docs/mobile-services-plan.md`.

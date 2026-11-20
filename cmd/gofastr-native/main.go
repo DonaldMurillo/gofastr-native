@@ -59,6 +59,7 @@ Flags (build, run):
   --microphone-usage  optional microphone purpose text; empty disables recording
   --url-scheme  optional application-specific deep-link scheme (native renderer)
   --receive-shares  accept shared text and files into the app's private inbox
+  --calendar        enable iOS calendar events (--calendar-usage sets purpose text)
   --secure-storage  enable Keychain/Keystore storage and authentication
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
   --widgets     package a home-screen widget; requires --url-scheme

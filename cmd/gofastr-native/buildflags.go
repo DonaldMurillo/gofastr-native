@@ -13,7 +13,9 @@ import (
 // buildFlags is the one parser for the flags doctor, build, run, and dev
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
-	fs *flag.FlagSet
+	fs            *flag.FlagSet
+	calendar      *bool
+	calendarUsage *string
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
@@ -25,6 +27,8 @@ type buildFlags struct {
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:              fs,
+		calendar:        fs.Bool("calendar", false, "enable iOS calendar events"),
+		calendarUsage:   fs.String("calendar-usage", "Add and read calendar events you choose.", "calendar permission purpose text"),
 		platform:        fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
 		pkg:             fs.String("pkg", "", "bind package"),
 		id:              fs.String("id", "", "bundle / application id"),
@@ -160,6 +164,10 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2
+	}
+	a.Calendar = *f.calendar
+	if a.Calendar {
+		a.CalendarUsage = strings.TrimSpace(*f.calendarUsage)
 	}
 	a.HostTemplate = *f.hostTemplate
 	a.Renderer = *f.renderer

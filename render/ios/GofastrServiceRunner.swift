@@ -13,6 +13,8 @@ public final class GofastrServiceRunner: NSObject {
     private var dismissing = false
     private var scheduling = false
     private var cancellingSchedule = false
+    private let calendar = GofastrCalendar()
+    private var calendarActive = false
     private let secureStorage = GofastrSecureStorage()
     private var secureStorageActive = false
     private var durableServiceActive = false
@@ -28,6 +30,7 @@ public final class GofastrServiceRunner: NSObject {
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
         return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+                "calendar/v1": GofastrCalendar.enabled ? "available" : "unavailable",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
@@ -68,6 +71,7 @@ public final class GofastrServiceRunner: NSObject {
     public func cancel() {
         guard Thread.isMainThread else { DispatchQueue.main.async { self.cancel() }; return }
         guard let token = settlement.active else { return }
+        if calendarActive { calendar.cancel(); return }
         if secureStorageActive { secureStorage.cancel(); return }
         if durableServiceActive { return }
         if scheduling { cancellingSchedule = true; return }
@@ -75,6 +79,14 @@ public final class GofastrServiceRunner: NSObject {
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if let request = request.calendar {
+            calendarActive = true
+            calendar.perform(request) { [weak self] result in
+                self?.calendarActive = false
+                self?.finish(token, result)
+            }
+            return
+        }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in
