@@ -24,8 +24,12 @@ external records are omitted. Results carry event identifiers, never OS paths.
 Trace records contain capability/status metadata, not event content.
 
 Foundation executable wire checks and UIKit compilation cover the adapter.
-Simulator/hardware permission, save, read, lifecycle, and accessibility
-acceptance: NOT RUN.
+The opt-in `scripts/ios_calendar_smoke.py` XCUITest installs the device-features
+example, grants calendar access with simctl, adds a sample event, verifies full
+authorization, and reads the event title/start back on screen. This passed on
+an iPhone 17 simulator with iOS 26.5. The read-result screenshot showed
+`GoFastr sample event` followed by its RFC3339 start timestamp.
+Permission-prompt, hardware, lifecycle, and accessibility acceptance: NOT RUN.
 
 Implementation notes, November 5, 2026. These are library/protocol verification
 notes, not real microphone, notification, or share-provider acceptance results.

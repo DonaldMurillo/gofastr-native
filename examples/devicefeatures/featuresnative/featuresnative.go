@@ -6,8 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -95,6 +98,8 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Calendar != nil:
+				message = calendarMessage(*result.Calendar)
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -128,6 +133,7 @@ func newApp() (*nativeui.App, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
+			{ID: "calendar", Title: "Calendar events", Destination: "/features/calendar"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 		}}}, nil
 	}},
@@ -151,6 +157,21 @@ func newApp() (*nativeui.App, error) {
 			"status": secure(securestore.Status, ""), "put": secure(securestore.Put, securestore.Device), "get": secure(securestore.Get, securestore.Device), "delete": secure(securestore.Delete, securestore.Device),
 			"biometric-put": secure(securestore.Put, securestore.Biometric), "biometric-get": secure(securestore.Get, securestore.Biometric), "biometric-delete": secure(securestore.Delete, securestore.Biometric), "authenticate": secure(securestore.Authenticate, securestore.Biometric),
 		}),
+		deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar.", []nativeui.Action{
+			{ID: "calendar-add", Label: "Add sample event", Primary: true},
+			{ID: "calendar-status", Label: "Calendar status"},
+			{ID: "calendar-read", Label: "Read next 7 days"},
+		}, map[string]nativeui.Handle{
+			"calendar-status": service(nativeui.ServiceRequest{Calendar: &calendar.Request{Operation: calendar.Status}}),
+			"calendar-add": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				start := time.Now().AddDate(0, 0, 1).Truncate(time.Minute)
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Add, Event: &calendar.Event{Title: "GoFastr sample event", Start: start, End: start.Add(time.Hour)}}}}, nil
+			},
+			"calendar-read": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				now := time.Now()
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Read, From: now, To: now.AddDate(0, 0, 7), Limit: calendar.MaxLimit}}}, nil
+			},
+		}),
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
@@ -167,4 +188,21 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+func calendarMessage(result calendar.Result) string {
+	if result.Authorization != "" {
+		return "Calendar authorization: " + result.Authorization
+	}
+	if result.Identifier != "" {
+		return "Sample event added."
+	}
+	if len(result.Events) == 0 {
+		return "No calendar events in the next 7 days."
+	}
+	lines := make([]string, 0, len(result.Events))
+	for _, event := range result.Events {
+		lines = append(lines, event.Title+" — "+event.Start.Format(time.RFC3339))
+	}
+	return strings.Join(lines, "\n")
 }
