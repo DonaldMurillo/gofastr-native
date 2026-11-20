@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
 
     private WebView web;
     private volatile boolean destroyed;
-    private final java.util.List<WebMessagePort> bridgePorts = new java.util.ArrayList<>();
+    private WebMessagePort bridgePort;
     private ValueCallback<Uri[]> fileChoice;
 {{if or .WebViewCamera .WebViewMicrophone .WebViewGeolocation}}    // At most one page request of each kind waits for the Android dialog.
     private PermissionRequest mediaRequest;
@@ -112,8 +112,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         destroyed = true;
-        for (WebMessagePort port : bridgePorts) port.close();
-        bridgePorts.clear();
+        if (bridgePort != null) { bridgePort.close(); bridgePort = null; }
         if (fileChoice != null) { fileChoice.onReceiveValue(null); fileChoice = null; }
         bridgeThreads.shutdownNow();
         try {
@@ -256,7 +255,8 @@ public final class MainActivity extends Activity {
             }
             WebMessagePort[] ports = view.createWebMessageChannel();
             final WebMessagePort mine = ports[0];
-            bridgePorts.add(mine);
+            if (bridgePort != null) bridgePort.close();
+            bridgePort = mine;
             mine.setWebMessageCallback(new WebMessagePort.WebMessageCallback() {
                 @Override
                 public void onMessage(WebMessagePort port, WebMessage message) {
@@ -271,7 +271,7 @@ public final class MainActivity extends Activity {
                             String reply = {{.JavaClass}}.bridge(msg);
                             if (destroyed) return;
                             runOnUiThread(() -> {
-                                if (!destroyed) mine.postMessage(new WebMessage(answer(reply)));
+                                if (!destroyed && bridgePort == mine) mine.postMessage(new WebMessage(answer(reply)));
                             });
                         });
                     } catch (RejectedExecutionException e) {
