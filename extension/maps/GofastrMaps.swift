@@ -62,9 +62,33 @@ final class GofastrVisibleMap: MKMapView {
     override func didMoveToWindow() { super.didMoveToWindow(); visibilityChanged?() }
 }
 
-final class GofastrMapView: NSObject, MobileComponentExtensionView, MKMapViewDelegate, CLLocationManagerDelegate {
+final class GofastrMapAuthorization: NSObject, CLLocationManagerDelegate {
+    static let shared = GofastrMapAuthorization()
+    private let manager = CLLocationManager()
+    private let views = NSHashTable<GofastrMapView>.weakObjects()
+
+    private override init() {
+        super.init()
+        manager.delegate = self
+    }
+
+    var status: CLAuthorizationStatus { manager.authorizationStatus }
+
+    func observe(_ view: GofastrMapView) { views.add(view) }
+    func remove(_ view: GofastrMapView) { views.remove(view) }
+
+    func request() {
+        precondition(Thread.isMainThread)
+        if status == .notDetermined { manager.requestWhenInUseAuthorization() }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        for view in views.allObjects { view.updateLocation() }
+    }
+}
+
+final class GofastrMapView: NSObject, MobileComponentExtensionView, MKMapViewDelegate {
     private let map = GofastrVisibleMap()
-    private let location = CLLocationManager()
     private var annotations: [String: GofastrMapAnnotation] = [:]
     private var generation = UUID()
     private var emit: ((String) -> Void)?
@@ -77,7 +101,7 @@ final class GofastrMapView: NSObject, MobileComponentExtensionView, MKMapViewDel
         map.accessibilityIdentifier = "native.map"
         map.heightAnchor.constraint(equalToConstant: 360).isActive = true
         map.delegate = self
-        location.delegate = self
+        GofastrMapAuthorization.shared.observe(self)
         map.visibilityChanged = { [weak self] in self?.updateLocation() }
         try update(payload: payload, emit: emit)
     }
@@ -110,15 +134,14 @@ final class GofastrMapView: NSObject, MobileComponentExtensionView, MKMapViewDel
         updateLocation()
     }
 
-    private func updateLocation() {
+    fileprivate func updateLocation() {
         precondition(Thread.isMainThread)
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSLocationWhenInUseUsageDescription") as? String ?? ""
         let enabled = !disposed && wantsLocation && map.window != nil && !purpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if enabled && location.authorizationStatus == .notDetermined { location.requestWhenInUseAuthorization() }
-        map.showsUserLocation = enabled && (location.authorizationStatus == .authorizedWhenInUse || location.authorizationStatus == .authorizedAlways)
+        let authorization = GofastrMapAuthorization.shared
+        if enabled { authorization.request() }
+        map.showsUserLocation = enabled && (authorization.status == .authorizedWhenInUse || authorization.status == .authorizedAlways)
     }
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { updateLocation() }
 
     private func configure(_ marker: MKAnnotationView, _ annotation: GofastrMapAnnotation) {
         marker.accessibilityIdentifier = "native.map.pin.\(annotation.id)"
@@ -149,8 +172,7 @@ final class GofastrMapView: NSObject, MobileComponentExtensionView, MKMapViewDel
         map.visibilityChanged = nil
         map.delegate = nil
         map.showsUserLocation = false
-        location.stopUpdatingLocation()
-        location.delegate = nil
+        GofastrMapAuthorization.shared.remove(self)
         map.removeAnnotations(Array(annotations.values))
         annotations.removeAll()
     }

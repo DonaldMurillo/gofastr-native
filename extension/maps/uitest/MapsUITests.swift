@@ -7,6 +7,10 @@ final class MapsUITests: XCTestCase {
         continueAfterFailure = false
         app.terminate()
         app.launch()
+        openMap()
+    }
+
+    private func openMap(waitForMap: Bool = true) {
         let controls = app.buttons["native.tab.controls"]
         XCTAssertTrue(controls.waitForExistence(timeout: 15))
         controls.tap()
@@ -18,11 +22,28 @@ final class MapsUITests: XCTestCase {
         let row = app.staticTexts["Map"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["native.map"].firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        if waitForMap {
+            XCTAssertTrue(app.descendants(matching: .any)["native.map"].firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        }
     }
 
     private func pin(_ id: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: "native.map.pin.\(id)").firstMatch
+    }
+
+    func testFirstAuthorizationSurvivesSuspension() {
+        app.navigationBars.buttons["BackButton"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Form fields"].waitForExistence(timeout: 10))
+        app.terminate()
+        app.resetAuthorizationStatus(for: .location)
+        app.launch()
+        openMap(waitForMap: false)
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow While Using App"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 15))
+        allow.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["native.map"].firstMatch.waitForExistence(timeout: 15))
+        let user = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", "My Location")).firstMatch
+        XCTAssertTrue(user.waitForExistence(timeout: 30), app.debugDescription)
     }
 
     func testPinsAndLabels() {
