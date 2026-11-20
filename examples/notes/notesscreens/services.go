@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -34,6 +36,17 @@ func authorizeNote(ctx context.Context, service *notes.Service, request nativeui
 	}
 	_, err := service.Get(ctx, request.Params["id"])
 	return presentationError(err)
+}
+
+func requestCalendarEvent(service *notes.Service) nativeui.Handle {
+	return func(ctx context.Context, request nativeui.Request) (nativeui.Result, error) {
+		if err := authorizeNote(ctx, service, request); err != nil {
+			return nativeui.Result{}, err
+		}
+		start := time.Now().Truncate(time.Hour).Add(time.Hour)
+		event := calendar.New("Notes event", start, start.Add(time.Hour))
+		return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "calendar", CalendarEvent: &event}}, nil
+	}
 }
 
 func requestNoteShare(service *notes.Service, clipboard bool) nativeui.Handle {
@@ -113,6 +126,8 @@ func serviceOutcome(kind string, outcome nativeui.ServiceResult) nativeui.Result
 		switch kind {
 		case "share":
 			message = "Share sheet finished. Recipient delivery is not confirmed."
+		case "calendar":
+			message = "Calendar editor closed. Saving is not confirmed."
 		case "copy":
 			message = "Device reports text copied."
 		case "reminder-schedule":
@@ -139,7 +154,7 @@ func serviceOutcome(kind string, outcome nativeui.ServiceResult) nativeui.Result
 
 func editorServices(service *notes.Service, store *files.Store) map[string]nativeui.ServiceRespond {
 	responders := make(map[string]nativeui.ServiceRespond)
-	for _, identifier := range []string{"share", "copy", "reminder-schedule", "reminder-cancel", "reminder-status"} {
+	for _, identifier := range []string{"calendar", "share", "copy", "reminder-schedule", "reminder-cancel", "reminder-status"} {
 		responders[identifier] = func(ctx context.Context, request nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
 			if err := authorizeNote(ctx, service, request); err != nil {
 				return nativeui.Result{}, err

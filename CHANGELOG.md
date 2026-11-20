@@ -8,6 +8,12 @@ This repository holds two Go modules, tagged separately:
 
 ## Unreleased
 
+### Added
+
+- Bounded calendar event editor requests through `device/calendar` and
+  `calendar/v1`, with Android calendar intents and gallery/Notes actions.
+  Closing the editor does not confirm saving. iOS and WebView report unavailable.
+
 ### Internal
 
 - De-duplicated production and test code with no intended behavior change:

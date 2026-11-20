@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -34,11 +35,45 @@ func serviceCommand(t *testing.T, ctx context.Context, runtime *Runtime, command
 	return reply
 }
 
+func TestCalendarServiceValidationAndContent(t *testing.T) {
+	event := calendar.Event{Title: "Event", Start: 1000, End: 2000}
+	request := ServiceRequest{ID: "calendar", CalendarEvent: &event}
+	if err := request.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if request.capability() != CapabilityCalendar {
+		t.Fatal("wrong capability")
+	}
+	for _, status := range []EffectStatus{EffectCompleted, EffectCancelled, EffectUnsupported, EffectFailed} {
+		if err := request.accept(ServiceResult{Status: status}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, result := range []ServiceResult{
+		{Status: EffectDenied}, {Status: EffectCompleted, Permission: "authorized"},
+		{Status: EffectCompleted, File: &files.Document{}}, {Status: EffectCompleted, DurationMillis: 1},
+		{Status: EffectCompleted, Identifier: "event"},
+	} {
+		if request.accept(result) == nil {
+			t.Fatal("calendar content accepted", result)
+		}
+	}
+	request.Clipboard = &sharing.Clipboard{}
+	if request.Validate() == nil {
+		t.Fatal("competing operation accepted")
+	}
+	request.Clipboard = nil
+	event.Title = ""
+	if request.Validate() == nil {
+		t.Fatal("empty event accepted")
+	}
+}
+
 func serviceConnection(t *testing.T, runtime *Runtime) string {
 	t.Helper()
 	reply := serviceCommand(t, context.Background(), runtime, Command{Kind: "hello", Hello: &Hello{Minimum: 1, Maximum: 1, Renderer: "webview", Capabilities: map[Capability]Support{
 		CapabilityNavigation: SupportAvailable, CapabilityEditor: SupportAvailable, CapabilityNotifications: SupportUnavailable,
-		CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
+		CapabilityCalendar: SupportAvailable, CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
 		CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback,
 	}}})
 	if reply.Error != nil {
@@ -87,6 +122,7 @@ func admitService(t *testing.T, runtime *Runtime, command Command) Reply {
 
 func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 	definitions := map[string]ServiceRequest{
+		"calendar":  {ID: "device", CalendarEvent: &calendar.Event{Title: "Event", Start: 1000, End: 2000}},
 		"schedule":  {ID: "device", Notification: &notifications.Request{Operation: "schedule", Identifier: "notes:1", Title: "Remember", Route: "/device", Date: "2028-02-29", Time: "10:00"}},
 		"cancel":    {ID: "device", Notification: &notifications.Request{Operation: "cancel", Identifier: "notes:1"}},
 		"status":    {ID: "device", Notification: &notifications.Request{Operation: "status", Identifier: "notes:1"}},
@@ -96,6 +132,9 @@ func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 	}
 	for name, definition := range definitions {
 		for _, status := range []EffectStatus{EffectCompleted, EffectCancelled, EffectDenied, EffectUnsupported, EffectFailed} {
+			if name == "calendar" && status == EffectDenied {
+				continue
+			}
 			t.Run(name+"/"+string(status), func(t *testing.T) {
 				var calls atomic.Int32
 				runtime, command := serviceFixture(t, &definition, func(_ context.Context, request Request, outcome ServiceResult) (Result, error) {

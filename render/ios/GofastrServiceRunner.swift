@@ -27,7 +27,7 @@ public final class GofastrServiceRunner: NSObject {
 
     public static func capabilities() -> [String: String] {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
-        return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
+        return ["calendar/v1": "unavailable", "notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
@@ -75,6 +75,7 @@ public final class GofastrServiceRunner: NSObject {
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if request.calendarEvent != nil { finish(token, MobileServiceResult(status: "unsupported", message: "Calendar editing is unavailable.")); return }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in

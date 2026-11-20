@@ -30,6 +30,7 @@
   };
   const fallbackCapabilities = () => ({
     'notifications/v1': 'unavailable',
+    'calendar/v1': 'unavailable',
     'sharing/v1': typeof navigator.share === 'function' || typeof Blob === 'function' && typeof atob === 'function' && typeof URL.createObjectURL === 'function' ? 'fallback' : 'unavailable',
     'clipboard/v1': window.isSecureContext && typeof navigator.clipboard?.writeText === 'function' ? 'fallback' : 'unavailable',
     'audio/v1': audioType() ? 'fallback' : 'unavailable',
@@ -42,14 +43,14 @@
     let timer;
     try { facts = await Promise.race([host.capabilities(), new Promise(resolve => { timer = setTimeout(resolve, 2000); })]); } catch (_) {}
     finally { clearTimeout(timer); }
-    const result = { 'live/v1': 'available' };
+    const result = { 'live/v1': 'available', 'calendar/v1': 'unavailable' };
     for (const capability of ['notifications/v1', 'sharing/v1', 'clipboard/v1', 'audio/v1']) {
       result[capability] = ['available', 'fallback', 'unavailable'].includes(facts?.[capability]) ? facts[capability] : 'unavailable';
     }
     return result;
   })();
   const kindOf = request => {
-    const kinds = ['notification', 'share', 'clipboard', 'audio'].filter(key => request?.[key] != null);
+    const kinds = ['calendarEvent', 'notification', 'share', 'clipboard', 'audio'].filter(key => request?.[key] != null);
     return kinds.length === 1 ? kinds[0] : '';
   };
   const bytesOf = file => {
@@ -321,7 +322,10 @@
     view.actions = element('div', '', { class: 'gfw-service-actions' });
     dialog.append(heading, view.feedback, view.actions);
     try {
-      if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
+      if (kind === 'calendarEvent') {
+        feedback(view, 'Calendar editing is unavailable.');
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Calendar editing is unavailable.' }));
+      } else if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
       else if (kind === 'notification') {
         feedback(view, 'Scheduled reminders are unavailable in a plain browser. No timer or notification was created.');
         button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Scheduled reminders require a native device host. No reminder was scheduled.' }));

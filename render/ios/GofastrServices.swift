@@ -4,6 +4,7 @@ struct MobileServiceRequest: Codable {
     let id: String
     let notification: MobileNotificationRequest?
     let share: MobileShareRequest?
+    var calendarEvent: MobileCalendarEvent? = nil
     let clipboard: MobileClipboardRequest?
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
@@ -13,7 +14,7 @@ struct MobileServiceRequest: Codable {
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
+              [calendarEvent != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try notification?.validate()
@@ -24,6 +25,12 @@ struct MobileServiceRequest: Codable {
         try secureStorage?.validate()
         try widget?.validate()
     }
+}
+
+struct MobileCalendarEvent: Codable {
+    let title: String
+    let startMillis: Int64
+    let endMillis: Int64
 }
 
 enum MobileServiceBounds {

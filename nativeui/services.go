@@ -7,6 +7,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -26,6 +27,7 @@ type ServiceRequest struct {
 	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
 	Widget        *widgets.Request       `json:"widget,omitempty"`
+	CalendarEvent *calendar.Event        `json:"calendarEvent,omitempty"`
 	Commit        bool                   `json:"commit,omitempty"`
 }
 
@@ -50,7 +52,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.CalendarEvent != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
 		if present {
 			operations++
 		}
@@ -59,6 +61,8 @@ func (request ServiceRequest) Validate() error {
 		return errors.New("nativeui: exactly one named device service is required")
 	}
 	switch {
+	case request.CalendarEvent != nil:
+		return request.CalendarEvent.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -78,6 +82,8 @@ func (request ServiceRequest) Validate() error {
 
 func (request ServiceRequest) capability() Capability {
 	switch {
+	case request.CalendarEvent != nil:
+		return CapabilityCalendar
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -96,6 +102,9 @@ func (request ServiceRequest) capability() Capability {
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
+	if request.CalendarEvent != nil && (outcome.Status == EffectDenied || outcome.Permission != "" || outcome.Identifier != "" || outcome.File != nil || outcome.DurationMillis != 0 || outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil) {
+		return errors.New("nativeui: calendar outcome cannot contain device content or permission")
+	}
 	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}

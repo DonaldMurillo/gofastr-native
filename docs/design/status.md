@@ -32,6 +32,10 @@ renderers share the same Go [image preview definitions](../image-previews.md).
 
 Notes also exposes typed reminder scheduling/status/cancellation, rich note and
 attachment sharing, explicit clipboard writes, and private voice recordings.
+Android also opens a user-controlled calendar event editor through calendar/v1;
+closing it does not confirm saving. iOS and WebView report unavailable.
+Calendar launch and return were checked on an Android 14 emulator. Account
+sign-in blocked editor field and save acceptance; accessibility is NOT RUN.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go

@@ -8,6 +8,7 @@ import android.database.Cursor;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.CalendarContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Base64;
@@ -35,7 +36,7 @@ public final class Services {
     private int maximumDuration,maximumBytes;
     private boolean recordingFinishing,disposed;
     private boolean fileTask;
-    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406;
+    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406, CALENDAR=407;
     Services(GofastrActivity host){this.host=host;this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
@@ -95,12 +96,39 @@ public final class Services {
             intent.setClipData(ClipData.newRawUri("Photo",uri));picked=callback;activityCode=CAMERA;host.startActivityForResult(intent,CAMERA);
         }catch(Exception e){failed(e);}
     }
+    private static boolean calendarText(String text,int maximum,boolean plain) {
+        if(text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>maximum)return false;
+        for(int i=0;i<text.length();) {
+            int point=text.codePointAt(i);i+=Character.charCount(point);
+            if(point==0 || plain && Character.isISOControl(point) || point>=0xd800 && point<=0xdfff)return false;
+        }
+        return true;
+    }
+    private void calendarEvent(JSONObject event) throws Exception {
+        String title=event.getString("title"),location=event.optString("location"),notes=event.optString("notes");
+        long start=event.getLong("startMillis"),end=event.getLong("endMillis");
+        boolean allDay=event.getBoolean("allDay");
+        if(title.isEmpty() || !calendarText(title,200,true) || !calendarText(location,200,true) || !calendarText(notes,4096,false) ||
+           start==0 || start==-62135596800000L || end<=start || (start<=Long.MAX_VALUE-31622400000L && end>start+31622400000L)) {
+            throw new IllegalArgumentException("Invalid calendar event");
+        }
+        if(allDay && (start%86400000L!=0 || end%86400000L!=0))throw new IllegalArgumentException("Invalid all-day boundaries");
+        Intent intent=new Intent(Intent.ACTION_INSERT,CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,start).putExtra(CalendarContract.EXTRA_EVENT_END_TIME,end)
+            .putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY,allDay).putExtra(CalendarContract.Events.TITLE,title)
+            .putExtra(CalendarContract.Events.EVENT_LOCATION,location).putExtra(CalendarContract.Events.DESCRIPTION,notes);
+        activityCode=CALENDAR;
+        try{host.startActivityForResult(intent,CALENDAR);}
+        catch(ActivityNotFoundException e){finish(outcome("unsupported","No calendar app is installed."));}
+        catch(SecurityException e){finish(outcome("failed","The calendar editor could not be opened."));}
+    }
     public void releaseCapture(){if(cameraFile!=null){host.revokeUriPermission(TransferProvider.uri(host,cameraFile),Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);TransferProvider.remove(cameraFile);cameraFile=null;}}
     public void shareText(String text,Consumer<JSONObject> callback){run(JSON.object("share",JSON.object("text",text)),callback);}
     public void run(JSONObject request,Consumer<JSONObject> callback) {
         if(!begin(callback))return;
         try {
-            if(request.has("clipboard")) {
+            if(request.has("calendarEvent")) calendarEvent(request.getJSONObject("calendarEvent"));
+            else if(request.has("clipboard")) {
                 ClipboardManager clipboard=(ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(ClipData.newPlainText("",request.getJSONObject("clipboard").optString("text")));finish(outcome("completed","Copied to clipboard."));
             }else if(request.has("share")) share(request.getJSONObject("share"));
@@ -201,6 +229,7 @@ public final class Services {
     void dispose(){disposed=true;secureStorage.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
+        if(code==CALENDAR){finish(outcome("completed","Calendar editor closed. Android does not confirm the event was saved."));return;}
         if(code==SHARE){finish(outcome(status==Activity.RESULT_OK?"completed":"cancelled","Share sheet closed. Android does not confirm delivery."));return;}
         Consumer<Uri> callback=picked;picked=null;activityCode=0;
         if(status!=Activity.RESULT_OK){releaseCapture();finish(JSON.object("status","cancelled"));return;}
