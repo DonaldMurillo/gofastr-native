@@ -78,6 +78,7 @@ func Dispatch(route, action, values string) (string, error) {
 func newApp() (*nativeui.App, error) {
 	var mu sync.Mutex
 	var observedID string
+	finished := make(map[string]bool)
 	operations := []struct {
 		path, title, action, text string
 		request                   iap.Request
@@ -136,7 +137,9 @@ func newApp() (*nativeui.App, error) {
 					message = "Purchase pending."
 					if result.Transaction != nil {
 						mu.Lock()
-						observedID = result.Transaction.ID
+						if !finished[result.Transaction.ID] {
+							observedID = result.Transaction.ID
+						}
 						mu.Unlock()
 						message = "Purchased: " + result.Transaction.ProductID
 					}
@@ -144,11 +147,14 @@ func newApp() (*nativeui.App, error) {
 					label := "Entitlements"
 					if request.Service.IAP.Operation == iap.Updates {
 						label = "Updates"
-						if n := len(result.Transactions); n != 0 {
-							mu.Lock()
-							observedID = result.Transactions[n-1].ID
-							mu.Unlock()
+						mu.Lock()
+						for i := len(result.Transactions) - 1; i >= 0; i-- {
+							if id := result.Transactions[i].ID; !finished[id] {
+								observedID = id
+								break
+							}
 						}
+						mu.Unlock()
 					}
 					var products []string
 					for _, transaction := range result.Transactions {
@@ -162,6 +168,13 @@ func newApp() (*nativeui.App, error) {
 					}
 					message = fmt.Sprintf("Subscription statuses (%d): %s", len(states), strings.Join(states, ", "))
 				case iap.Finish:
+					mu.Lock()
+					id := request.Service.IAP.TransactionID
+					finished[id] = true
+					if observedID == id {
+						observedID = ""
+					}
+					mu.Unlock()
 					message = "Finished transaction."
 				case iap.Sync:
 					message = "Purchases synced."
