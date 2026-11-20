@@ -11,6 +11,7 @@ func TestRequestValidation(t *testing.T) {
 		{Operation: Products, ProductIDs: []string{"demo.unlock", "DEMO_123"}},
 		{Operation: Purchase, ProductID: "demo.unlock"},
 		{Operation: SubscriptionStatus, ProductID: "demo.monthly"},
+		{Operation: Finish, TransactionID: "0"},
 		{Operation: Finish, TransactionID: "18446744073709551615"},
 		{Operation: Sync}, {Operation: Entitlements}, {Operation: Updates},
 	} {
@@ -27,7 +28,7 @@ func TestRequestValidation(t *testing.T) {
 		{Operation: Purchase, ProductID: "é"},
 		{Operation: Purchase, ProductID: "a", TransactionID: "1"},
 		{Operation: Finish, TransactionID: "01"},
-		{Operation: Finish, TransactionID: "0"},
+		{Operation: Finish},
 		{Operation: Finish, TransactionID: "18446744073709551616"},
 		{Operation: Entitlements, ProductIDs: []string{"a"}},
 	} {
@@ -76,8 +77,12 @@ func TestTypedResultValidation(t *testing.T) {
 		t.Fatal("a revocation is an update, not an entitlement")
 	}
 	transaction.Type = AutoRenewable
+	transaction.ID, transaction.OriginalID = "0", "0"
 	status := Request{Operation: SubscriptionStatus, ProductID: "demo.monthly"}
 	if err := status.Accept(Result{Subscriptions: []Subscription{{State: GracePeriod, AutoRenews: true, Transaction: transaction}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Request{Operation: Updates}).Accept(Result{Transactions: []Transaction{transaction}}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -179,7 +179,7 @@ func validProduct(id string) bool {
 
 func validTransactionID(id string) bool {
 	number, err := strconv.ParseUint(id, 10, 64)
-	return err == nil && number > 0 && strconv.FormatUint(number, 10) == id
+	return err == nil && strconv.FormatUint(number, 10) == id
 }
 
 func validType(kind ProductType) bool {

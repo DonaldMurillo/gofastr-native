@@ -21,7 +21,7 @@ struct MobileIAPRequest: Codable {
             valid = ids.isEmpty && transactionId == nil && productId.map(Self.validProduct) == true
         case .finish:
             valid = ids.isEmpty && productId == nil && transactionId.flatMap { id in
-                UInt64(id).map { $0 > 0 && String($0) == id }
+                UInt64(id).map { String($0) == id }
             } == true
         case .sync, .entitlements, .updates:
             valid = ids.isEmpty && productId == nil && transactionId == nil
