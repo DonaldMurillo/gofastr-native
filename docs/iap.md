@@ -17,7 +17,7 @@ or unsupported platforms.
 | `iap.Purchase` | `ProductID` | `PurchaseState` is `iap.Purchased` with a verified `Transaction`, or `iap.Pending` without one (for example, Ask to Buy) |
 | `iap.Entitlements` | None | `Transactions` from StoreKit current entitlements; excludes revoked, upgraded and consumable transactions and requires a matching verified subscribed or grace-period status for auto-renewable subscriptions |
 | `iap.Updates` | None | `Transactions` combining verified unfinished transactions and up to 100 recent verified StoreKit updates observed in this process; excludes matching subscription transactions with unknown renewal state |
-| `iap.Finish` | `TransactionID` (decimal string) | Empty result; finishes a matching verified unfinished transaction, or does nothing if none remains |
+| `iap.Finish` | `TransactionID` (decimal string) | Empty result; finishes a matching verified unfinished transaction, or does nothing if none remains. Fails if StoreKit still lists the transaction as unfinished after finishing it |
 | `iap.SubscriptionStatus` | `ProductID` of an auto-renewable subscription | `Subscriptions` for the product's group, including renewal state, auto-renewal flag and verified transaction; the transaction may identify another tier |
 | `iap.Sync` | None | Empty result; asks the App Store to sync purchases, after which the app should re-read entitlements |
 
@@ -59,6 +59,15 @@ bash examples/storefront/uitests/run.sh "$device" "$out/Storefrontnative.app" "$
 A simulator `.app` zip can be extracted and installed with `simctl install`
 instead of rebuilding. A standalone launch does not activate the local store:
 run the suite above to exercise local transactions without App Store Connect.
+
+With Xcode 26.6 on an iOS 18.5 simulator, the three UI tests passed:
+purchase, finish and restore; finishing two purchases one at a time, with
+Updates empty afterward and again after a relaunch; and an approved Ask to Buy
+subscription. On an iOS 26.5 simulator with the same Xcode, catalog lookup
+returned no products. An earlier run on iOS 27 that mixed an Xcode 26.6 app
+build with the Xcode 27 StoreKit runner reported Finish as done while both
+transactions stayed unfinished after relaunch; Finish now fails in that case.
+Physical devices, Sandbox and real billing: **NOT RUN**.
 
 Some iOS simulator runtimes reject StoreKit test configuration from the
 command line (`SKInternalErrorDomain Code=3`, Apple Feedback FB22237318).

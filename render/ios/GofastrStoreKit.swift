@@ -87,11 +87,13 @@ final class GofastrStoreKit {
                 }
                 return completed(MobileIAPResult(transactions: updates))
             case .finish:
-                for await result in Transaction.unfinished {
-                    if case .verified(let transaction) = result, String(transaction.id) == request.transactionId {
-                        await transaction.finish()
-                        break
-                    }
+                // Finishing is idempotent: no matching unfinished transaction is a completed no-op.
+                guard let transaction = await Self.unfinished(request.transactionId) else { return completed(MobileIAPResult()) }
+                await transaction.finish()
+                recent.removeAll { $0.id == transaction.id }
+                // Report success only once StoreKit stops listing the transaction as unfinished.
+                guard await Self.unfinished(request.transactionId) == nil else {
+                    return MobileServiceResult(status: "failed", message: "The App Store did not finish the transaction.")
                 }
                 return completed(MobileIAPResult())
             case .subscriptionStatus:
@@ -140,6 +142,13 @@ final class GofastrStoreKit {
 
     private static func timestamp(_ date: Date) -> Int64 {
         Int64(date.timeIntervalSince1970 * 1000)
+    }
+
+    private static func unfinished(_ id: String?) async -> Transaction? {
+        for await result in Transaction.unfinished {
+            if case .verified(let transaction) = result, String(transaction.id) == id { return transaction }
+        }
+        return nil
     }
 
     private static func renewalState(of transaction: Transaction) async -> Product.SubscriptionInfo.RenewalState? {

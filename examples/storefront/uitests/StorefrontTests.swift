@@ -21,9 +21,41 @@ final class StorefrontTests: XCTestCase {
         back(in: app)
         run("finish", in: app, expecting: "Finished transaction.")
         back(in: app)
+        run("updates", in: app, expecting: "Updates (0):")
+        app.terminate()
+        app.launch()
+        run("updates", in: app, expecting: "Updates (0):")
+        back(in: app)
         run("restore", in: app, expecting: "Purchases synced.")
         back(in: app)
         run("entitlements", in: app, expecting: "Entitlements (1): dev.gofastr.storefront.unlock")
+    }
+
+    @MainActor
+    func testFinishClearsEachUnfinishedTransaction() throws {
+        let session = try store()
+        let app = XCUIApplication(bundleIdentifier: "dev.gofastr.storefront")
+        app.launch()
+
+        run("unlock", in: app, expecting: "Purchased: dev.gofastr.storefront.unlock")
+        back(in: app)
+        run("monthly", in: app, expecting: "Purchased: dev.gofastr.storefront.monthly")
+        XCTAssertEqual(session.allTransactions().count, 2)
+        back(in: app)
+        run("updates", in: app, expecting: "Updates (2):")
+        back(in: app)
+        run("finish", in: app, expecting: "Finished transaction.")
+        back(in: app)
+        run("updates", in: app, expecting: "Updates (1):")
+        back(in: app)
+        run("finish", in: app, expecting: "Finished transaction.")
+        back(in: app)
+        run("updates", in: app, expecting: "Updates (0):")
+        app.terminate()
+        app.launch()
+        run("updates", in: app, expecting: "Updates (0):")
+        back(in: app)
+        run("entitlements", in: app, expecting: "Entitlements (2):")
     }
 
     @MainActor
