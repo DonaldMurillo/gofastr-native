@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -53,6 +54,8 @@ public final class MainActivity extends Activity {
     private static final String ORIGIN = "{{.Origin}}";
 
     private WebView web;
+    private volatile boolean destroyed;
+    private final java.util.List<WebMessagePort> bridgePorts = new java.util.ArrayList<>();
     private ValueCallback<Uri[]> fileChoice;
 {{if or .WebViewCamera .WebViewMicrophone .WebViewGeolocation}}    // At most one page request of each kind waits for the Android dialog.
     private PermissionRequest mediaRequest;
@@ -97,7 +100,9 @@ public final class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 {{.JavaClass}}.start(dataDir, ORIGIN);
-                runOnUiThread(() -> web.loadUrl(ORIGIN + "/"));
+                runOnUiThread(() -> {
+                    if (!destroyed) web.loadUrl(ORIGIN + "/");
+                });
             } catch (Exception e) {
                 Log.e(TAG, "start failed", e);
             }
@@ -106,6 +111,9 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        destroyed = true;
+        for (WebMessagePort port : bridgePorts) port.close();
+        bridgePorts.clear();
         if (fileChoice != null) { fileChoice.onReceiveValue(null); fileChoice = null; }
         bridgeThreads.shutdownNow();
         try {
@@ -243,19 +251,32 @@ public final class MainActivity extends Activity {
         // frame of every origin sees).
         @Override
         public void onPageFinished(WebView view, String url) {
-            if (!trusted(Uri.parse(url))) {
+            if (destroyed || !trusted(Uri.parse(url))) {
                 return;
             }
             WebMessagePort[] ports = view.createWebMessageChannel();
             final WebMessagePort mine = ports[0];
+            bridgePorts.add(mine);
             mine.setWebMessageCallback(new WebMessagePort.WebMessageCallback() {
                 @Override
                 public void onMessage(WebMessagePort port, WebMessage message) {
+                    if (destroyed) {
+                        Log.d(TAG, "bridge message dropped after destroy");
+                        return;
+                    }
                     final String msg = message.getData();
-                    bridgeThreads.execute(() -> {
-                        String reply = {{.JavaClass}}.bridge(msg);
-                        runOnUiThread(() -> mine.postMessage(new WebMessage(answer(reply))));
-                    });
+                    try {
+                        bridgeThreads.execute(() -> {
+                            if (destroyed) return;
+                            String reply = {{.JavaClass}}.bridge(msg);
+                            if (destroyed) return;
+                            runOnUiThread(() -> {
+                                if (!destroyed) mine.postMessage(new WebMessage(answer(reply)));
+                            });
+                        });
+                    } catch (RejectedExecutionException e) {
+                        Log.d(TAG, "bridge message dropped after executor shutdown");
+                    }
                 }
             });
             view.postWebMessage(new WebMessage("gofastr-mobile-bridge", new WebMessagePort[]{ports[1]}), Uri.parse(ORIGIN));
