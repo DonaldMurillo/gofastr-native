@@ -396,7 +396,7 @@ final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate
     static let routeKey = "gofastr.route"
     private weak var previous: UNUserNotificationCenterDelegate?
     private var openRoute: ((String) -> Bool)?
-    private var pending: String?
+    private let routes = MobileNotificationRouteQueue()
     private var observer: NSObjectProtocol?
 
     func install(_ openRoute: @escaping (String) -> Bool) {
@@ -417,8 +417,7 @@ final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate
     }
 
     func flush() {
-        guard let route = pending, openRoute?(route) == true else { return }
-        pending = nil
+        routes.flush(openRoute)
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
@@ -432,7 +431,7 @@ final class MobileNotificationRouter: NSObject, UNUserNotificationCenterDelegate
             return
         }
         DispatchQueue.main.async {
-            self.pending = route
+            self.routes.pending = route
             self.flush()
             completionHandler()
         }

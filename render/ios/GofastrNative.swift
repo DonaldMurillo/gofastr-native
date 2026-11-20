@@ -423,6 +423,7 @@ public final class GofastrNativeRenderer {
         privacyCover = nil
         host.active = true
         retainedScreens.forEach { $0.resumeVisibleReads() }
+        MobileNotificationRouter.shared.flush()
     }
 
     private func lockProtectedScreens() {

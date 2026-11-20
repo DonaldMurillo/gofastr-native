@@ -6,8 +6,10 @@ Validated remote notification routes share local reminders' pending/cold-tap
 path; foreground pushes do not navigate. Notes exposes push settings and a
 push-tap destination. See [iOS services](../../render/ios/docs/services.md).
 On an iOS 26.5 simulator, simulated remote delivery displayed a banner and
-foreground delivery did not navigate. Default-tap navigation was visually
-inconclusive.
+foreground delivery did not navigate. A warm default tap opened push settings
+in the same process after renderer resume. Local reminder taps share that
+resume retry; their warm lifecycle is covered by executable Swift checks, not
+a simulator reminder tap.
 Status displayed authorized/registered state without an observed device token.
 Token issuance and cold-launch taps: **NOT RUN**.
 Real APNs delivery on hardware: **NOT RUN**.

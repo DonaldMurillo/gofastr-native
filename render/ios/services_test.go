@@ -61,12 +61,30 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 	}
 }
 
+func TestNotificationRoutesRetryAfterRendererResume(t *testing.T) {
+	native, err := Sources.ReadFile("GofastrNative.swift")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(native), "public func resume()")
+	end := strings.Index(string(native), "private func lockProtectedScreens()")
+	if start < 0 || end <= start {
+		t.Fatal("missing renderer resume boundary")
+	}
+	resume := string(native)[start:end]
+	active := strings.Index(resume, "host.active = true")
+	flush := strings.Index(resume, "MobileNotificationRouter.shared.flush()")
+	if active < 0 || flush <= active {
+		t.Fatal("notification routes must retry after the renderer becomes active")
+	}
+}
+
 func TestServiceRunnerAndVisibleLiveContracts(t *testing.T) {
 	requireTokenMap(t, map[string][]string{
 		"GofastrServiceRunner.swift": {
 			"public final class GofastrServiceRunner", "public init(presenter: UIViewController, openRoute: @escaping (String) -> Bool)",
 			"public static func capabilities() -> [String: String]", "public func perform(requestJSON: String, completion: @escaping (String) -> Void)", "public func cancel()",
-			"NSMicrophoneUsageDescription", "UNUserNotificationCenterDelegate", "UNNotificationDefaultActionIdentifier", "self.pending = route", "completionHandler([.banner, .sound])",
+			"NSMicrophoneUsageDescription", "UNUserNotificationCenterDelegate", "UNNotificationDefaultActionIdentifier", "self.routes.pending = route", "completionHandler([.banner, .sound])",
 			"request.scheduledDate()", "requestAuthorization(options: [.alert, .sound])", "getPendingNotificationRequests", "removePendingNotificationRequests",
 			"UIActivityViewController(activityItems: items", "completionWithItemsHandler", "removeItem(at: temporary)", "UIPasteboard.general.string = clipboard.text",
 			"settlement.finish(token)", "queue.async", "DispatchQueue.main.async",
@@ -164,6 +182,26 @@ enum ServiceChecks {
         precondition(!MobilePushRoute.shouldPresent(remote: true, identifier: "gofastr.notification.remote", userInfo: [:]))
         precondition(MobilePushRoute.shouldPresent(remote: false, identifier: "gofastr.notification.local", userInfo: [:]))
         precondition(MobilePushRoute.shouldPresent(remote: true, identifier: "", userInfo: ["gofastr.route": "/settings/push"]))
+        for remote in [true, false] {
+            let queue = MobileNotificationRouteQueue()
+            var active = false
+            var opened: [String] = []
+            let open: (String) -> Bool = { route in
+                guard active else { return false }
+                opened.append(route)
+                return true
+            }
+            queue.pending = MobilePushRoute.route(remote: remote, identifier: "gofastr.notification.test", userInfo: ["gofastr.route": "/settings/push"])
+            queue.flush(nil)
+            queue.flush(open)
+            // The notification observer may run before the renderer resumes.
+            queue.flush(open)
+            precondition(queue.pending == "/settings/push" && opened.isEmpty)
+            active = true
+            queue.flush(open)
+            queue.flush(open)
+            precondition(queue.pending == nil && opened == ["/settings/push"])
+        }
         for route in ["", "//host/path", "https://host/path", "/a/../b", "/%2e%2e/b", "/%2fhost", "/bad\\route", "/a#b", "/a b", "/a%00b", "/bad%"] {
             precondition(MobilePushRoute.route(remote: true, identifier: "", userInfo: ["gofastr.route": route]) == nil)
         }

@@ -34,6 +34,15 @@ struct MobilePushState: Codable {
     }
 }
 
+final class MobileNotificationRouteQueue {
+    var pending: String?
+
+    func flush(_ openRoute: ((String) -> Bool)?) {
+        guard let route = pending, openRoute?(route) == true else { return }
+        pending = nil
+    }
+}
+
 enum MobilePushRoute {
     static func route(remote: Bool, identifier: String, userInfo: [AnyHashable: Any]) -> String? {
         guard remote || identifier.hasPrefix("gofastr.notification."),
