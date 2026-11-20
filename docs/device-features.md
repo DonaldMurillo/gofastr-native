@@ -10,6 +10,13 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
+| Foreground location | `ServiceRequest.Location` | Not implemented | CoreLocation, when-in-use authorization, bounded updates |
+
+[Location](location.md) is an additional iOS-only opt-in service. Build the
+demo with `--location --location-usage "Show nearby places in the foreground."`
+to enable its Location section. It reports permission, current position and
+up to five samples over five seconds; it never requests background access.
+The other three features remain shared across Android and iOS.
 
 The same Go-only demo runs on both platforms:
 
@@ -64,6 +71,13 @@ linking, actual Android 14 x86-64 behavior, and the existing WebView tests.
 macOS tests compile and execute Foundation wire fixtures and compile/sign both
 iOS extensions against the simulator SDK. These tests skip on Windows, so the
 iOS implementation still requires a Mac build and runtime acceptance.
+
+For location, `GOFASTR_IOS_UI=1 GOWORK=off go test -v -count=1 -timeout=20m ./internal/iosuitest`
+builds the demo, boots a fresh simulator, grants location permission, sets a
+simulated position and drives all four actions through the UI. iOS 26.5
+simulator acceptance passed with visible current and tracking coordinates.
+First-use prompts, denial UI and physical-device location checks are NOT RUN;
+see [location acceptance limits](location.md#checks-and-acceptance).
 
 ## Contact picker
 

@@ -124,11 +124,12 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
-	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
+			{ID: "location", Title: "Location", Destination: "/features/location"},
 		}}}, nil
 	}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
@@ -158,7 +159,8 @@ func newApp() (*nativeui.App, error) {
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
-	)
+	}
+	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 }
 
 func preview(value string) string {

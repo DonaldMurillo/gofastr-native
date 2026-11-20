@@ -77,3 +77,20 @@ func TestLocationPlistAndReleaseReport(t *testing.T) {
 		}
 	}
 }
+
+func TestInspectRecognizesLocationCapability(t *testing.T) {
+	found := false
+	for _, capability := range inspectCapabilities {
+		if capability == "location/v1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("inspect drops location capability")
+	}
+	for _, profile := range inspectProfiles() {
+		if profile.Caps["location/v1"] == "available" {
+			t.Fatal("default profile advertises opt-in location")
+		}
+	}
+}

@@ -34,6 +34,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Files](files-services.md)
 - [Photos](photos-services.md)
 - [Secure storage](secure-storage.md)
+- [Location](location.md): opt-in iOS permission, current position and bounded foreground updates.
 - [Share-in](share-in.md)
 - [Widgets](widgets.md)
 - [Video capture](capture.md): Android camera recording and WHIP streaming with GPS and camera direction, on the native and WebView renderers. Covers segmented and loop recording, impact locks and the dash cam example.
