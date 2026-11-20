@@ -1,5 +1,15 @@
 # UIKit device services and live collections
 
+## Barcode scanner
+
+`GofastrScanner.swift` implements the typed `scanner/v1` sheet using
+AVFoundation metadata capture. It stops capture before returning the first
+accepted value, cancellation, background or interruption outcome. Permission
+is requested only on sheet appearance. Camera hardware and nonblank camera
+purpose text gate capability discovery. Simulator-only QR generation and
+Vision decoding, bounds, and the standalone XCUITest command are documented in
+[scanner](../../../docs/scanner.md). Hardware camera acceptance: **NOT RUN**.
+
 Implementation notes, November 5, 2026. These are library/protocol verification
 notes, not real microphone, notification, or share-provider acceptance results.
 The frozen cross-worker contract is `../../../docs/mobile-services-plan.md`.

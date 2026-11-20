@@ -12,6 +12,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -32,6 +33,7 @@ type ServiceRequest struct {
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
 	Location      *location.Request      `json:"location,omitempty"`
 	Widget        *widgets.Request       `json:"widget,omitempty"`
+	Scan          *scanner.Request       `json:"scan,omitempty"`
 	Commit        bool                   `json:"commit,omitempty"`
 }
 
@@ -48,6 +50,7 @@ type ServiceResult struct {
 	SecureStorage  *securestore.Result `json:"secureStorage,omitempty"`
 	Location       *location.Result    `json:"location,omitempty"`
 	Widget         *widgets.State      `json:"widget,omitempty"`
+	Scan           *scanner.Result     `json:"scan,omitempty"`
 }
 
 // ServiceRespond receives every validated outcome, including cancellation.
@@ -58,7 +61,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil} {
+	for _, present := range []bool{request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil} {
 		if present {
 			operations++
 		}
@@ -71,6 +74,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Browser.Validate()
 	case request.Contacts != nil:
 		return request.Contacts.Validate()
+	case request.Scan != nil:
+		return request.Scan.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -96,6 +101,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityBrowser
 	case request.Contacts != nil:
 		return CapabilityContacts
+	case request.Scan != nil:
+		return CapabilityScanner
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -121,6 +128,9 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	if request.Location != nil && outcome.Permission != "" && !location.ValidPermission(location.Permission(outcome.Permission)) {
 		return errors.New("nativeui: invalid location permission")
+	}
+	if outcome.Scan != nil && (request.Scan == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unexpected scanner content")
 	}
 	if (outcome.Contacts != nil && request.Contacts == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
@@ -148,6 +158,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: location result is required")
 			}
 			if err := request.Location.Accept(*outcome.Location); err != nil {
+				return err
+			}
+		}
+		if request.Scan != nil {
+			if outcome.Scan == nil {
+				return errors.New("nativeui: scanner result is required")
+			}
+			if err := request.Scan.Accept(*outcome.Scan); err != nil {
 				return err
 			}
 		}

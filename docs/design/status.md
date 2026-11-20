@@ -23,6 +23,12 @@ the Go completed continuation screen. The test waits for hittable Safari chrome
 and taps the Done control's center coordinate. Physical-device and VoiceOver
 acceptance: NOT RUN.
 
+The [typed barcode scanner](../scanner.md) adds `scanner/v1` to native iOS and a
+**Scan code** action to the device-features example. Simulator XCUITests cover
+the QR image/Vision fixture and cancellation through the real service wire.
+Hardware camera acceptance: **NOT RUN**; simulator checks do not establish
+physical barcode, permission, interruption or accessibility acceptance.
+
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop

@@ -12,6 +12,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
 | Foreground location | `ServiceRequest.Location` | Not implemented | CoreLocation, when-in-use authorization, bounded updates |
+| Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
 
 [Location](location.md) is an additional iOS-only opt-in service. Build the
 demo with `--location --location-usage "Show nearby places in the foreground."`

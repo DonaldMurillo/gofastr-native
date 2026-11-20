@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -72,6 +73,7 @@ func Dispatch(route, action, values string) (string, error) {
 func newApp() (*nativeui.App, error) {
 	var inboxMu sync.Mutex
 	var next *sharein.Item
+	var scanMessage string
 	service := func(request nativeui.ServiceRequest) nativeui.Handle {
 		request.ID = "device"
 		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
@@ -95,6 +97,8 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Scan != nil:
+				message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -124,14 +128,29 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
+	scanRespond := func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+		message := "Device result: " + string(result.Status)
+		if result.Scan != nil {
+			message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
+		}
+		inboxMu.Lock()
+		scanMessage = message
+		inboxMu.Unlock()
+		return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/features/scanned"}}, nil
+	}
 	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
+		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 			{ID: "location", Title: "Location", Destination: "/features/location"},
 		}}}, nil
-	}},
+	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
+		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			inboxMu.Lock()
+			defer inboxMu.Unlock()
+			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
+		}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
