@@ -50,7 +50,7 @@
     return result;
   })();
   const kindOf = request => {
-    const kinds = ['notification', 'share', 'clipboard', 'audio'].filter(key => request?.[key] != null);
+    const kinds = ['browser', 'notification', 'share', 'clipboard', 'audio'].filter(key => request?.[key] != null);
     return kinds.length === 1 ? kinds[0] : '';
   };
   const bytesOf = file => {
@@ -313,7 +313,7 @@
     if (!kind || typeof serviceId !== 'string' || !serviceId || issued.has(serviceId)) throw new Error('The service has no new issued identity. It was not repeated.');
     const prefix = 'gfw-service-' + ++sequence;
     const dialog = element('dialog', '', { 'data-gfw-service': kind, 'data-gfw-service-id': serviceId, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': prefix + '-title', 'aria-describedby': prefix + '-status' });
-    const heading = element('h2', request[kind].title || { notification: 'Reminder', share: 'Share', clipboard: 'Copy text', audio: 'Record audio' }[kind], { id: prefix + '-title', tabindex: '-1' });
+    const heading = element('h2', request[kind].title || { browser: 'Browser', notification: 'Reminder', share: 'Share', clipboard: 'Copy text', audio: 'Record audio' }[kind], { id: prefix + '-title', tabindex: '-1' });
     const view = { root, request: JSON.parse(JSON.stringify(request)), kind, dialog, heading, opener, respond, host: bridge(), downloadURLs: new Set(), chunks: [] };
     window.__gofastr_foreground?.claim(view);
     issued.add(serviceId);
@@ -322,7 +322,10 @@
     view.actions = element('div', '', { class: 'gfw-service-actions' });
     dialog.append(heading, view.feedback, view.actions);
     try {
-      if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
+      if (kind === 'browser') {
+        feedback(view, 'The in-app browser is unavailable in this renderer. No page was opened.');
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'The in-app browser requires a supported native renderer. No page was opened.' }));
+      } else if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
       else if (kind === 'notification') {
         feedback(view, 'Scheduled reminders are unavailable in a plain browser. No timer or notification was created.');
         button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Scheduled reminders require a native device host. No reminder was scheduled.' }));
