@@ -46,7 +46,7 @@ public final class Push {
                     current.delete(context,(token,error)->main.post(()->{
                         if(error!=null){done.accept(JSON.object("status","failed","message","Push unregistration failed."));return;}
                         store(context).edit().remove(TOKEN).commit();
-                        done.accept(JSON.object("status","completed","message","Unregistered from push notifications."));
+                        done.accept(JSON.object("status","completed","push",new JSONObject(),"message","Unregistered from push notifications."));
                     }));
                     return;
                 case "status": {
@@ -69,7 +69,7 @@ public final class Push {
                         if(!store(context).edit().putString(INBOX,kept.toString()).commit())throw new IllegalStateException("Cannot update the push inbox");
                     }
                     ((NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(id,1);
-                    done.accept(JSON.object("status","completed","message","Push message acknowledged."));
+                    done.accept(JSON.object("status","completed","push",new JSONObject(),"message","Push message acknowledged."));
                     return;
                 }
                 default: done.accept(JSON.object("status","failed","message","Unsupported push operation."));

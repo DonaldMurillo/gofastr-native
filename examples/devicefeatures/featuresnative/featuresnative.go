@@ -116,6 +116,8 @@ func newApp() (*nativeui.App, error) {
 					message = fmt.Sprintf("Push token %s (%d bytes). Send it to your server; notifications permission: %s.", preview(result.Push.Token[:min(12, len(result.Push.Token))]), len(result.Push.Token), result.Permission)
 				case result.Push.Message != nil:
 					message = fmt.Sprintf("Push %s: %s %s (%d data keys, route %q).", result.Push.Message.Identifier, result.Push.Message.Title, preview(result.Push.Message.Body), len(result.Push.Message.Data), result.Push.Message.Route)
+				case result.Message != "":
+					message = result.Message
 				default:
 					message = "No push message is waiting, or the device is not registered."
 				}
