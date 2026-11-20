@@ -59,3 +59,29 @@ func TestInvalidImageAndMissingCode(t *testing.T) {
 		t.Fatal("accepted oversized image")
 	}
 }
+
+func TestDecodeGS1128(t *testing.T) {
+	for _, tc := range []struct{ name, encoded, want string }{
+		{"GS1", "\u00f110LOT1\u00f117251231", "]C110LOT1\x1d17251231"},
+		{"non-GS1 FNC1", "LOT1\u00f117251231", "LOT117251231"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, err := oned.NewCode128Writer().Encode(tc.encoded, gozxing.BarcodeFormat_CODE_128, 400, 80, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			img := image.NewGray(image.Rect(0, 0, code.GetWidth(), code.GetHeight()))
+			for y := 0; y < img.Rect.Dy(); y++ {
+				for x := 0; x < img.Rect.Dx(); x++ {
+					if !code.Get(x, y) {
+						img.SetGray(x, y, color.Gray{Y: 255})
+					}
+				}
+			}
+			got, err := Decode(img)
+			if err != nil || got != (Result{Format: Code128, Text: tc.want}) {
+				t.Fatalf("got %+q, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+}

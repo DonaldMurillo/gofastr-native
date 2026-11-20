@@ -86,6 +86,16 @@ func Decode(img image.Image) (Result, error) {
 		if err != nil {
 			continue
 		}
+		if decoded.GetBarcodeFormat() == gozxing.BarcodeFormat_CODE_128 {
+			// Raw Code 128 codewords start with the start code, followed by FNC1 (102) for GS1-128.
+			if raw := decoded.GetRawBytes(); len(raw) > 1 && raw[1] == 102 {
+				hints[gozxing.DecodeHintType_ASSUME_GS1] = true
+				decoded, err = reader.Decode(bitmap, hints)
+				if err != nil {
+					return Result{}, err
+				}
+			}
+		}
 		result := Result{Format: Format(decoded.GetBarcodeFormat().String()), Text: decoded.GetText()}
 		return result, result.Validate()
 	}
