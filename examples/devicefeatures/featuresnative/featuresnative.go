@@ -194,6 +194,9 @@ func barcodeRoute() nativeui.Route {
 			if err != nil {
 				return nativeui.Result{}, err
 			}
+			if result.NotFound {
+				return nativeui.Result{Announcement: "No barcode found."}, nil
+			}
 			return nativeui.Result{Announcement: string(result.Format) + ": " + strconv.QuoteToASCII(preview(result.Text))}, nil
 		}},
 	}

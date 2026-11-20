@@ -80,7 +80,7 @@ func TestDecodeGS1128(t *testing.T) {
 			}
 			got, err := Decode(img)
 			if err != nil || got != (Result{Format: Code128, Text: tc.want}) {
-				t.Fatalf("got %+q, %v; want %q", got, err, tc.want)
+				t.Fatalf("got %+v, error %v; want Code 128 text %q", got, err, tc.want)
 			}
 		})
 	}

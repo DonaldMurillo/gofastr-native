@@ -44,13 +44,21 @@ func (request Request) Validate() error {
 	return nil
 }
 
-// Result holds decoded text, which must be treated as untrusted input.
+// Result holds decoded text or reports that a valid image contained no supported code.
+// Treat decoded text as untrusted input.
 type Result struct {
-	Format Format `json:"format"`
-	Text   string `json:"text"`
+	Format   Format `json:"format,omitempty"`
+	Text     string `json:"text,omitempty"`
+	NotFound bool   `json:"notFound,omitempty"`
 }
 
 func (result Result) Validate() error {
+	if result.NotFound {
+		if result.Format != "" || result.Text != "" {
+			return errors.New("barcode: no-code result cannot carry decoded content")
+		}
+		return nil
+	}
 	switch result.Format {
 	case QRCode, Code128, EAN13, EAN8, UPCA, UPCE:
 	default:

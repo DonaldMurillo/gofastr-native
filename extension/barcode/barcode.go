@@ -33,7 +33,7 @@ func Scan(request barcode.Request) (*extension.FileOperation, error) {
 	return &extension.FileOperation{Name: name, Payload: string(payload)}, nil
 }
 
-// ReadResult extracts the bounded code from a completed scan document.
+// ReadResult extracts the code or explicit no-code result from a completed scan document.
 func ReadResult(document files.Document) (barcode.Result, error) {
 	var result barcode.Result
 	if document.Name != filename || document.MediaType != "application/json" {

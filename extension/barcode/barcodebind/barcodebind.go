@@ -3,6 +3,7 @@ package barcodebind
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/DonaldMurillo/gofastr-native/device/barcode"
 )
@@ -11,7 +12,9 @@ func MaxDimension() int { return barcode.MaxDimension }
 
 func Decode(pixels []byte, width, height int) (string, error) {
 	result, err := barcode.DecodeLuminance(pixels, width, height)
-	if err != nil {
+	if errors.Is(err, barcode.ErrNotFound) {
+		result = barcode.Result{NotFound: true}
+	} else if err != nil {
 		return "", err
 	}
 	data, err := json.Marshal(result)

@@ -15,8 +15,9 @@ adb install -r dist/mobile/device-features/Featuresnative.apk
 Open **Barcode and QR scanner**, then choose **Scan with camera** to take and
 confirm a system camera photo, or choose **Scan from image** in the overflow
 menu to select an image.
-Keep a single code in focus with room around its edges. An unreadable image
-or one with no supported code fails the task; start a new scan to try again.
+Keep a single code in focus with room around its edges. If the image contains
+no supported code, the demo says **No barcode found.** An unreadable image
+still fails the task.
 
 ## Go application API
 
@@ -25,7 +26,8 @@ In an explicit action, call `extension/barcode.Scan` with a
 `device/barcode.Request{Source: barcode.Camera}` (or `barcode.Image`). Set
 the returned operation as the `Extension` of a `nativeui.FileRequest`. In the
 matching `Route.Files` continuation, pass the completed document to
-`extension/barcode.ReadResult` for the typed `device/barcode.Result`. The
+`extension/barcode.ReadResult` for the typed `device/barcode.Result`. A
+completed scan with no supported code sets `Result.NotFound`. The
 [device-features example](../examples/devicefeatures/featuresnative/featuresnative.go)
 shows the full wiring.
 

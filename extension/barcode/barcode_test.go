@@ -35,7 +35,7 @@ func TestScanContracts(t *testing.T) {
 		if result, err := ReadResult(document); result.Format != barcode.QRCode || result.Text != "hello" || err != nil {
 			t.Fatalf("unexpected result: %+v, %v", result, err)
 		}
-		for _, invalid := range []string{`{"format":"QR_CODE","text":""}`, `{"format":"UNKNOWN","text":"hello"}`, `{"format":"QR_CODE","text":"hello","path":"/image.jpg"}`} {
+		for _, invalid := range []string{`{"format":"QR_CODE","text":""}`, `{"format":"UNKNOWN","text":"hello"}`, `{"format":"QR_CODE","text":"hello","path":"/image.jpg"}`, `{"notFound":true,"format":"QR_CODE","text":"hello"}`, `{}`} {
 			document.Data = []byte(invalid)
 			if err := registry.Accept(*op, document); err == nil {
 				t.Fatal("accepted invalid result")
