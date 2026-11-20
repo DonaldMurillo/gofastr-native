@@ -99,7 +99,7 @@ func validate(component extension.Component) error {
 	}
 	seen := map[string]bool{}
 	for _, p := range content.Pins {
-		if !behavior.SafeToken(p.ID) || len(p.ID) > 64 || seen[p.ID] || !bounded(p.Latitude, -90, 90) || !bounded(p.Longitude, -180, 180) || !text(p.Title, 256) || !text(p.Subtitle, 1024) || len(p.Destination) > 4096 {
+		if !behavior.SafeToken(p.ID) || len(p.ID) > 64 || seen[p.ID] || !bounded(p.Latitude, -90, 90) || !bounded(p.Longitude, -180, 180) || !text(p.Title, 256) || !text(p.Subtitle, 1024) || len(p.Destination) > 4096 || p.Destination != "" && p.Title == "" {
 			return errors.New("maps: invalid pin")
 		}
 		seen[p.ID] = true

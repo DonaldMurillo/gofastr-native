@@ -39,19 +39,20 @@ func TestValidation(t *testing.T) {
 		}
 	}
 	for name, change := range map[string]func(*maps.Content){
-		"empty":             func(c *maps.Content) { c.Pins = nil },
-		"latitude":          func(c *maps.Content) { c.Pins[0].Latitude = 91 },
-		"longitude":         func(c *maps.Content) { c.Pins[0].Longitude = -181 },
-		"nan":               func(c *maps.Content) { c.Pins[0].Latitude = math.NaN() },
-		"infinity":          func(c *maps.Content) { c.Pins[0].Longitude = math.Inf(1) },
-		"id":                func(c *maps.Content) { c.Pins[0].ID = "../bad" },
-		"duplicate":         func(c *maps.Content) { c.Pins = append(c.Pins, c.Pins[0]) },
-		"title":             func(c *maps.Content) { c.Pins[0].Title = strings.Repeat("x", 257) },
-		"subtitle":          func(c *maps.Content) { c.Pins[0].Subtitle = "bad\x00text" },
-		"region":            func(c *maps.Content) { c.Region = &maps.Region{LatitudeDelta: 0, LongitudeDelta: 1} },
-		"delta":             func(c *maps.Content) { c.Region = &maps.Region{LatitudeDelta: 181, LongitudeDelta: 361} },
-		"region-coordinate": func(c *maps.Content) { c.Region = &maps.Region{Latitude: 91, LatitudeDelta: 1, LongitudeDelta: 1} },
-		"too-many":          func(c *maps.Content) { c.Pins = make([]maps.Pin, 201) },
+		"empty":                func(c *maps.Content) { c.Pins = nil },
+		"latitude":             func(c *maps.Content) { c.Pins[0].Latitude = 91 },
+		"longitude":            func(c *maps.Content) { c.Pins[0].Longitude = -181 },
+		"nan":                  func(c *maps.Content) { c.Pins[0].Latitude = math.NaN() },
+		"infinity":             func(c *maps.Content) { c.Pins[0].Longitude = math.Inf(1) },
+		"id":                   func(c *maps.Content) { c.Pins[0].ID = "../bad" },
+		"duplicate":            func(c *maps.Content) { c.Pins = append(c.Pins, c.Pins[0]) },
+		"title":                func(c *maps.Content) { c.Pins[0].Title = strings.Repeat("x", 257) },
+		"untitled-destination": func(c *maps.Content) { c.Pins[0].Title = "" },
+		"subtitle":             func(c *maps.Content) { c.Pins[0].Subtitle = "bad\x00text" },
+		"region":               func(c *maps.Content) { c.Region = &maps.Region{LatitudeDelta: 0, LongitudeDelta: 1} },
+		"delta":                func(c *maps.Content) { c.Region = &maps.Region{LatitudeDelta: 181, LongitudeDelta: 361} },
+		"region-coordinate":    func(c *maps.Content) { c.Region = &maps.Region{Latitude: 91, LatitudeDelta: 1, LongitudeDelta: 1} },
+		"too-many":             func(c *maps.Content) { c.Pins = make([]maps.Pin, 201) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := valid()
@@ -71,7 +72,7 @@ func TestValidation(t *testing.T) {
 	c := valid()
 	c.Pins = nil
 	for i := 0; i < 200; i++ {
-		c.Pins = append(c.Pins, maps.Pin{ID: fmt.Sprintf("p%d", i), Destination: "/detail"})
+		c.Pins = append(c.Pins, maps.Pin{ID: fmt.Sprintf("p%d", i), Title: "Place", Destination: "/detail"})
 	}
 	block, err := maps.Block("map", c)
 	if err != nil {
@@ -83,6 +84,12 @@ func TestValidation(t *testing.T) {
 	block.Destinations["pin.p0"] = "/forged"
 	if err := registry.ValidateComponent(block); err == nil {
 		t.Fatal("forged destination accepted")
+	}
+	c = valid()
+	c.Pins[0].Title = ""
+	c.Pins[0].Destination = ""
+	if _, err := maps.Block("map", c); err != nil {
+		t.Fatal("untitled non-navigable pin rejected:", err)
 	}
 }
 

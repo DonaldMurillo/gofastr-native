@@ -21,7 +21,8 @@ within [-180,180]. Region deltas are (0,180] and (0,360]. There may be at most
 200 pins, each with a unique `behavior.SafeToken` ID of at most 64 bytes, so the
 prefixed event key fits the generic destination-key limit. Titles and subtitles are
 plain UTF-8 without controls, at most 256 and 1024 bytes respectively. Destinations
-are ordinary registered local routes, validated by the screen runtime.
+require a nonempty title so MapKit can show their callout, and are ordinary
+registered local routes, validated by the screen runtime.
 
 ## Wire and lifecycle
 
