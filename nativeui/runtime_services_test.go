@@ -11,6 +11,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
@@ -39,6 +40,7 @@ func serviceConnection(t *testing.T, runtime *Runtime) string {
 	reply := serviceCommand(t, context.Background(), runtime, Command{Kind: "hello", Hello: &Hello{Minimum: 1, Maximum: 1, Renderer: "webview", Capabilities: map[Capability]Support{
 		CapabilityNavigation: SupportAvailable, CapabilityEditor: SupportAvailable, CapabilityNotifications: SupportUnavailable,
 		CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
+		CapabilityOpenURL:      SupportAvailable,
 		CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback,
 	}}})
 	if reply.Error != nil {
@@ -92,6 +94,7 @@ func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 		"status":    {ID: "device", Notification: &notifications.Request{Operation: "status", Identifier: "notes:1"}},
 		"share":     {ID: "device", Share: &sharing.Request{Text: "Private text"}},
 		"clipboard": {ID: "device", Clipboard: &sharing.Clipboard{Text: "Copy"}},
+		"open-url":  {ID: "device", OpenURL: &links.Open{URL: "https://example.org/"}},
 		"audio":     {ID: "device", Audio: &audio.Request{Title: "Record"}, Commit: true},
 	}
 	for name, definition := range definitions {
@@ -189,6 +192,8 @@ func TestServiceRequestAndPlaybackValidationThroughCommands(t *testing.T) {
 		"empty":                       {ID: "device"},
 		"competing":                   {ID: "device", Share: &sharing.Request{Text: "Share"}, Clipboard: &sharing.Clipboard{Text: "Copy"}},
 		"large clipboard":             {ID: "device", Clipboard: &sharing.Clipboard{Text: strings.Repeat("x", (64<<10)+1)}},
+		"invalid URL":                 {ID: "device", OpenURL: &links.Open{URL: "intent://example.org"}},
+		"competing URL and clipboard": {ID: "device", OpenURL: &links.Open{URL: "https://example.org"}, Clipboard: &sharing.Clipboard{Text: "Copy"}},
 		"unregistered reminder route": {ID: "device", Notification: &notifications.Request{Operation: "schedule", Identifier: "notes:1", Title: "Reminder", Route: "/foreign", Date: "2028-01-01", Time: "10:00"}},
 	} {
 		t.Run(name, func(t *testing.T) {

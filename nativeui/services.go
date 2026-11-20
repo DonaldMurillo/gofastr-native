@@ -8,6 +8,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
@@ -22,6 +23,7 @@ type ServiceRequest struct {
 	Notification  *notifications.Request `json:"notification,omitempty"`
 	Share         *sharing.Request       `json:"share,omitempty"`
 	Clipboard     *sharing.Clipboard     `json:"clipboard,omitempty"`
+	OpenURL       *links.Open            `json:"openURL,omitempty"`
 	Audio         *audio.Request         `json:"audio,omitempty"`
 	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
@@ -50,7 +52,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
 		if present {
 			operations++
 		}
@@ -65,6 +67,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Share.Validate()
 	case request.Clipboard != nil:
 		return request.Clipboard.Validate()
+	case request.OpenURL != nil:
+		return request.OpenURL.Validate()
 	case request.IncomingShare != nil:
 		return request.IncomingShare.Validate()
 	case request.SecureStorage != nil:
@@ -84,6 +88,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilitySharing
 	case request.Clipboard != nil:
 		return CapabilityClipboard
+	case request.OpenURL != nil:
+		return CapabilityOpenURL
 	case request.IncomingShare != nil:
 		return CapabilityIncomingShares
 	case request.SecureStorage != nil:

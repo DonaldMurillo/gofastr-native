@@ -92,6 +92,66 @@ to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
 The [capture library](capture.md) uses all of these for background video
 capture, location and camera direction, with live WHIP streaming.
 
+## Opening web URLs and receiving Android App Links
+
+A Go action can return a `nativeui.Result` with a `ServiceRequest` whose
+`OpenURL` is `&links.Open{URL: "https://example.org/help"}`
+(`device/links`). Give the request an ID and register the matching
+`ServiceRespond` on the route, as with the other device services. Native
+Android provides `nativeui.CapabilityOpenURL` (`open-url/v1`). The
+service accepts absolute HTTP(S) URLs without credentials (use punycode for
+internationalized hosts) and uses Android's browser or other selected handler.
+A completed result means Android accepted the handoff, not that a page loaded.
+No handler returns `unsupported`. Use Go navigation for destinations inside
+the same app.
+
+Inbound Android App Links are separate and opt-in:
+
+```sh
+go run ./cmd/gofastr-native build --platform android-emu --renderer native \
+  --pkg ./examples/devicefeatures/featuresnative --id dev.gofastr.linksdemo \
+  --app-link-hosts links.example.org,links.example.net --url-scheme gofastr-links-demo
+```
+
+Use lowercase DNS hosts you control (ASCII or punycode, no wildcards, paths
+or ports). Each gets an auto-verified HTTP/HTTPS intent filter. The activity
+checks the configured host and standard port, then sends the path and query
+to the matching Go screen. Fragments are ignored. Cold links open at that
+screen, falling back to the root if it cannot open; warm links use the same
+navigation guard as custom-scheme links. Unlisted hosts cannot supply routes.
+Use a dedicated host if only part of a website should open in the app.
+Treat incoming path and query values as untrusted. App Link verification
+controls Android's default routing; it does not authorize access to a screen.
+
+For verification, publish a Digital Asset Links statement at
+`https://<host>/.well-known/assetlinks.json` on **each** configured host.
+Serve it directly over HTTPS with `Content-Type: application/json`, without
+redirects. Set the statement's package name to the build's `--id` and its
+fingerprint to the **installed APK signer's SHA-256** (the app-signing
+certificate, not the upload certificate, for Play App Signing):
+
+```json
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "dev.gofastr.linksdemo",
+    "sha256_cert_fingerprints": ["<colon-separated SHA-256 fingerprint>"]
+  }
+}]
+```
+
+Get the APK fingerprint with `apksigner verify --print-certs <app.apk>`.
+On Android 12+, run `adb shell pm verify-app-links --re-verify <package>`,
+then look for `verified` per host in `adb shell pm get-app-links <package>`.
+Then open a link without an explicit component or package. On Android 11
+and below, verification requires all manifest hosts to verify.
+See the [Android App Links guide](https://developer.android.com/training/app-links).
+For local routing tests with the demo's placeholder hosts, install its APK on
+an isolated Android 12+ emulator and run
+`python3 scripts/android_links_smoke.py --serial <emulator-serial>`. This uses
+the user's supported-links selection, not live domain verification.
+
 ## Build compatibility
 
 The pinned dependencies exposed two failures inside a real Android app sandbox:

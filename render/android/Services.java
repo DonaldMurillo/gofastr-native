@@ -103,7 +103,8 @@ public final class Services {
             if(request.has("clipboard")) {
                 ClipboardManager clipboard=(ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(ClipData.newPlainText("",request.getJSONObject("clipboard").optString("text")));finish(outcome("completed","Copied to clipboard."));
-            }else if(request.has("share")) share(request.getJSONObject("share"));
+            }else if(request.has("openURL")) openURL(request.getJSONObject("openURL").optString("url"));
+            else if(request.has("share")) share(request.getJSONObject("share"));
             else if(request.has("notification")) notification(request.getJSONObject("notification"));
             else if(request.has("audio")) record(request.getJSONObject("audio"));
             else if(request.has("incomingShare")) {
@@ -125,6 +126,20 @@ public final class Services {
             }
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
+    }
+    private void openURL(String value) {
+        java.net.URI url = WebLinks.parse(value);
+        if (url == null) { finish(outcome("failed","The web URL is invalid.")); return; }
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url.toASCIIString()).normalizeScheme())
+                .addCategory(Intent.CATEGORY_BROWSABLE);
+        try {
+            host.startActivity(intent);
+            finish(outcome("completed","Link handed off to Android."));
+        } catch (ActivityNotFoundException e) {
+            finish(outcome("unsupported","No app can open this web URL."));
+        } catch (SecurityException e) {
+            finish(outcome("denied","Android blocked this web URL."));
+        }
     }
     private void share(JSONObject request) {
         host.workers.execute(()->{

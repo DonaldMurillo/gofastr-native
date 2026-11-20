@@ -56,6 +56,8 @@ mounted components, focus and scroll.
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
+Its Android build also exercises [opening web URLs and receiving Android App
+Links](../android.md#opening-web-urls-and-receiving-android-app-links).
 
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.

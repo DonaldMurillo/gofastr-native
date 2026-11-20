@@ -18,6 +18,7 @@ type buildFlags struct {
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
+	appLinkHosts                                                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
 	wait                                                            *time.Duration
 }
@@ -36,6 +37,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		cameraUsage:     fs.String("camera-usage", defaultCameraUsage, "iOS camera purpose string; empty disables native camera"),
 		microphoneUsage: fs.String("microphone-usage", "", "iOS microphone purpose string; empty disables recording"),
 		urlScheme:       fs.String("url-scheme", "", "application-specific deep-link scheme (native renderer)"),
+		appLinkHosts:    fs.String("app-link-hosts", "", "comma-separated verified App Link hosts (native Android)"),
 		receiveShares:   fs.Bool("receive-shares", false, "enable the private incoming-share inbox"),
 		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
 		biometricUsage:  fs.String("biometric-usage", "", "Face ID purpose text"),
@@ -73,6 +75,10 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 		return 2
 	}
 	if sub == "doctor" {
+		if f.given("app-link-hosts") {
+			fmt.Fprintln(stderr, "--app-link-hosts applies only to build, run, and dev")
+			return 2
+		}
 		if *f.debugTrace {
 			fmt.Fprintln(stderr, "--debug-trace applies only to build, run, and dev")
 			return 2
@@ -117,6 +123,14 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 	}
 	if *f.urlScheme != "" && *f.renderer != "native" {
 		fmt.Fprintln(stderr, "--url-scheme requires --renderer native")
+		return 2
+	}
+	if *f.appLinkHosts != "" && (*f.platform != "android-emu" || *f.renderer != "native") {
+		fmt.Fprintln(stderr, "--app-link-hosts requires --platform android-emu and --renderer native")
+		return 2
+	}
+	if _, err := parseAppLinkHosts(*f.appLinkHosts); err != nil {
+		fmt.Fprintln(stderr, err)
 		return 2
 	}
 	if *f.wait < 0 {
@@ -167,6 +181,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.CameraUsage = strings.TrimSpace(*f.cameraUsage)
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme
+	a.AppLinkHosts, _ = parseAppLinkHosts(*f.appLinkHosts)
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {

@@ -40,6 +40,7 @@ public abstract class GofastrActivity extends Activity {
     }
     protected abstract Backend createBackend();
     protected String urlScheme() { return ""; }
+    protected List<String> appLinkHosts() { return Collections.emptyList(); }
     protected boolean cameraEnabled() { return false; }
     protected boolean microphoneEnabled() { return false; }
     protected boolean incomingSharesEnabled() { return false; }
@@ -83,14 +84,14 @@ public abstract class GofastrActivity extends Activity {
         viewport = new FrameLayout(this); shell.addView(viewport, new LinearLayout.LayoutParams(-1, 0, 1));
         tabs = row(); shell.addView(tabs); setContentView(shell); systemBars();
         viewport.addView(text("Opening app...", 18));
-        pendingRoute = routeFrom(getIntent());
-        if (state != null && pendingRoute.isEmpty()) pendingRoute = state.getString("route", "");
+        pendingRoute = state != null && state.containsKey("route") ? state.getString("route", "") : routeFrom(getIntent());
         lifecycle.execute(() -> {
             try {
                 backend.start(getFilesDir().getAbsolutePath()+"/app");
                 Map<String,String> caps = new LinkedHashMap<>();
                 for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
+                caps.put("open-url/v1", "available");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");
@@ -98,7 +99,13 @@ public abstract class GofastrActivity extends Activity {
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));
                 connection = reply.getString("connection");
-                main.post(() -> { if (!destroyed) { started = true; open(pendingRoute.isEmpty()?backend.root():pendingRoute, new LinkedHashMap<>(), "root", null); } });
+                main.post(() -> {
+                    if (destroyed) return;
+                    started = true;
+                    String route = pendingRoute;
+                    pendingRoute = "";
+                    open(route.isEmpty()?backend.root():route, new LinkedHashMap<>(), "root", null);
+                });
             } catch (Exception e) { main.post(() -> failure("The app could not start.",e)); }
         });
     }
@@ -161,7 +168,7 @@ public abstract class GofastrActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent); setIntent(intent); String route=routeFrom(intent);
         if (incomingSharesEnabled()) captureIncomingShare(intent, null);
-        if(!route.isEmpty()) { if(started) navigate(route); else pendingRoute=route; }
+        if(!route.isEmpty()) { if(current!=null) navigate(route); else pendingRoute=route; }
     }
     private void captureIncomingShare(Intent intent, Bundle state) {
         if(intent==null)return;
@@ -176,10 +183,13 @@ public abstract class GofastrActivity extends Activity {
     }
     private String routeFrom(Intent intent) {
         if(intent==null) return "";
-        if(intent.getBooleanExtra("gofastr.reminder", false)) return localRoute(intent.getStringExtra("route"));
-        if(!Intent.ACTION_VIEW.equals(intent.getAction()))return "";
+        if(!Intent.ACTION_VIEW.equals(intent.getAction())) {
+            return intent.getBooleanExtra("gofastr.reminder", false) ? localRoute(intent.getStringExtra("route")) : "";
+        }
         android.net.Uri uri=intent.getData();
-        if(uri==null || urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";
+        if(uri==null) return "";
+        if("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) return localRoute(WebLinks.route(uri.toString(), appLinkHosts()));
+        if(urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";
         String route=(uri.getHost()==null?"":"/"+uri.getHost())+(uri.getEncodedPath()==null?"":uri.getEncodedPath());
         if(uri.getEncodedQuery()!=null) route+="?"+uri.getEncodedQuery();
         return localRoute(route);
@@ -227,6 +237,10 @@ public abstract class GofastrActivity extends Activity {
         shortCall(request, reply -> {
             if(generation!=privacyGeneration){if(reply.has("instance"))retire(reply.optString("instance"));return;}
             navigationPending=false;
+            if(current==null && kind.equals("root") && reply.has("error") && !route.equals(backend.root())) {
+                open(backend.root(), new LinkedHashMap<>(), "root", null);
+                return;
+            }
             if(error(reply, current)) { if(current!=null) watch(current); return; }
             try {
                 Frame f=reuse==null?new Frame():reuse;
@@ -249,6 +263,11 @@ public abstract class GofastrActivity extends Activity {
                     stack.add(f);
                 } else f.update();
                 show(f);
+                if(kind.equals("root") && !pendingRoute.isEmpty()) {
+                    String queued = pendingRoute;
+                    pendingRoute = "";
+                    navigate(queued);
+                }
             } catch(Exception e) { failure("The screen could not open.",e); }
         });
     }

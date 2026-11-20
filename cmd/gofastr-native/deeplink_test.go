@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -35,6 +37,89 @@ func TestURLSchemePackagingIsOptIn(t *testing.T) {
 			if !bytes.Contains(plist, []byte("<string>"+scheme+"</string>")) || bytes.Count(swift, []byte("\n")) > 75 {
 				t.Fatal("deep-link packaging lost its scheme or introduced screen behavior into bootstrap")
 			}
+		}
+	}
+}
+
+func TestAndroidAppLinkPackaging(t *testing.T) {
+	application := nativeApp(t).forAndroid(36)
+	application.URLScheme = "notes-demo"
+	hosts := []string{"links.example.org", "xn--bcher-kva.example"}
+	for _, enabled := range []bool{false, true} {
+		if enabled {
+			application.AppLinkHosts = hosts
+		}
+		manifest, err := render("templates/android/AndroidManifest.xml.tmpl", application)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var parsed struct {
+			Filters []struct {
+				Verify bool `xml:"autoVerify,attr"`
+				Action struct {
+					Name string `xml:"name,attr"`
+				} `xml:"action"`
+				Categories []struct {
+					Name string `xml:"name,attr"`
+				} `xml:"category"`
+				Data []struct {
+					Host   string `xml:"host,attr"`
+					Scheme string `xml:"scheme,attr"`
+				} `xml:"data"`
+			} `xml:"application>activity>intent-filter"`
+		}
+		if err := xml.Unmarshal(manifest, &parsed); err != nil {
+			t.Fatal(err)
+		}
+		var registered []string
+		for _, filter := range parsed.Filters {
+			if !filter.Verify {
+				continue
+			}
+			if filter.Action.Name != "android.intent.action.VIEW" || len(filter.Categories) != 2 ||
+				filter.Categories[0].Name != "android.intent.category.DEFAULT" || filter.Categories[1].Name != "android.intent.category.BROWSABLE" {
+				t.Fatalf("wrong action or categories: %+v", filter)
+			}
+			if len(filter.Data) != 3 || filter.Data[0].Scheme != "https" || filter.Data[1].Scheme != "http" || filter.Data[2].Host == "" {
+				t.Fatalf("wrong App Link data: %+v", filter.Data)
+			}
+			registered = append(registered, filter.Data[2].Host)
+		}
+		if !slices.Equal(registered, application.AppLinkHosts) || !bytes.Contains(manifest, []byte(`android:scheme="notes-demo"`)) {
+			t.Fatalf("expected hosts %v and custom scheme; got hosts %v", application.AppLinkHosts, registered)
+		}
+		java, err := render("templates/android/MainActivity.java.tmpl", application)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(java, []byte(`Arrays.asList("links.example.org", "xn--bcher-kva.example")`)) != enabled {
+			t.Fatalf("host allowlist did not match the manifest: %s", java)
+		}
+	}
+}
+
+func TestAppLinkHostValidation(t *testing.T) {
+	want := []string{"links.example.org", "xn--bcher-kva.example"}
+	hosts, err := parseAppLinkHosts("links.example.org, xn--bcher-kva.example,links.example.org")
+	if err != nil || !slices.Equal(hosts, want) {
+		t.Fatalf("hosts = %v, %v; want %v", hosts, err, want)
+	}
+	for _, invalid := range []string{"HTTPS://example.org", "EXAMPLE.org", "*.example.org", "example.org.", "example.org:443",
+		"example.org/path", "example..org", "bad-.org", "user@example.org", `"injected.org`, "localhost", "127.0.0.1", "example.1org",
+		"example.org,", strings.Repeat("a", 64) + ".org"} {
+		if _, err := parseAppLinkHosts(invalid); err == nil {
+			t.Errorf("accepted unsafe or invalid host %q", invalid)
+		}
+	}
+	for _, flags := range [][]string{
+		{"--platform", "ios-sim", "--renderer", "native", "--app-link-hosts", "example.org"},
+		{"--platform", "android", "--renderer", "webview", "--app-link-hosts", "example.org"},
+		{"--platform", "android", "--renderer", "native", "--app-link-hosts", "*.example.org"},
+	} {
+		var stdout, stderr bytes.Buffer
+		args := append([]string{"build", "--pkg", "./unused", "--dry-run"}, flags...)
+		if code := run(context.Background(), args, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), "--app-link-hosts") || stdout.Len() != 0 {
+			t.Fatalf("invalid hosts reached build: %v: %d %s %s", flags, code, &stdout, &stderr)
 		}
 	}
 }

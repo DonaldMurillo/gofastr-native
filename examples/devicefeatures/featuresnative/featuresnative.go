@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	goruntime "runtime"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -125,11 +127,15 @@ func newApp() (*nativeui.App, error) {
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
 	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
+		rows := []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
-		}}}, nil
+		}
+		if goruntime.GOOS == "android" {
+			rows = append(rows, nativeui.Row{ID: "links", Title: "Web links", Destination: "/features/links"})
+		}
+		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: rows}}, nil
 	}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
@@ -158,6 +164,23 @@ func newApp() (*nativeui.App, error) {
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
+		nativeui.Route{
+			Path: "/features/links",
+			Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+				return nativeui.Screen{
+					Title:    "Web links",
+					Text:     "Open a web URL with Android. Link source: " + preview(request.Values["source"]),
+					Actions:  []nativeui.Action{{ID: "open-web", Label: "Open Android App Links guide", Primary: true}},
+					Requires: []nativeui.Requirement{{Capability: nativeui.CapabilityOpenURL}},
+				}, nil
+			},
+			Actions: map[string]nativeui.Handle{
+				"open-web": service(nativeui.ServiceRequest{OpenURL: &links.Open{URL: "https://developer.android.com/training/app-links"}}),
+			},
+			Services: map[string]nativeui.ServiceRespond{"device": func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+				return nativeui.Result{Announcement: result.Message}, nil
+			}},
+		},
 	)
 }
 

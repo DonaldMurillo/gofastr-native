@@ -58,6 +58,7 @@ Flags (build, run):
                 empty disables native camera access)
   --microphone-usage  optional microphone purpose text; empty disables recording
   --url-scheme  optional application-specific deep-link scheme (native renderer)
+  --app-link-hosts  comma-separated verified App Link hosts (native Android)
   --receive-shares  accept shared text and files into the app's private inbox
   --secure-storage  enable Keychain/Keystore storage and authentication
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
