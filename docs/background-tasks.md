@@ -93,5 +93,41 @@ Refresh the timestamp or reopen its screen after execution.
 Go tests cover request validation, service outcomes, registered handler dispatch,
 deadlines, cancellation, panics, and unknown tasks. CLI tests cover opt-in flags,
 manifest wiring, and SDK compilation of the generated JobService binding.
-Emulator execution, closed-activity delivery, reboot persistence, constraints,
-retry timing, and physical-device acceptance: **NOT RUN**.
+
+Android 14 x86-64 emulator acceptance (Pixel 5 API 34, November 20, 2026):
+
+- The demo's one-off schedule and status reported `Background job scheduled:
+  true.`. `dumpsys jobscheduler` showed job `3079651`, `PERSISTED`, extras
+  `{identifier=demo, task=timestamp}`, and a one-minute minimum latency.
+  `cmd jobscheduler run -f dev.gofastr.featuresnative 3079651` reported
+  `Running job [FORCED]`. Reopening the screen displayed the handler's stored
+  timestamp, `2026-11-20T14:55:16Z`.
+- After backgrounding, `am kill dev.gofastr.featuresnative` removed the process
+  while the pending job remained. A forced run started a new process for
+  `BackgroundService`, not `MainActivity`. The subsequently reopened screen
+  showed a newer timestamp, `2026-11-20T14:56:04Z`. No force-stop or app-data
+  clearing was used for these background-task checks.
+- Periodic scheduling showed `PERIODIC: interval=+15m0s0ms` and status true.
+  Cancel followed by status reported false, and the package's registered job
+  disappeared from `dumpsys jobscheduler`.
+- A periodic job survived `adb reboot`: a changed kernel boot ID confirmed the
+  reboot, and the same service, job ID, task extras, periodic interval, and
+  `PERSISTED` entry were present before reopening the app. In-app status then
+  reported true. This proves schedule persistence, not post-reboot execution.
+- A Java probe on that emulator built the production zero-delay combination
+  (`setMinimumLatency(0)`, no network, no charging) successfully and reported
+  `minLatency=0`. The suspected no-constraints exception did not reproduce.
+  API 24's platform source also sets `mHasEarlyConstraint = true` in
+  `setMinimumLatency`, including zero; its builder's constraint check therefore
+  accepts this path. No override deadline was added: deadlines could bypass
+  requested network or charging constraints.
+- The separate Notes `scripts/android_smoke.py --services` regression passed
+  launch, save/list, process-death drafts, Back guards, corrected modal
+  selection, clipboard, exact UTF-8 SAF transfer, attachment return, normalized
+  photos, AAC recording/playback backgrounding, share cancellation, and reminder
+  status/schedule/cancel on the same emulator.
+
+The forced runs bypass scheduler constraints. Unforced delivery timing, network
+and charging enforcement, Doze/quotas, retry/backoff timing, interruption of a
+long-running handler, API 24 runtime behavior, other Android releases, physical
+devices, and accessibility acceptance remain **NOT RUN**.

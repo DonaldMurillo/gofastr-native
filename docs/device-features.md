@@ -47,7 +47,10 @@ See [share-in](share-in.md), [secure storage](secure-storage.md), and
 [Background tasks](background-tasks.md) add Android-only Go handlers that can run
 without an activity. Add `--background-tasks` to the Android demo build above.
 The background screen records a durable timestamp; scheduling does not prove
-execution. Emulator acceptance for this feature is NOT RUN.
+execution. Android 14 x86-64 emulator checks cover forced one-off execution with
+and without an activity process, periodic scheduling/cancellation, and schedule
+persistence across reboot. See the background-task validation section for the
+remaining gates; forced execution does not prove scheduler timing or constraints.
 
 ## Acceptance
 
