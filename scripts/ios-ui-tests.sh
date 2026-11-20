@@ -8,7 +8,7 @@ export GOWORK=off
 go run ./cmd/gofastr-native build --platform ios-sim --renderer native \
   --pkg ./examples/devicefeatures/featuresnative --id dev.example.devicefeatures \
   --name GofastrDeviceFeatures --camera-usage 'Scan a code when you choose Scan code.' --out "$OUT/app"
-if ! xcrun simctl list devices booted | rg -Fq "$SIMULATOR_UDID"; then
+if ! xcrun simctl list devices booted | grep -Fq "$SIMULATOR_UDID"; then
   xcrun simctl boot "$SIMULATOR_UDID"
 fi
 xcrun simctl bootstatus "$SIMULATOR_UDID" -b
