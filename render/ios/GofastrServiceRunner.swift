@@ -371,6 +371,8 @@ public enum GofastrPush {
 
     private static func observe(_ completion: @escaping (MobilePushState) -> Void) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let profile = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
+            let environment = profile.flatMap { try? Data(contentsOf: $0, options: .mappedIfSafe) }.flatMap { MobilePushState.environment(profile: $0) }
             DispatchQueue.main.async {
                 let permission: String
                 switch settings.authorizationStatus {
@@ -382,8 +384,6 @@ public enum GofastrPush {
                 @unknown default: permission = "notDetermined"
                 }
                 let registered = UIApplication.shared.isRegisteredForRemoteNotifications
-                let profile = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
-                let environment = profile.flatMap { try? Data(contentsOf: $0, options: .mappedIfSafe) }.flatMap { MobilePushState.environment(profile: $0) }
                 completion(MobilePushState(permission: permission, registered: registered, token: registered && !token.isEmpty ? token : nil, environment: environment))
             }
         }
