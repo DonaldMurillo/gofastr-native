@@ -111,9 +111,10 @@ public final class Push {
             JSONObject values=new JSONObject();int total=0;
             if(data!=null)for(Map.Entry<String,String> entry:new TreeMap<>(data).entrySet()){
                 String key=entry.getKey(),value=entry.getValue()==null?"":entry.getValue();
-                if(key==null || key.isEmpty() || key.length()>128 || reserved(key) || values.length()>=32 || !plain(key).equals(key) || value.indexOf('\0')>=0)continue;
-                if(total+key.length()+value.length()>MAX_DATA)break;
-                total+=key.length()+value.length();values.put(key,value);
+                int size=key==null?0:utf8(key)+utf8(value);
+                if(key==null || key.isEmpty() || utf8(key)>128 || reserved(key) || values.length()>=32 || !plain(key).equals(key) || value.indexOf('\0')>=0)continue;
+                if(total+size>MAX_DATA)break;
+                total+=size;values.put(key,value);
             }
             if(values.length()>0)message.put("data",values);
             synchronized(Push.class){
@@ -135,6 +136,8 @@ public final class Push {
         for(String key:extras.keySet()){Object value=extras.get(key);if(value instanceof String)data.put(key,(String)value);}
         deliver(context,extras.getString("google.message_id"),data.get("gcm.notification.title"),data.get("gcm.notification.body"),data,false);
     }
+
+    private static int utf8(String value) { return value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length; }
 
     private static String plain(String value) {
         StringBuilder out=new StringBuilder(value.length());
