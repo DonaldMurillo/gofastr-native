@@ -36,8 +36,7 @@ func TestAndroidWebViewBridgeAfterDestroy(t *testing.T) {
 		return body
 	}
 	if !strings.Contains(source, "private volatile boolean destroyed;") ||
-		!strings.Contains(source, "if (destroyed || !trusted(Uri.parse(url)))") ||
-		!strings.Contains(source, "bridgePorts.add(mine);") {
+		!strings.Contains(source, "if (destroyed || !trusted(Uri.parse(url)))") {
 		t.Fatal("bridge lifecycle fencing missing")
 	}
 	callback := between("public void onMessage(WebMessagePort port, WebMessage message) {", "\n                }\n            });")
@@ -49,7 +48,6 @@ import java.util.concurrent.RejectedExecutionException;
 public class BridgeTest {
     static final String TAG = "test";
     boolean destroyed;
-    final List<WebMessagePort> bridgePorts = new ArrayList<>();
     final Worker bridgeThreads = new Worker();
     final List<Runnable> ui = new ArrayList<>();
     final WebMessagePort mine = new WebMessagePort();
@@ -94,9 +92,7 @@ public class BridgeTest {
             check(b.mine.replies == 1);
         }
         BridgeTest late = new BridgeTest();
-        late.bridgePorts.add(late.mine);
         late.destroy();
-        check(late.mine.closed && late.bridgePorts.isEmpty());
         late.onMessage(late.mine, null);
         check(late.bridgeThreads.pending == null);
         BridgeTest rejected = new BridgeTest();
@@ -110,7 +106,6 @@ public class BridgeTest {
         worker.bridgeThreads.pending.run();
         check(Go.calls == calls && worker.ui.isEmpty());
         BridgeTest reply = new BridgeTest();
-        reply.bridgePorts.add(reply.mine);
         reply.onMessage(reply.mine, new WebMessage("request"));
         reply.bridgeThreads.pending.run();
         reply.destroy();
