@@ -43,8 +43,9 @@ are `native.map` and `native.map.pin.<id>`; pin labels use their titles.
 
 ## Location permission
 
-Build with `--location-usage "Show your position on the map."` to add
-`NSLocationWhenInUseUsageDescription`. The default empty flag disables this
+Build with `--location --location-usage "Show your position on the map."` to add
+`NSLocationWhenInUseUsageDescription`. Location is opt-in; both flags are required
+and supported only with the native iOS renderer. Omitting both disables this
 permission. The map requests when-in-use authorization on main only while
 attached to a window, only if `ShowsUserLocation` is true and nonempty purpose
 text exists. Without permission or purpose text, pins and the map still render.
@@ -83,7 +84,7 @@ GOWORK=off go test ./extension/maps -run TestGalleryMapUI -v -count=1 -timeout=2
 ```
 
 The output directory must be outside the repository and must not already contain
-`Maps.xcresult`. The opt-in wrapper builds the gallery with `--location-usage`,
+`Maps.xcresult`. The opt-in wrapper builds the gallery with `--location --location-usage`,
 installs it, grants location with `simctl privacy`, and sets a simulated position
 before launching. It runs `xcodebuild test` with the shared `MapsUITests` scheme,
 serially on the specified simulator. Normal Go test runs skip UI acceptance.

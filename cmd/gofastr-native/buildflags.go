@@ -13,11 +13,12 @@ import (
 // buildFlags is the one parser for the flags doctor, build, run, and dev
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
-	fs *flag.FlagSet
+	fs            *flag.FlagSet
+	location      *bool
+	locationUsage *string
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
-	locationUsage                                                   *string
 	appGroup, device, shot, existingApp, require                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
 	wait                                                            *time.Duration
@@ -26,6 +27,8 @@ type buildFlags struct {
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:              fs,
+		location:        fs.Bool("location", false, "enable foreground iOS location services"),
+		locationUsage:   fs.String("location-usage", "", "iOS when-in-use location purpose text"),
 		platform:        fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
 		pkg:             fs.String("pkg", "", "bind package"),
 		id:              fs.String("id", "", "bundle / application id"),
@@ -36,7 +39,6 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		renderer:        fs.String("renderer", "webview", "webview or native (iOS/Android)"),
 		cameraUsage:     fs.String("camera-usage", defaultCameraUsage, "iOS camera purpose string; empty disables native camera"),
 		microphoneUsage: fs.String("microphone-usage", "", "iOS microphone purpose string; empty disables recording"),
-		locationUsage:   fs.String("location-usage", "", "iOS location purpose string; empty disables map location"),
 		urlScheme:       fs.String("url-scheme", "", "application-specific deep-link scheme (native renderer)"),
 		receiveShares:   fs.Bool("receive-shares", false, "enable the private incoming-share inbox"),
 		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
@@ -133,10 +135,6 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	if err := validateUsage("location-usage", *f.locationUsage, "disables map location"); err != nil {
-		fmt.Fprintln(stderr, err)
-		return 2
-	}
 	if *f.hostTemplate != "" {
 		resolved, err := filepath.Abs(*f.hostTemplate)
 		if err != nil {
@@ -172,10 +170,10 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.DebugTrace = *f.debugTrace
 	a.CameraUsage = strings.TrimSpace(*f.cameraUsage)
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
-	a.LocationUsage = strings.TrimSpace(*f.locationUsage)
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
+	a.Location, a.LocationUsage = *f.location, strings.TrimSpace(*f.locationUsage)
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2

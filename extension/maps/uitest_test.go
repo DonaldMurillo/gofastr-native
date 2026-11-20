@@ -52,7 +52,7 @@ func TestGalleryMapUI(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 	}
-	run("go", "run", "./cmd/gofastr-native", "build", "--platform", "ios-sim", "--renderer", "native", "--pkg", "./examples/gallery/gallerynative", "--location-usage", "Show your position on the map.", "--out", output)
+	run("go", "run", "./cmd/gofastr-native", "build", "--platform", "ios-sim", "--renderer", "native", "--pkg", "./examples/gallery/gallerynative", "--location", "--location-usage", "Show your position on the map.", "--out", output)
 	run("xcrun", "simctl", "install", device, filepath.Join(output, "Gallerynative.app"))
 	run("xcrun", "simctl", "privacy", device, "grant", "location", "dev.gofastr.gallerynative")
 	run("xcrun", "simctl", "location", device, "set", "37.765,-122.435")

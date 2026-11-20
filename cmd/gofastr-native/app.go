@@ -70,11 +70,12 @@ type app struct {
 	Renderer        string
 	CameraUsage     string
 	MicrophoneUsage string
-	LocationUsage   string
 	URLScheme       string
 	ReceiveShares   bool
 	SecureStorage   bool
 	BiometricUsage  string
+	Location        bool
+	LocationUsage   string
 	Widgets         bool
 	AppGroup        string
 	Extensions      []compiledExtension

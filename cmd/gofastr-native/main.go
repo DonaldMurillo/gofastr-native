@@ -57,11 +57,12 @@ Flags (build, run):
   --camera-usage  camera purpose text (default: user-initiated photo capture;
                 empty disables native camera access)
   --microphone-usage  optional microphone purpose text; empty disables recording
-  --location-usage    optional iOS location purpose text; empty disables map location
   --url-scheme  optional application-specific deep-link scheme (native renderer)
   --receive-shares  accept shared text and files into the app's private inbox
   --secure-storage  enable Keychain/Keystore storage and authentication
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
+  --location         Enable foreground iOS location services (native renderer)
+  --location-usage   When-in-use purpose text; required with --location
   --widgets     package a home-screen widget; requires --url-scheme
   --app-group   iOS app-group identifier for share and widget extensions
   --dry-run     print every step without running it
