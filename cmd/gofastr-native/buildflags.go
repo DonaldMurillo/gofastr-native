@@ -14,6 +14,8 @@ import (
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
 	fs            *flag.FlagSet
+	location      *bool
+	locationUsage *string
 	calendar      *bool
 	calendarUsage *string
 
@@ -21,12 +23,15 @@ type buildFlags struct {
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
+	signInWithApple                                                 *bool
 	wait                                                            *time.Duration
 }
 
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:              fs,
+		location:        fs.Bool("location", false, "enable foreground iOS location services"),
+		locationUsage:   fs.String("location-usage", "", "iOS when-in-use location purpose text"),
 		calendar:        fs.Bool("calendar", false, "enable iOS calendar events"),
 		calendarUsage:   fs.String("calendar-usage", "Add and read calendar events you choose.", "calendar permission purpose text"),
 		platform:        fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
@@ -44,6 +49,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
 		biometricUsage:  fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:         fs.Bool("widgets", false, "package a home-screen widget"),
+		signInWithApple: fs.Bool("sign-in-with-apple", false, "enable Sign in with Apple (native iOS)"),
 		appGroup:        fs.String("app-group", "", "iOS app-group identifier"),
 		dry:             fs.Bool("dry-run", false, "print the steps only"),
 		debugTrace:      fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
@@ -176,7 +182,9 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
+	a.SignInWithApple = *f.signInWithApple
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
+	a.Location, a.LocationUsage = *f.location, strings.TrimSpace(*f.locationUsage)
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2

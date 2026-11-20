@@ -76,7 +76,10 @@ type app struct {
 	Calendar        bool
 	CalendarUsage   string
 	BiometricUsage  string
+	Location        bool
+	LocationUsage   string
 	Widgets         bool
+	SignInWithApple bool
 	AppGroup        string
 	Extensions      []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")

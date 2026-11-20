@@ -62,6 +62,8 @@ Flags (build, run):
   --calendar        enable iOS calendar events (--calendar-usage sets purpose text)
   --secure-storage  enable Keychain/Keystore storage and authentication
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
+  --location         Enable foreground iOS location services (native renderer)
+  --location-usage   When-in-use purpose text; required with --location
   --widgets     package a home-screen widget; requires --url-scheme
   --app-group   iOS app-group identifier for share and widget extensions
   --dry-run     print every step without running it

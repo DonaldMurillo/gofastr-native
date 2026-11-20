@@ -7,9 +7,14 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	"github.com/DonaldMurillo/gofastr-native/device/browser"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
+	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -19,30 +24,39 @@ import (
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
-	ID            string                 `json:"id"`
-	Notification  *notifications.Request `json:"notification,omitempty"`
-	Share         *sharing.Request       `json:"share,omitempty"`
-	Clipboard     *sharing.Clipboard     `json:"clipboard,omitempty"`
-	Audio         *audio.Request         `json:"audio,omitempty"`
-	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
-	Calendar      *calendar.Request      `json:"calendar,omitempty"`
-	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
-	Widget        *widgets.Request       `json:"widget,omitempty"`
-	Commit        bool                   `json:"commit,omitempty"`
+	Browser        *browser.Request        `json:"browser,omitempty"`
+	Contacts       *contacts.Request       `json:"contacts,omitempty"`
+	ID             string                  `json:"id"`
+	Notification   *notifications.Request  `json:"notification,omitempty"`
+	Share          *sharing.Request        `json:"share,omitempty"`
+	Clipboard      *sharing.Clipboard      `json:"clipboard,omitempty"`
+	Audio          *audio.Request          `json:"audio,omitempty"`
+	IncomingShare  *sharein.Request        `json:"incomingShare,omitempty"`
+	Calendar       *calendar.Request       `json:"calendar,omitempty"`
+	SecureStorage  *securestore.Request    `json:"secureStorage,omitempty"`
+	Location       *location.Request       `json:"location,omitempty"`
+	Widget         *widgets.Request        `json:"widget,omitempty"`
+	Scan           *scanner.Request        `json:"scan,omitempty"`
+	Authentication *authentication.Request `json:"authentication,omitempty"`
+	Commit         bool                    `json:"commit,omitempty"`
 }
 
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
-	Status         EffectStatus        `json:"status"`
-	Message        string              `json:"message,omitempty"`
-	Permission     string              `json:"permission,omitempty"`
-	Identifier     string              `json:"identifier,omitempty"`
-	File           *files.Document     `json:"file,omitempty"`
-	DurationMillis int                 `json:"durationMillis,omitempty"`
-	IncomingShare  *sharein.Item       `json:"incomingShare,omitempty"`
-	Calendar       *calendar.Result    `json:"calendar,omitempty"`
-	SecureStorage  *securestore.Result `json:"secureStorage,omitempty"`
-	Widget         *widgets.State      `json:"widget,omitempty"`
+	Contacts       *contacts.Selection    `json:"contacts,omitempty"`
+	Status         EffectStatus           `json:"status"`
+	Message        string                 `json:"message,omitempty"`
+	Permission     string                 `json:"permission,omitempty"`
+	Identifier     string                 `json:"identifier,omitempty"`
+	File           *files.Document        `json:"file,omitempty"`
+	DurationMillis int                    `json:"durationMillis,omitempty"`
+	IncomingShare  *sharein.Item          `json:"incomingShare,omitempty"`
+	Calendar       *calendar.Result       `json:"calendar,omitempty"`
+	SecureStorage  *securestore.Result    `json:"secureStorage,omitempty"`
+	Location       *location.Result       `json:"location,omitempty"`
+	Widget         *widgets.State         `json:"widget,omitempty"`
+	Scan           *scanner.Result        `json:"scan,omitempty"`
+	Authentication *authentication.Result `json:"authentication,omitempty"`
 }
 
 // ServiceRespond receives every validated outcome, including cancellation.
@@ -53,7 +67,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Calendar != nil} {
+	for _, present := range []bool{request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil} {
 		if present {
 			operations++
 		}
@@ -62,6 +76,12 @@ func (request ServiceRequest) Validate() error {
 		return errors.New("nativeui: exactly one named device service is required")
 	}
 	switch {
+	case request.Browser != nil:
+		return request.Browser.Validate()
+	case request.Contacts != nil:
+		return request.Contacts.Validate()
+	case request.Scan != nil:
+		return request.Scan.Validate()
 	case request.Notification != nil:
 		return request.Notification.Validate()
 	case request.Share != nil:
@@ -76,6 +96,10 @@ func (request ServiceRequest) Validate() error {
 		return request.Calendar.Validate()
 	case request.Widget != nil:
 		return request.Widget.Validate()
+	case request.Location != nil:
+		return request.Location.Validate()
+	case request.Authentication != nil:
+		return request.Authentication.Validate()
 	default:
 		return request.Audio.Validate()
 	}
@@ -83,6 +107,12 @@ func (request ServiceRequest) Validate() error {
 
 func (request ServiceRequest) capability() Capability {
 	switch {
+	case request.Browser != nil:
+		return CapabilityBrowser
+	case request.Contacts != nil:
+		return CapabilityContacts
+	case request.Scan != nil:
+		return CapabilityScanner
 	case request.Notification != nil:
 		return CapabilityNotifications
 	case request.Share != nil:
@@ -97,16 +127,32 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityCalendar
 	case request.Widget != nil:
 		return CapabilityWidgets
+	case request.Location != nil:
+		return CapabilityLocation
+	case request.Authentication != nil:
+		if request.Authentication.Operation == authentication.Apple {
+			return CapabilitySignInWithApple
+		}
+		return CapabilityOAuthWebLogin
 	default:
 		return CapabilityAudio
 	}
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
-	if (outcome.Calendar != nil && request.Calendar == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
+	if outcome.Location != nil && (request.Location == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unexpected location content")
+	}
+	if request.Location != nil && outcome.Permission != "" && !location.ValidPermission(location.Permission(outcome.Permission)) {
+		return errors.New("nativeui: invalid location permission")
+	}
+	if outcome.Scan != nil && (request.Scan == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unexpected scanner content")
+	}
+	if (outcome.Calendar != nil && request.Calendar == nil) || (outcome.Contacts != nil && request.Contacts == nil) || (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) || (outcome.Authentication != nil && request.Authentication == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
-	if outcome.Status != EffectCompleted && (outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil || outcome.Calendar != nil) {
+	if outcome.Status != EffectCompleted && (outcome.Contacts != nil || outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil || outcome.Authentication != nil || outcome.Calendar != nil) {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	for _, text := range []string{outcome.Message, outcome.Permission, outcome.Identifier} {
@@ -119,6 +165,27 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	switch outcome.Status {
 	case EffectCompleted:
+		if request.Contacts != nil {
+			if err := request.Contacts.Accept(outcome.Contacts); err != nil {
+				return err
+			}
+		}
+		if request.Location != nil {
+			if outcome.Location == nil {
+				return errors.New("nativeui: location result is required")
+			}
+			if err := request.Location.Accept(*outcome.Location); err != nil {
+				return err
+			}
+		}
+		if request.Scan != nil {
+			if outcome.Scan == nil {
+				return errors.New("nativeui: scanner result is required")
+			}
+			if err := request.Scan.Accept(*outcome.Scan); err != nil {
+				return err
+			}
+		}
 		if request.Calendar != nil {
 			if outcome.Calendar == nil {
 				return errors.New("nativeui: calendar result required")
@@ -145,6 +212,11 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: widget result is required")
 			}
 			if err := request.Widget.Accept(*outcome.Widget); err != nil {
+				return err
+			}
+		}
+		if request.Authentication != nil {
+			if err := request.Authentication.Accept(outcome.Authentication); err != nil {
 				return err
 			}
 		}

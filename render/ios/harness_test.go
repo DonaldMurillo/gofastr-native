@@ -28,7 +28,7 @@ func requireSwift(t *testing.T) {
 var rendererSourceFiles = []string{
 	"GofastrComponents.swift", "GofastrComponentExtensions.swift", "GofastrActions.swift", "GofastrFiles.swift",
 	"GofastrPresentation.swift", "GofastrImages.swift", "GofastrAttachments.swift", "GofastrServices.swift",
-	"GofastrIncomingShares.swift", "GofastrSecureStorage.swift", "GofastrCalendar.swift", "GofastrWidgets.swift",
+	"GofastrIncomingShares.swift", "GofastrSecureStorage.swift", "GofastrCalendar.swift", "GofastrWidgets.swift", "GofastrLocation.swift", "GofastrScanner.swift",
 }
 
 // readSource returns one source file of fsys as a string.
