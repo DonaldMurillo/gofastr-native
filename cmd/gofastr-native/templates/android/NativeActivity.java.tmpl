@@ -21,6 +21,7 @@ public final class MainActivity extends GofastrActivity {
     @Override protected boolean microphoneEnabled() { return {{if .MicrophoneUsage}}true{{else}}false{{end}}; }
     @Override protected boolean incomingSharesEnabled() { return {{.ReceiveShares}}; }
     @Override protected boolean secureStorageEnabled() { return {{.SecureStorage}}; }
+    @Override protected boolean networkStatusEnabled() { return {{.NetworkStatus}}; }
     @Override protected boolean biometricsEnabled() { return {{if .BiometricUsage}}true{{else}}false{{end}}; }
     @Override protected boolean widgetsEnabled() { return {{.Widgets}}; }
 }

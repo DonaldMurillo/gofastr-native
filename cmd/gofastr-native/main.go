@@ -60,6 +60,7 @@ Flags (build, run):
   --url-scheme  optional application-specific deep-link scheme (native renderer)
   --receive-shares  accept shared text and files into the app's private inbox
   --secure-storage  enable Keychain/Keystore storage and authentication
+  --network-status  enable Android one-shot network status
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
   --widgets     package a home-screen widget; requires --url-scheme
   --app-group   iOS app-group identifier for share and widget extensions

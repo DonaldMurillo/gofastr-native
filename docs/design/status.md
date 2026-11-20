@@ -57,6 +57,10 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+[Network status](../network-status.md) has an opt-in Android native adapter and
+a device-features demo action. It reports one snapshot, with no subscriptions.
+iOS and WebView are not implemented.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

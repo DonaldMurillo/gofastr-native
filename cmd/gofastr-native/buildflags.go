@@ -13,7 +13,8 @@ import (
 // buildFlags is the one parser for the flags doctor, build, run, and dev
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
-	fs *flag.FlagSet
+	fs            *flag.FlagSet
+	networkStatus *bool
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
@@ -25,6 +26,7 @@ type buildFlags struct {
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:              fs,
+		networkStatus:   fs.Bool("network-status", false, "enable Android network status queries"),
 		platform:        fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
 		pkg:             fs.String("pkg", "", "bind package"),
 		id:              fs.String("id", "", "bundle / application id"),
@@ -168,6 +170,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
+	a.NetworkStatus = *f.networkStatus
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)

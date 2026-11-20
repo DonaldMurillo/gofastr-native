@@ -1,5 +1,8 @@
 # Shared native device features
 
+[Network status](network-status.md) is an Android-only, opt-in one-shot service.
+The device-features demo includes a network query; enable it with `--network-status`.
+
 Share-in, secure storage with biometric authentication, and home-screen widgets
 use the same Go contracts on Android and iOS. The app authors requests and
 handles typed outcomes in `nativeui.Route.Services`. The platform adapters own

@@ -8,6 +8,9 @@ import (
 )
 
 func validateDeviceFeatures(a app, platform string) error {
+	if a.NetworkStatus && (a.Renderer != "native" || platform != "android-emu") {
+		return errors.New("--network-status requires Android and --renderer native")
+	}
 	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
 	}

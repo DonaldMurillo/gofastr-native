@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/network"
+
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -95,6 +97,8 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Network != nil:
+				message = fmt.Sprintf("Connected: %t; transport: %s; metered: %t; validated: %t.", result.Network.Connected, result.Network.Transport, result.Network.Metered, result.Network.Validated)
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -127,10 +131,12 @@ func newApp() (*nativeui.App, error) {
 	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
+			{ID: "network", Title: "Network status", Destination: "/features/network"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 		}}}, nil
 	}},
+		deviceRoute("/features/network", "Network status", "Query the active Android network. Re-query after changing connectivity or resuming the app.", []nativeui.Action{{ID: "status", Label: "Check network status", Primary: true}}, map[string]nativeui.Handle{"status": service(nativeui.ServiceRequest{Network: &network.Request{Operation: network.Status}})}),
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
