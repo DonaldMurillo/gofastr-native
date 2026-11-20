@@ -8,12 +8,13 @@ struct MobileServiceRequest: Codable {
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
+    let location: MobileLocationRequest?
     let widget: MobileWidgetRequest?
     let commit: Bool?
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
+              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try notification?.validate()
@@ -22,6 +23,7 @@ struct MobileServiceRequest: Codable {
         try audio?.validate()
         try incomingShare?.validate()
         try secureStorage?.validate()
+        try location?.validate()
         try widget?.validate()
     }
 }
@@ -299,6 +301,7 @@ struct MobileServiceResult: Codable {
     var durationMillis: Int?
     var incomingShare: MobileIncomingShareItem?
     var secureStorage: MobileSecureStorageResult?
+    var location: MobileLocationResult?
     var widget: MobileWidgetState?
 
     var wire: [String: Any] {
@@ -313,6 +316,7 @@ struct MobileServiceResult: Codable {
         if status == "completed" {
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }
+            if let location { value["location"] = location.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }
         }
         return value

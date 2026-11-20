@@ -15,6 +15,8 @@ public final class GofastrServiceRunner: NSObject {
     private var cancellingSchedule = false
     private let secureStorage = GofastrSecureStorage()
     private var secureStorageActive = false
+    private let location = GofastrLocation(isForeground: { UIApplication.shared.applicationState != .background })
+    private var locationActive = false
     private var durableServiceActive = false
     private lazy var dismissalDelegate = MobileServiceDismissalDelegate { [weak self] in self?.cancel() }
 
@@ -29,6 +31,7 @@ public final class GofastrServiceRunner: NSObject {
         let purpose = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
         return ["notifications/v1": "available", "sharing/v1": "available", "clipboard/v1": "available",
                 "secure-storage/v1": GofastrSecureStorage.enabled ? "available" : "unavailable",
+                "location/v1": GofastrLocation.enabled ? "available" : "unavailable",
                 "incoming-shares/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrReceiveShares") as? Bool == true ? "available" : "unavailable",
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
                 "audio/v1": purpose?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "available" : "unavailable"]
@@ -69,12 +72,21 @@ public final class GofastrServiceRunner: NSObject {
         guard Thread.isMainThread else { DispatchQueue.main.async { self.cancel() }; return }
         guard let token = settlement.active else { return }
         if secureStorageActive { secureStorage.cancel(); return }
+        if locationActive { location.cancel(); return }
         if durableServiceActive { return }
         if scheduling { cancellingSchedule = true; return }
         finish(token, MobileServiceResult(status: "cancelled", message: "Device service cancelled."))
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if let locationRequest = request.location {
+            locationActive = true
+            location.perform(locationRequest) { [weak self] result in
+                self?.locationActive = false
+                self?.finish(token, result)
+            }
+            return
+        }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in

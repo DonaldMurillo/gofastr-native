@@ -8,6 +8,23 @@ import (
 )
 
 func validateDeviceFeatures(a app, platform string) error {
+	if a.Location || a.LocationUsage != "" {
+		if a.Renderer != "native" {
+			return errors.New("location flags require --renderer native")
+		}
+		if platform != "ios-sim" && platform != "ios-device" {
+			return errors.New("--location is supported only on iOS")
+		}
+	}
+	if !uitext.Plain(a.LocationUsage, 512) {
+		return errors.New("--location-usage must be at most 512 UTF-8 bytes without control characters")
+	}
+	if a.LocationUsage != "" && !a.Location {
+		return errors.New("--location-usage requires --location")
+	}
+	if a.Location && strings.TrimSpace(a.LocationUsage) == "" {
+		return errors.New("iOS location requires --location-usage for when-in-use authorization")
+	}
 	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
 	}
