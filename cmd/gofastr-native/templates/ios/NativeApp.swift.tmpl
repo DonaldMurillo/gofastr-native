@@ -40,7 +40,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         GofastrCompiledExtensions.install()
-        window = renderer.makeWindow()
+{{if .BackgroundRefresh}}        GofastrBackgroundRefresh.register(ready: renderer.afterStart, run: { timeoutMillis in
+            var error: NSError?
+            guard {{.Prefix}}BackgroundRefresh(timeoutMillis, &error) else {
+                throw error ?? NSError(domain: "GoFastrMobile", code: 1, userInfo: [NSLocalizedDescriptionKey: "Background refresh failed."])
+            }
+        }, cancel: { {{.Prefix}}CancelBackgroundRefresh() })
+{{end}}        window = renderer.makeWindow()
 {{if .URLScheme}}        if let url = options?[.url] as? URL { _ = open(url) }
 {{end}}        return true
     }

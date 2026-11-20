@@ -62,6 +62,9 @@ Flags (build, run):
   --secure-storage  enable Keychain/Keystore storage and authentication
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
   --widgets     package a home-screen widget; requires --url-scheme
+  --background-refresh  let Go schedule periodic work while the app is closed (iOS);
+                the --pkg package must export BackgroundRefresh(int64) error
+                and CancelBackgroundRefresh()
   --app-group   iOS app-group identifier for share and widget extensions
   --dry-run     print every step without running it
   --debug-trace enable redacted Go runtime traces in instrumented native apps

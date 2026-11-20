@@ -57,6 +57,10 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+[Background refresh](../background-refresh.md) schedules periodic Go work
+through `BGTaskScheduler` on iOS. It has no Android adapter. Simulator builds
+and contract tests pass; a physical-device run is NOT RUN.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

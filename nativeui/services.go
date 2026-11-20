@@ -9,6 +9,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -26,6 +27,7 @@ type ServiceRequest struct {
 	IncomingShare *sharein.Request       `json:"incomingShare,omitempty"`
 	SecureStorage *securestore.Request   `json:"secureStorage,omitempty"`
 	Widget        *widgets.Request       `json:"widget,omitempty"`
+	Refresh       *refresh.Request       `json:"refresh,omitempty"`
 	Commit        bool                   `json:"commit,omitempty"`
 }
 
@@ -40,6 +42,7 @@ type ServiceResult struct {
 	IncomingShare  *sharein.Item       `json:"incomingShare,omitempty"`
 	SecureStorage  *securestore.Result `json:"secureStorage,omitempty"`
 	Widget         *widgets.State      `json:"widget,omitempty"`
+	Refresh        *refresh.State      `json:"refresh,omitempty"`
 }
 
 // ServiceRespond receives every validated outcome, including cancellation.
@@ -50,7 +53,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil} {
+	for _, present := range []bool{request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Refresh != nil} {
 		if present {
 			operations++
 		}
@@ -71,6 +74,8 @@ func (request ServiceRequest) Validate() error {
 		return request.SecureStorage.Validate()
 	case request.Widget != nil:
 		return request.Widget.Validate()
+	case request.Refresh != nil:
+		return request.Refresh.Validate()
 	default:
 		return request.Audio.Validate()
 	}
@@ -90,16 +95,18 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilitySecureStorage
 	case request.Widget != nil:
 		return CapabilityWidgets
+	case request.Refresh != nil:
+		return CapabilityBackgroundRefresh
 	default:
 		return CapabilityAudio
 	}
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
-	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) {
+	if (outcome.IncomingShare != nil && request.IncomingShare == nil) || (outcome.SecureStorage != nil && request.SecureStorage == nil) || (outcome.Widget != nil && request.Widget == nil) || (outcome.Refresh != nil && request.Refresh == nil) {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
-	if outcome.Status != EffectCompleted && (outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil) {
+	if outcome.Status != EffectCompleted && (outcome.IncomingShare != nil || outcome.SecureStorage != nil || outcome.Widget != nil || outcome.Refresh != nil) {
 		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	for _, text := range []string{outcome.Message, outcome.Permission, outcome.Identifier} {
@@ -130,6 +137,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: widget result is required")
 			}
 			if err := request.Widget.Accept(*outcome.Widget); err != nil {
+				return err
+			}
+		}
+		if request.Refresh != nil {
+			if outcome.Refresh == nil {
+				return errors.New("nativeui: background refresh result is required")
+			}
+			if err := request.Refresh.Accept(*outcome.Refresh); err != nil {
 				return err
 			}
 		}

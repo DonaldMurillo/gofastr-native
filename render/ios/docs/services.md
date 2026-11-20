@@ -151,6 +151,11 @@ late result is invalidated and closed, not falsely claimed to be interrupted.
   the tap remains cached. Native startup and appearance flush that cache.
 - Keep UIKit, AVFoundation, UserNotifications, and existing framework sources
   in the parent's Swift bind/link inputs. No production dependency is needed.
+- Background refresh needs `GofastrBackgroundRefresh.register(ready:run:cancel:)`
+  in `didFinishLaunching`, before launch returns, plus the Info.plist entries in
+  `docs/background-refresh.md` at the repository root. The runner reports the
+  `refresh` service `unsupported` until both are present. Keep BackgroundTasks in
+  the link inputs.
 
 ## Regression commands and limits
 
