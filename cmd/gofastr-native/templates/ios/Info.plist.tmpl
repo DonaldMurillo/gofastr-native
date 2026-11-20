@@ -43,6 +43,7 @@
 	<string>{{xml .CameraUsage}}</string>
 {{end}}{{if .MicrophoneUsage}}	<key>NSMicrophoneUsageDescription</key>
 	<string>{{xml .MicrophoneUsage}}</string>
+{{end}}{{if .SignInWithApple}}	<key>GofastrSignInWithApple</key><true/>
 {{end}}{{if .SecureStorage}}	<key>GofastrSecureStorage</key><true/>
 	<key>NSFaceIDUsageDescription</key><string>{{xml .BiometricUsage}}</string>
 {{end}}{{if .ReceiveShares}}	<key>GofastrReceiveShares</key><true/>

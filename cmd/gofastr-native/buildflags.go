@@ -19,6 +19,7 @@ type buildFlags struct {
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
+	signInWithApple                                                 *bool
 	wait                                                            *time.Duration
 }
 
@@ -40,6 +41,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
 		biometricUsage:  fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:         fs.Bool("widgets", false, "package a home-screen widget"),
+		signInWithApple: fs.Bool("sign-in-with-apple", false, "enable Sign in with Apple (native iOS)"),
 		appGroup:        fs.String("app-group", "", "iOS app-group identifier"),
 		dry:             fs.Bool("dry-run", false, "print the steps only"),
 		debugTrace:      fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
@@ -168,6 +170,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
+	a.SignInWithApple = *f.signInWithApple
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)

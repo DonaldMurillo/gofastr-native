@@ -9,11 +9,12 @@ struct MobileServiceRequest: Codable {
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
     let widget: MobileWidgetRequest?
+    let authentication: MobileAuthenticationRequest?
     let commit: Bool?
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
+              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, authentication != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try notification?.validate()
@@ -23,7 +24,74 @@ struct MobileServiceRequest: Codable {
         try incomingShare?.validate()
         try secureStorage?.validate()
         try widget?.validate()
+        try authentication?.validate()
     }
+}
+
+struct MobileAuthenticationRequest: Codable {
+    let operation: String
+    let nonce: String?
+    let authorizationURL: String?
+    let redirectURI: String?
+    let state: String?
+    let preferEphemeralSession: Bool?
+
+    private static func url(_ raw: String?, limit: Int = 8192) -> URLComponents? {
+        guard let raw, token(raw, limit: limit), !raw.contains("#"), !raw.contains("\\"),
+              let value = URLComponents(string: raw), value.scheme != nil,
+              value.user == nil, value.password == nil else { return nil }
+        return value
+    }
+
+    static func token(_ value: String?, limit: Int) -> Bool {
+        guard let value, !value.isEmpty, value.utf8.count <= limit else { return false }
+        return !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.union(.whitespacesAndNewlines).contains)
+    }
+
+    var redirect: URLComponents? {
+        guard let value = Self.url(redirectURI), let scheme = value.scheme?.lowercased(),
+              !["http", "https", "file"].contains(scheme), value.port == nil, value.query == nil,
+              value.path.hasPrefix("/") else { return nil }
+        return value
+    }
+
+    var authorize: URL? {
+        guard let value = Self.url(authorizationURL), value.scheme?.lowercased() == "https",
+              let host = value.host, !host.isEmpty else { return nil }
+        return value.url
+    }
+
+    func validate() throws {
+        switch operation {
+        case "apple":
+            if Self.token(nonce, limit: 512), authorizationURL == nil, redirectURI == nil, state == nil, preferEphemeralSession != true { return }
+        case "oauth":
+            if nonce == nil, authorize != nil, redirect != nil, Self.token(state, limit: 512) { return }
+        default: break
+        }
+        throw MobileServiceFailure.invalid
+    }
+
+    func acceptCallback(_ url: URL) -> MobileAuthenticationResult? {
+        guard let expected = redirect, let state,
+              let callback = Self.url(url.absoluteString, limit: 32768),
+              callback.scheme?.lowercased() == expected.scheme?.lowercased(),
+              callback.host?.lowercased() == expected.host?.lowercased(),
+              callback.port == nil, callback.percentEncodedPath == expected.percentEncodedPath,
+              let items = callback.queryItems, !items.contains(where: { $0.name == "error" }) else { return nil }
+        let states = items.filter { $0.name == "state" }
+        let codes = items.filter { $0.name == "code" }
+        guard states.count == 1, let returned = states[0].value, returned.utf8.elementsEqual(state.utf8),
+              codes.count == 1, let code = codes[0].value, Self.token(code, limit: 8192) else { return nil }
+        return MobileAuthenticationResult(authorizationCode: code, state: state)
+    }
+}
+
+struct MobileAuthenticationResult: Codable {
+    let authorizationCode: String
+    var identityToken: String?
+    var user: String?
+    var state: String?
 }
 
 enum MobileServiceBounds {
@@ -300,6 +368,7 @@ struct MobileServiceResult: Codable {
     var incomingShare: MobileIncomingShareItem?
     var secureStorage: MobileSecureStorageResult?
     var widget: MobileWidgetState?
+    var authentication: MobileAuthenticationResult?
 
     var wire: [String: Any] {
         var value: [String: Any] = ["status": status]
@@ -314,6 +383,7 @@ struct MobileServiceResult: Codable {
             if let incomingShare { value["incomingShare"] = incomingShare.wire }
             if let secureStorage { value["secureStorage"] = secureStorage.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }
+            if let authentication, let data = try? JSONEncoder().encode(authentication), let encoded = try? JSONSerialization.jsonObject(with: data) { value["authentication"] = encoded }
         }
         return value
     }

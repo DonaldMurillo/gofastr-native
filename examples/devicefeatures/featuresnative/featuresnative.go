@@ -4,10 +4,15 @@ package featuresnative
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -124,11 +129,28 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
+	signIn := func(operation authentication.Operation) nativeui.Handle {
+		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
+			state := demoToken()
+			request := authentication.Request{Operation: operation, Nonce: state}
+			if operation == authentication.OAuth {
+				redirect := "dev.gofastr.features:/oauth"
+				challenge := sha256.Sum256([]byte(demoToken()))
+				query := url.Values{"response_type": {"code"}, "client_id": {"demo"}, "redirect_uri": {redirect},
+					"state": {state}, "code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])},
+					"code_challenge_method": {"S256"}}
+				request = authentication.Request{Operation: operation, State: state, RedirectURI: redirect,
+					AuthorizationURL: "https://example.com/?" + query.Encode(), PreferEphemeralSession: true}
+			}
+			return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "sign-in", Authentication: &request}}, nil
+		}
+	}
 	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
+			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 		}}}, nil
 	}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
@@ -151,6 +173,13 @@ func newApp() (*nativeui.App, error) {
 			"status": secure(securestore.Status, ""), "put": secure(securestore.Put, securestore.Device), "get": secure(securestore.Get, securestore.Device), "delete": secure(securestore.Delete, securestore.Device),
 			"biometric-put": secure(securestore.Put, securestore.Biometric), "biometric-get": secure(securestore.Get, securestore.Biometric), "biometric-delete": secure(securestore.Delete, securestore.Biometric), "authenticate": secure(securestore.Authenticate, securestore.Biometric),
 		}),
+		nativeui.Route{Path: "/features/sign-in", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{Title: "Native sign-in", Text: "This demo tests presentation only. It has no OAuth provider and never signs you in.",
+				Actions: []nativeui.Action{{ID: "apple", Label: "Sign in with Apple", Primary: true}, {ID: "oauth", Label: "Open OAuth login"}}}, nil
+		}, Actions: map[string]nativeui.Handle{"apple": signIn(authentication.Apple), "oauth": signIn(authentication.OAuth)},
+			Services: map[string]nativeui.ServiceRespond{"sign-in": func(_ context.Context, _ nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
+				return nativeui.Result{Announcement: "Sign-in result: " + string(outcome.Status) + ". No app account was created."}, nil
+			}}},
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
@@ -159,6 +188,12 @@ func newApp() (*nativeui.App, error) {
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
 	)
+}
+
+func demoToken() string {
+	var input [32]byte
+	rand.Read(input[:])
+	return base64.RawURLEncoding.EncodeToString(input[:])
 }
 
 func preview(value string) string {

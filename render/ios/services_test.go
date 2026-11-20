@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -27,6 +28,7 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "share", Share: &sharing.Request{Title: "Files", Text: "Share these", Files: []files.Document{file}}},
 			{ID: "reminder", Notification: &notifications.Request{Operation: notifications.Schedule, Identifier: "notes:1", Title: "Reminder", Route: "/notes/1", Date: "2027-03-14", Time: "03:30"}},
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
+			{ID: "oauth", Authentication: &authentication.Request{Operation: authentication.OAuth, AuthorizationURL: "https://example.com/authorize", RedirectURI: "dev.example.app:/oauth", State: "state"}},
 		},
 		"audio":  audio.Document{File: file, DurationMillis: 1},
 		"result": nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
@@ -138,6 +140,21 @@ enum ServiceChecks {
         for request in fixture.requests { try request.validate() }
         precondition(fixture.requests[0].commit == nil, "false commit is omitted by canonical Go JSON")
         precondition(fixture.requests[3].commit == true)
+        let oauth = fixture.requests[4].authentication!
+        let accepted = oauth.acceptCallback(URL(string: "dev.example.app:/oauth?code=code&state=state")!)
+        precondition(accepted?.authorizationCode == "code" && accepted?.state == "state")
+        for callback in [
+            "other.app:/oauth?code=code&state=state", "dev.example.app:/elsewhere?code=code&state=state",
+            "dev.example.app://other/oauth?code=code&state=state",
+            "dev.example.app:/oauth?code=code&state=other", "dev.example.app:/oauth?code=code",
+            "dev.example.app:/oauth?code=code&state=state&state=state", "dev.example.app:/oauth?code=code&code=extra&state=state",
+            "dev.example.app:/oauth?error=access_denied&state=state", "dev.example.app:/oauth?code=code&state=state#fragment",
+        ] {
+            precondition(oauth.acceptCallback(URL(string: callback)!) == nil)
+        }
+        precondition(MobileServiceResult(status: "cancelled", authentication: accepted).wire["authentication"] == nil)
+        let authWire = MobileServiceResult(status: "completed", authentication: accepted).wire["authentication"] as? [String: String]
+        precondition(authWire == ["authorizationCode": "code", "state": "state"])
         precondition(fixture.reply.serviceId == "opaque-service" && fixture.reply.dataVersion == "epoch:2" && fixture.reply.changed == true)
         let roundTrip = try decoder.decode(MobileServiceResult.self, from: Data(fixture.result.json.utf8))
         precondition(roundTrip.file == fixture.audio.file && roundTrip.durationMillis == 1)
@@ -189,7 +206,7 @@ enum ServiceChecks {
         rejected { try MobileShareRequest(title: nil, text: nil, files: [half, half]).validate() }
         rejected { try MobileShareRequest(title: nil, text: nil, files: []).validate() }
         let maximumFile = MobileFileExport(name: "maximum.bin", mediaType: "application/octet-stream", data: Data(repeating: 255, count: 1_048_576).base64EncodedString())
-        let maximumShare = MobileServiceRequest(id: "maximum", notification: nil, share: MobileShareRequest(title: "Share", text: String(repeating: "\u{1}", count: 65_536), files: [maximumFile]), clipboard: nil, audio: nil, incomingShare: nil, secureStorage: nil, widget: nil, commit: nil)
+        let maximumShare = MobileServiceRequest(id: "maximum", notification: nil, share: MobileShareRequest(title: "Share", text: String(repeating: "\u{1}", count: 65_536), files: [maximumFile]), clipboard: nil, audio: nil, incomingShare: nil, secureStorage: nil, widget: nil, authentication: nil, commit: nil)
         try maximumShare.validate()
         let maximumJSON = try JSONEncoder().encode(maximumShare)
         precondition(maximumJSON.count <= MobileServiceBounds.maximumJSON, "the bounded JSON envelope must allow escaped slashes and legal 64 KiB text plus a full 1 MiB file")
