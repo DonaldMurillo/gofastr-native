@@ -1,11 +1,77 @@
 # UIKit device services and live collections
 
+## Barcode scanner
+
+`GofastrScanner.swift` implements the typed `scanner/v1` sheet using
+AVFoundation metadata capture. It stops capture before returning the first
+accepted value, cancellation, background or interruption outcome. Permission
+is requested only on sheet appearance. Camera hardware and nonblank camera
+purpose text gate capability discovery. Simulator-only QR generation and
+Vision decoding, bounds, and the standalone XCUITest command are documented in
+[scanner](../../../docs/scanner.md). Hardware camera acceptance: **NOT RUN**.
+
+## Calendar events
+
+The opt-in native build flag `--calendar` enables `calendar/v1`.
+`--calendar-usage` overrides the default purpose text used for
+`NSCalendarsFullAccessUsageDescription`,
+`NSCalendarsWriteOnlyAccessUsageDescription`, and legacy
+`NSCalendarsUsageDescription`. Disabled builds advertise unavailable;
+Android advertises unavailable and returns unsupported.
+
+`device/calendar.Request` supports status (no prompt), add, and read.
+On iOS 17+, add requests write-only access and read requests full access;
+older systems use legacy event access. Denied access returns a denied outcome.
+Adds save once to the default calendar for new events. EventKit work runs on
+a private serial queue. Cancellation before execution prevents a save; once
+execution starts the observed save outcome is returned, never replayed.
+
+Titles are required plain text, at most 200 UTF-8 bytes; locations are at most
+200 bytes and notes at most 2000 bytes without control characters. Dates use
+RFC3339 timestamps; end may equal start. Reads require an increasing range of
+at most 366 days and return at most 100 events (default 20). Invalid or oversized
+external records are omitted. Results carry event identifiers, never OS paths.
+Trace records contain capability/status metadata, not event content.
+
+Foundation executable wire checks and UIKit compilation cover the adapter.
+The opt-in `scripts/ios_calendar_smoke.py` XCUITest installs the device-features
+example, grants calendar access with simctl, adds a sample event, verifies full
+authorization, and reads the event title/start back on screen. This passed on
+an iPhone 17 simulator with iOS 26.5. The read-result screenshot showed
+`GoFastr sample event` followed by its RFC3339 start timestamp.
+Permission-prompt, hardware, lifecycle, and accessibility acceptance: NOT RUN.
+
 Implementation notes, November 5, 2026. These are library/protocol verification
 notes, not real microphone, notification, or share-provider acceptance results.
 The frozen cross-worker contract is `../../../docs/mobile-services-plan.md`.
 Android native remains deferred. All imports are Apple system frameworks.
 
 ## Reusable public runner
+
+### In-app browser
+
+`device/browser.Request` is carried by `ServiceRequest.Browser` and negotiated
+as `browser/v1`. UIKit advertises it as available; Android and WebView report
+unavailable. URLs must be absolute HTTP/HTTPS, at most 2048 UTF-8 bytes, with a
+host, no credentials, whitespace or control characters. `ReaderMode` requests
+Reader when available. `DismissLabel` is `done` (the default), `close` or `cancel`.
+
+The runner presents `SFSafariViewController` on main with accessibility identifier
+`gofastr.browser`. Dismissing it completes the service without device content;
+an initial page-load failure leaves the browser open and does not settle it.
+Host cancellation remains cancellation. Settlement is one-shot, after dismissal.
+Starter's About screen exposes **Open docs** and shows the returned status.
+
+`TestBrowserUI` uses XCTest UI automation against an installed native Starter
+app, with `GOFASTR_BROWSER_UI_DEVICE` selecting a simulator. It opens About,
+taps Open docs, checks the Safari controller, taps Done, and checks the
+Go continuation's Browser completed screen. Three consecutive runs passed on
+iOS 26.5. Safari chrome requires a hittable-control wait and a center-coordinate
+tap; an ordinary element tap did not dismiss it in the simulator UI test.
+Set `GOFASTR_BROWSER_UI_RESULTS` to retain an XCTest result bundle including
+Safari-open and completed-screen screenshots. The default Go test run skips
+this opt-in simulator test.
+Physical-device and VoiceOver acceptance: NOT RUN.
 
 `GofastrServiceRunner` is ordinary Swift source, embedded unchanged by
 `sources.go`, with no gomobile binding imports or application-specific code:
@@ -195,3 +261,11 @@ acceptance must verify those, plus cold launch, VoiceOver, IME and real playback
 - Scope: `ios/services`. Swift JSON encoding can escape base64 slashes and
   control text, expanding an admitted 1 MiB file plus 64 KiB text beyond 1.6 MiB.
   Next time, bound the wire envelope separately from decoded content limits.
+
+## Contact picker
+
+The iOS [contact picker](../../../docs/contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.

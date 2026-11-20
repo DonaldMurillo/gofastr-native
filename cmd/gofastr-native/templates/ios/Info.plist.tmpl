@@ -43,8 +43,15 @@
 	<string>{{xml .CameraUsage}}</string>
 {{end}}{{if .MicrophoneUsage}}	<key>NSMicrophoneUsageDescription</key>
 	<string>{{xml .MicrophoneUsage}}</string>
+{{end}}{{if .SignInWithApple}}	<key>GofastrSignInWithApple</key><true/>
+{{end}}{{if .Calendar}} <key>GofastrCalendar</key><true/>
+ <key>NSCalendarsFullAccessUsageDescription</key><string>{{xml .CalendarUsage}}</string>
+ <key>NSCalendarsWriteOnlyAccessUsageDescription</key><string>{{xml .CalendarUsage}}</string>
+ <key>NSCalendarsUsageDescription</key><string>{{xml .CalendarUsage}}</string>
 {{end}}{{if .SecureStorage}}	<key>GofastrSecureStorage</key><true/>
 	<key>NSFaceIDUsageDescription</key><string>{{xml .BiometricUsage}}</string>
+{{end}}{{if .Location}}	<key>GofastrLocation</key><true/>
+	<key>NSLocationWhenInUseUsageDescription</key><string>{{xml .LocationUsage}}</string>
 {{end}}{{if .ReceiveShares}}	<key>GofastrReceiveShares</key><true/>
 {{end}}{{if .Widgets}}	<key>GofastrWidgets</key><true/>
 	<key>GofastrWidgetScheme</key><string>{{xml .URLScheme}}</string>

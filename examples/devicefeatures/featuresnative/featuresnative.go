@@ -4,14 +4,22 @@ package featuresnative
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
+	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -115,6 +123,7 @@ func Dispatch(route, action, values string) (string, error) {
 func newApp() (*nativeui.App, error) {
 	var inboxMu sync.Mutex
 	var next *sharein.Item
+	var scanMessage string
 	service := func(request nativeui.ServiceRequest) nativeui.Handle {
 		request.ID = "device"
 		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
@@ -138,6 +147,10 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Scan != nil:
+				message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
+			case result.Calendar != nil:
+				message = calendarMessage(*result.Calendar)
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -171,14 +184,48 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
-	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
+	signIn := func(operation authentication.Operation) nativeui.Handle {
+		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
+			state := demoToken()
+			request := authentication.Request{Operation: operation, Nonce: state}
+			if operation == authentication.OAuth {
+				redirect := "dev.gofastr.features:/oauth"
+				challenge := sha256.Sum256([]byte(demoToken()))
+				query := url.Values{"response_type": {"code"}, "client_id": {"demo"}, "redirect_uri": {redirect},
+					"state": {state}, "code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])},
+					"code_challenge_method": {"S256"}}
+				request = authentication.Request{Operation: operation, State: state, RedirectURI: redirect,
+					AuthorizationURL: "https://example.com/?" + query.Encode(), PreferEphemeralSession: true}
+			}
+			return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "sign-in", Authentication: &request}}, nil
+		}
+	}
+	scanRespond := func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+		message := "Device result: " + string(result.Status)
+		if result.Scan != nil {
+			message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
+		}
+		inboxMu.Lock()
+		scanMessage = message
+		inboxMu.Unlock()
+		return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/features/scanned"}}, nil
+	}
+	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
+			{ID: "calendar", Title: "Calendar events", Destination: "/features/calendar"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
+			{ID: "location", Title: "Location", Destination: "/features/location"},
+			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
 		}}}, nil
-	}},
+	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
+		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			inboxMu.Lock()
+			defer inboxMu.Unlock()
+			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
+		}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
@@ -199,6 +246,28 @@ func newApp() (*nativeui.App, error) {
 			"status": secure(securestore.Status, ""), "put": secure(securestore.Put, securestore.Device), "get": secure(securestore.Get, securestore.Device), "delete": secure(securestore.Delete, securestore.Device),
 			"biometric-put": secure(securestore.Put, securestore.Biometric), "biometric-get": secure(securestore.Get, securestore.Biometric), "biometric-delete": secure(securestore.Delete, securestore.Biometric), "authenticate": secure(securestore.Authenticate, securestore.Biometric),
 		}),
+		nativeui.Route{Path: "/features/sign-in", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{Title: "Native sign-in", Text: "This demo tests presentation only. It has no OAuth provider and never signs you in.",
+				Actions: []nativeui.Action{{ID: "apple", Label: "Sign in with Apple", Primary: true}, {ID: "oauth", Label: "Open OAuth login"}}}, nil
+		}, Actions: map[string]nativeui.Handle{"apple": signIn(authentication.Apple), "oauth": signIn(authentication.OAuth)},
+			Services: map[string]nativeui.ServiceRespond{"sign-in": func(_ context.Context, _ nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
+				return nativeui.Result{Announcement: "Sign-in result: " + string(outcome.Status) + ". No app account was created."}, nil
+			}}},
+		deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar.", []nativeui.Action{
+			{ID: "calendar-add", Label: "Add sample event", Primary: true},
+			{ID: "calendar-status", Label: "Calendar status"},
+			{ID: "calendar-read", Label: "Read next 7 days"},
+		}, map[string]nativeui.Handle{
+			"calendar-status": service(nativeui.ServiceRequest{Calendar: &calendar.Request{Operation: calendar.Status}}),
+			"calendar-add": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				start := time.Now().AddDate(0, 0, 1).Truncate(time.Minute)
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Add, Event: &calendar.Event{Title: "GoFastr sample event", Start: start, End: start.Add(time.Hour)}}}}, nil
+			},
+			"calendar-read": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				now := time.Now()
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Read, From: now, To: now.AddDate(0, 0, 7), Limit: calendar.MaxLimit}}}, nil
+			},
+		}),
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
@@ -215,7 +284,14 @@ func newApp() (*nativeui.App, error) {
 			"status":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Status}}),
 			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
 		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
-	)
+	}
+	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
+}
+
+func demoToken() string {
+	var input [32]byte
+	rand.Read(input[:])
+	return base64.RawURLEncoding.EncodeToString(input[:])
 }
 
 func preview(value string) string {
@@ -224,4 +300,21 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+func calendarMessage(result calendar.Result) string {
+	if result.Authorization != "" {
+		return "Calendar authorization: " + result.Authorization
+	}
+	if result.Identifier != "" {
+		return "Sample event added."
+	}
+	if len(result.Events) == 0 {
+		return "No calendar events in the next 7 days."
+	}
+	lines := make([]string, 0, len(result.Events))
+	for _, event := range result.Events {
+		lines = append(lines, event.Title+" — "+event.Start.Format(time.RFC3339))
+	}
+	return strings.Join(lines, "\n")
 }

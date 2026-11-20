@@ -73,8 +73,13 @@ type app struct {
 	URLScheme       string
 	ReceiveShares   bool
 	SecureStorage   bool
+	Calendar        bool
+	CalendarUsage   string
 	BiometricUsage  string
+	Location        bool
+	LocationUsage   string
 	Widgets         bool
+	SignInWithApple bool
 	AppGroup        string
 	// BackgroundRefresh registers a BGAppRefreshTask that calls the bound
 	// package's BackgroundRefresh(timeoutMillis int64) error, cancelled by

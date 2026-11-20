@@ -39,6 +39,7 @@ func (r *recorder) actions() []string {
 
 func everything() map[nativeui.Capability]nativeui.Support {
 	capabilities := map[nativeui.Capability]nativeui.Support{}
+	capabilities["gofastr.maps/v1"] = nativeui.SupportAvailable
 	for _, capability := range KnownCapabilities {
 		capabilities[capability] = nativeui.SupportAvailable
 	}
@@ -57,6 +58,11 @@ func reachable(t *testing.T, app *nativeui.App) []string {
 			t.Fatalf("render %s: %v", queue[index], err)
 		}
 		var next []string
+		for _, component := range screen.Components {
+			for _, destination := range component.Destinations {
+				next = append(next, destination)
+			}
+		}
 		for _, tab := range screen.Tabs {
 			next = append(next, tab.Route)
 		}

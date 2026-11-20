@@ -13,18 +13,27 @@ import (
 // buildFlags is the one parser for the flags doctor, build, run, and dev
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
-	fs *flag.FlagSet
+	fs            *flag.FlagSet
+	location      *bool
+	locationUsage *string
+	calendar      *bool
+	calendarUsage *string
 
-	platform, pkg, id, name, version, out, hostTemplate, renderer                      *string
-	cameraUsage, microphoneUsage, urlScheme, biometricUsage                            *string
-	appGroup, device, shot, existingApp, require                                       *string
-	receiveShares, secureStorage, widgets, backgroundRefresh, dry, devices, debugTrace *bool
-	wait                                                                               *time.Duration
+	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
+	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
+	appGroup, device, shot, existingApp, require                    *string
+	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
+	signInWithApple, backgroundRefresh                              *bool
+	wait                                                            *time.Duration
 }
 
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:                fs,
+		location:          fs.Bool("location", false, "enable foreground iOS location services"),
+		locationUsage:     fs.String("location-usage", "", "iOS when-in-use location purpose text"),
+		calendar:          fs.Bool("calendar", false, "enable iOS calendar events"),
+		calendarUsage:     fs.String("calendar-usage", "Add and read calendar events you choose.", "calendar permission purpose text"),
 		platform:          fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
 		pkg:               fs.String("pkg", "", "bind package"),
 		id:                fs.String("id", "", "bundle / application id"),
@@ -40,6 +49,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		secureStorage:     fs.Bool("secure-storage", false, "enable secure storage and authentication"),
 		biometricUsage:    fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:           fs.Bool("widgets", false, "package a home-screen widget"),
+		signInWithApple:   fs.Bool("sign-in-with-apple", false, "enable Sign in with Apple (native iOS)"),
 		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS)"),
 		appGroup:          fs.String("app-group", "", "iOS app-group identifier"),
 		dry:               fs.Bool("dry-run", false, "print the steps only"),
@@ -162,14 +172,21 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2
 	}
+	a.Calendar = *f.calendar
+	if a.Calendar {
+		a.CalendarUsage = strings.TrimSpace(*f.calendarUsage)
+	}
 	a.HostTemplate = *f.hostTemplate
 	a.Renderer = *f.renderer
 	a.DebugTrace = *f.debugTrace
 	a.CameraUsage = strings.TrimSpace(*f.cameraUsage)
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme
-	a.ReceiveShares, a.SecureStorage, a.Widgets, a.BackgroundRefresh = *f.receiveShares, *f.secureStorage, *f.widgets, *f.backgroundRefresh
+	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
+	a.SignInWithApple = *f.signInWithApple
+	a.BackgroundRefresh = *f.backgroundRefresh
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
+	a.Location, a.LocationUsage = *f.location, strings.TrimSpace(*f.locationUsage)
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2

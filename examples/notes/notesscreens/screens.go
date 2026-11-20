@@ -79,7 +79,7 @@ func editor(service *notes.Service, store *files.Store) nativeui.Render {
 		if note.ID == "" {
 			title, status, key = "New note", "Not saved yet · tap Done to save", "new"
 		}
-		actions := []nativeui.Action{{ID: "save", Label: "Done", Primary: true, Commit: true}, {ID: "share", Label: "Share note", Icon: nativeui.IconShare}, {ID: "copy", Label: "Copy note"}, {ID: "export", Label: "Export"}}
+		actions := []nativeui.Action{{ID: "contacts", Label: "Pick contact"}, {ID: "contacts-multiple", Label: "Pick contacts"}, {ID: "save", Label: "Done", Primary: true, Commit: true}, {ID: "share", Label: "Share note", Icon: nativeui.IconShare}, {ID: "copy", Label: "Copy note"}, {ID: "export", Label: "Export"}}
 		if note.ID != "" {
 			actions = append(actions, nativeui.Action{ID: "save-copy", Label: "Save text as new note", Commit: true})
 			actions = append(actions, nativeui.Action{ID: "attach", Label: "Add file"}, nativeui.Action{ID: "attachments", Label: "Attachments"},
@@ -111,6 +111,8 @@ func editorActions(service *notes.Service, store *files.Store) map[string]native
 	return map[string]nativeui.Handle{
 		"save":              saveEditor(service, false),
 		"save-copy":         saveEditor(service, true),
+		"contacts":          requestContacts(service, false),
+		"contacts-multiple": requestContacts(service, true),
 		"share":             requestNoteShare(service, false),
 		"copy":              requestNoteShare(service, true),
 		"reminder-schedule": requestReminder(service, "schedule"),
