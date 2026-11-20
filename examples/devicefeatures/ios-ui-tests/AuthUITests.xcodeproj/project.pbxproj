@@ -1,0 +1,91 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		A00000000000000000000001 = {
+			isa = PBXProject;
+			buildConfigurationList = A00000000000000000000006;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			knownRegions = (en, Base);
+			mainGroup = A00000000000000000000003;
+			productRefGroup = A00000000000000000000004;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A00000000000000000000002);
+		};
+		A00000000000000000000002 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000007;
+			buildPhases = (A0000000000000000000000C);
+			buildRules = ();
+			dependencies = ();
+			name = AuthUITests;
+			productName = AuthUITests;
+			productReference = A00000000000000000000005;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A00000000000000000000003 = {
+			isa = PBXGroup;
+			children = (A0000000000000000000000A, A00000000000000000000004);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000004 = {
+			isa = PBXGroup;
+			children = (A00000000000000000000005);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000005 = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.cfbundle;
+			path = AuthUITests.xctest;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		A00000000000000000000006 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A00000000000000000000008);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A00000000000000000000007 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A00000000000000000000009);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A00000000000000000000008 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {IPHONEOS_DEPLOYMENT_TARGET = 16.0; SDKROOT = iphonesimulator;};
+			name = Debug;
+		};
+		A00000000000000000000009 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.gofastr.features.AuthUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A0000000000000000000000A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = AuthUITests.swift;
+			sourceTree = "<group>";
+		};
+		A0000000000000000000000B = {isa = PBXBuildFile; fileRef = A0000000000000000000000A;};
+		A0000000000000000000000C = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A0000000000000000000000B);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+	};
+	rootObject = A00000000000000000000001;
+}

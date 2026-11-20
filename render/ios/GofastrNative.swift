@@ -358,6 +358,7 @@ public final class GofastrNativeRenderer {
             } else { return false }
         }
         let extensionCapabilities = MobileFileExtensions.capabilities().filter { $0.value == "available" }.map(\.key)
+            + MobileComponentExtensions.capabilities().filter { $0.value == "available" }.map(\.key)
         let target = host.queue.sync { () -> MobileScreen? in
             guard let encoded = try? self.host.backend.render(route, "{}"),
                   let response = try? JSONDecoder().decode(MobileResponse.self, from: Data(encoded.utf8)),
@@ -424,6 +425,7 @@ public final class GofastrNativeRenderer {
         privacyCover = nil
         host.active = true
         retainedScreens.forEach { $0.resumeVisibleReads() }
+        MobileNotificationRouter.shared.flush()
     }
 
     private func lockProtectedScreens() {
@@ -510,6 +512,12 @@ public final class GofastrNativeRenderer {
                 navigation.pushViewController(NativeScreenController(model, host: self.host, reply: reply), animated: true)
             }
         }
+    }
+
+    /// Runs `work` once the backend start queued by `makeWindow()` has returned.
+    /// `work` must move long tasks off the startup queue.
+    public func afterStart(_ work: @escaping () -> Void) {
+        host.queue.async(execute: work)
     }
 
     public func stop() {
