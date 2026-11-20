@@ -84,18 +84,29 @@ public final class DeviceLocation {
             host.main.postDelayed(timeout,seconds*1000L);
             if(Build.VERSION.SDK_INT>=30) {
                 cancellation=new CancellationSignal();
-                manager.getCurrentLocation(provider,cancellation,host::runOnUiThread,value->located(token,value));
-            }else {
-                listener=new LocationListener(){
-                    public void onLocationChanged(Location value){located(token,value);}
-                    public void onStatusChanged(String provider,int status,Bundle extras){}
-                    public void onProviderEnabled(String provider){}
-                    public void onProviderDisabled(String provider){}
-                };
-                manager.requestSingleUpdate(provider,listener,host.main.getLooper());
-            }
+                long oldest=SystemClock.elapsedRealtimeNanos()-age*1000000000L;
+                String source=provider;
+                manager.getCurrentLocation(provider,cancellation,host::runOnUiThread,value->{
+                    if(value!=null && value.getElapsedRealtimeNanos()<oldest && token==generation && completion!=null) {
+                        try{single(token,source);}catch(SecurityException error){finish(token,Services.outcome("denied","Location permission was denied."));}
+                        return;
+                    }
+                    located(token,value);
+                });
+            }else single(token,provider);
         }catch(SecurityException error){finish(token,Services.outcome("denied","Location permission was denied."));}
         catch(Exception error){finish(token,Services.outcome("failed","The location read failed."));}
+    }
+
+    @SuppressWarnings("deprecation")
+    private void single(long token,String provider) {
+        listener=new LocationListener(){
+            public void onLocationChanged(Location value){located(token,value);}
+            public void onStatusChanged(String provider,int status,Bundle extras){}
+            public void onProviderEnabled(String provider){}
+            public void onProviderDisabled(String provider){}
+        };
+        manager.requestSingleUpdate(provider,listener,host.main.getLooper());
     }
 
     private void located(long token,Location value) {
