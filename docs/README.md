@@ -21,6 +21,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Presentation and selection behaviors](presentation-behaviors.md)
 - [Editor behavior](editor-behavior.md): checkpoints and drafts with the `behavior` package.
 - [Image previews](image-previews.md)
+- [iOS maps](maps.md): compiled MapKit pins and optional user location.
 - [Component gallery](component-gallery.md): every screen contract, one at a time.
 
 ## Hosting a GoFastr web app
