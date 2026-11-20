@@ -7,9 +7,14 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 
 | Feature | Go request | Android adapter | iOS adapter |
 | --- | --- | --- | --- |
+| Device and battery snapshots | `ServiceRequest.DeviceInfo` | Build metadata, sticky battery intent, PowerManager | Unsupported |
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
+
+[Device and battery snapshots](deviceinfo.md) require no opt-in or permission on
+Android. The demo offers Device info and Battery actions; iOS and WebView return
+unsupported without advertising `deviceinfo/v1`.
 
 The same Go-only demo runs on both platforms:
 

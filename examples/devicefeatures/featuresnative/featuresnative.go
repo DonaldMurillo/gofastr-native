@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -95,6 +96,8 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.DeviceInfo != nil:
+				message = snapshotText(*result.DeviceInfo)
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -126,11 +129,18 @@ func newApp() (*nativeui.App, error) {
 	}
 	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
+			{ID: "device", Title: "Device and battery", Destination: "/features/device"},
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 		}}}, nil
 	}},
+		deviceRoute("/features/device", "Device and battery", "Read a device or battery snapshot. No permission or subscription is required on Android. Other renderers report unsupported.", []nativeui.Action{
+			{ID: "info", Label: "Device info", Primary: true}, {ID: "battery", Label: "Battery"},
+		}, map[string]nativeui.Handle{
+			"info":    service(nativeui.ServiceRequest{DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}}),
+			"battery": service(nativeui.ServiceRequest{DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}}),
+		}),
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
@@ -167,4 +177,26 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+func snapshotText(result deviceinfo.Result) string {
+	if info := result.Info; info != nil {
+		version := info.AppVersion
+		if version == "" {
+			version = "unknown"
+		}
+		return fmt.Sprintf("Device: %s %s; %s %s (API %d); locale %s; app %s.", info.Manufacturer, info.Model, info.Platform, info.OSVersion, info.APILevel, info.Locale, version)
+	}
+	if battery := result.Battery; battery != nil {
+		level := "unknown"
+		if battery.LevelKnown {
+			level = fmt.Sprintf("%d%%", battery.Level)
+		}
+		save := "off"
+		if battery.PowerSave {
+			save = "on"
+		}
+		return fmt.Sprintf("Battery: %s %s (%s), power save %s.", level, battery.State, battery.PowerSource, save)
+	}
+	return "Device snapshot unavailable."
 }

@@ -29,7 +29,8 @@ own guide in [`tui/README.md`](../tui/README.md).
 
 ## Device services
 
-- [Device features](device-features.md): share-in, secure storage, widgets.
+- [Device features](device-features.md): share-in, secure storage, widgets, Android device snapshots.
+- [Device and battery snapshots](deviceinfo.md)
 - [Files](files-services.md)
 - [Photos](photos-services.md)
 - [Secure storage](secure-storage.md)

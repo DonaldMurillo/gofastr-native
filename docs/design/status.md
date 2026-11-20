@@ -57,6 +57,13 @@ mounted components, focus and scroll.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+[Device and battery snapshots](../deviceinfo.md) use typed `deviceinfo/v1`
+requests on native Android without permissions or opt-in flags. The devicefeatures
+demo displays both snapshots. iOS and WebView return unsupported and do not
+advertise support. Android 14 emulator acceptance compared model/API with system
+properties and displayed an injected 42% AC-charging battery snapshot.
+Physical-device acceptance is NOT RUN.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

@@ -86,7 +86,7 @@ func inspectProfiles() []inspectProfile {
 	uikit := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "live", "privacy")
 	// render/android/GofastrActivity.java, with microphone, incoming shares,
 	// secure storage and widgets off.
-	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy")
+	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy", "deviceinfo")
 	for _, name := range []string{"audio", "incoming-shares", "secure-storage", "widgets"} {
 		android[name+"/v1"] = "unavailable"
 	}
@@ -111,7 +111,7 @@ func inspectProfiles() []inspectProfile {
 var (
 	inspectCapabilities = []string{"navigation/v1", "editor/v1", "drafts/v1", "share/v1", "haptics/v1", "sheets/v1", "announcement/v1", "presentation/v1",
 		"files/v1", "photos/v1", "camera/v1", "notifications/v1", "sharing/v1", "clipboard/v1", "audio/v1", "live/v1", "incoming-shares/v1",
-		"secure-storage/v1", "widgets/v1", "privacy/v1"}
+		"secure-storage/v1", "widgets/v1", "privacy/v1", "deviceinfo/v1"}
 	inspectCodes = []string{"protocol", "busy", "expired", "unsupported", "pending", "superseded", "stale", "invalid_request", "internal", "unknown",
 		"conflict", "validation", "not_found", "forbidden", "draft", "cancelled", "unsaved_changes", "save_pending", "save_unknown", "stale_completion", "invalid_outcome"}
 	inspectFieldKinds = []string{"text", "multiline", "toggle", "date", "time", "select"}

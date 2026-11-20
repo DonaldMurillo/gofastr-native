@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -27,6 +28,8 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "share", Share: &sharing.Request{Title: "Files", Text: "Share these", Files: []files.Document{file}}},
 			{ID: "reminder", Notification: &notifications.Request{Operation: notifications.Schedule, Identifier: "notes:1", Title: "Reminder", Route: "/notes/1", Date: "2027-03-14", Time: "03:30"}},
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
+			{ID: "info", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}},
+			{ID: "battery", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}},
 		},
 		"audio":  audio.Document{File: file, DurationMillis: 1},
 		"result": nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
@@ -62,6 +65,7 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 func TestServiceRunnerAndVisibleLiveContracts(t *testing.T) {
 	requireTokenMap(t, map[string][]string{
 		"GofastrServiceRunner.swift": {
+			"request.deviceInfo != nil", `status: "unsupported", message: "Device snapshots are unavailable on this renderer."`,
 			"public final class GofastrServiceRunner", "public init(presenter: UIViewController, openRoute: @escaping (String) -> Bool)",
 			"public static func capabilities() -> [String: String]", "public func perform(requestJSON: String, completion: @escaping (String) -> Void)", "public func cancel()",
 			"NSMicrophoneUsageDescription", "UNUserNotificationCenterDelegate", "UNNotificationDefaultActionIdentifier", "self.pending = route", "completionHandler([.banner, .sound])",
@@ -151,6 +155,13 @@ enum ServiceChecks {
         for json in [#"{"id":"bad"}"#, #"{"id":"bad","clipboard":{"text":"x"},"audio":{"title":"Record"}}"#, #"{"id":"","clipboard":{"text":"x"}}"#] {
             rejected { try decoder.decode(MobileServiceRequest.self, from: Data(json.utf8)).validate() }
         }
+        for json in [#"{"id":"device","deviceInfo":{}}"#, #"{"id":"device","deviceInfo":{"operation":"subscribe"}}"#, #"{"id":"device","deviceInfo":{"operation":"info"},"clipboard":{"text":"x"}}"#] {
+            rejected { try decoder.decode(MobileServiceRequest.self, from: Data(json.utf8)).validate() }
+        }
+        let device = try decoder.decode(MobileServiceRequest.self, from: Data(#"{"id":"device","deviceInfo":{"operation":"battery"}}"#.utf8))
+        try device.validate()
+        let roundTrip = try decoder.decode(MobileServiceRequest.self, from: JSONEncoder().encode(device))
+        precondition(roundTrip.deviceInfo?.operation == "battery")
         let emptyClipboard = try decoder.decode(MobileServiceRequest.self, from: Data(#"{"id":"clear","clipboard":{"text":""}}"#.utf8))
         try emptyClipboard.validate()
         let hugeClipboard = try decoder.decode(MobileServiceRequest.self, from: JSONSerialization.data(withJSONObject: ["id":"copy", "clipboard":["text":String(repeating:"é", count:32769)]]))

@@ -49,7 +49,8 @@
     return result;
   })();
   const kindOf = request => {
-    const kinds = ['notification', 'share', 'clipboard', 'audio'].filter(key => request?.[key] != null);
+    const kinds = ['notification', 'share', 'clipboard', 'audio', 'deviceInfo'].filter(key => request?.[key] != null);
+    if (kinds.includes('deviceInfo') && (!['info', 'battery'].includes(request.deviceInfo.operation) || Object.keys(request.deviceInfo).some(key => key !== 'operation'))) throw new Error('Invalid device snapshot request.');
     return kinds.length === 1 ? kinds[0] : '';
   };
   const bytesOf = file => {
@@ -312,7 +313,7 @@
     if (!kind || typeof serviceId !== 'string' || !serviceId || issued.has(serviceId)) throw new Error('The service has no new issued identity. It was not repeated.');
     const prefix = 'gfw-service-' + ++sequence;
     const dialog = element('dialog', '', { 'data-gfw-service': kind, 'data-gfw-service-id': serviceId, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': prefix + '-title', 'aria-describedby': prefix + '-status' });
-    const heading = element('h2', request[kind].title || { notification: 'Reminder', share: 'Share', clipboard: 'Copy text', audio: 'Record audio' }[kind], { id: prefix + '-title', tabindex: '-1' });
+    const heading = element('h2', request[kind].title || { notification: 'Reminder', share: 'Share', clipboard: 'Copy text', audio: 'Record audio', deviceInfo: 'Device snapshot' }[kind], { id: prefix + '-title', tabindex: '-1' });
     const view = { root, request: JSON.parse(JSON.stringify(request)), kind, dialog, heading, opener, respond, host: bridge(), downloadURLs: new Set(), chunks: [] };
     window.__gofastr_foreground?.claim(view);
     issued.add(serviceId);
@@ -321,7 +322,10 @@
     view.actions = element('div', '', { class: 'gfw-service-actions' });
     dialog.append(heading, view.feedback, view.actions);
     try {
-      if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
+      if (kind === 'deviceInfo') {
+        feedback(view, 'Device snapshots are unavailable on this renderer.');
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Device snapshots are unavailable on this renderer.' }));
+      } else if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
       else if (kind === 'notification') {
         feedback(view, 'Scheduled reminders are unavailable in a plain browser. No timer or notification was created.');
         button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Scheduled reminders require a native device host. No reminder was scheduled.' }));

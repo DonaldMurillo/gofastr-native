@@ -75,6 +75,10 @@ public final class GofastrServiceRunner: NSObject {
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if request.deviceInfo != nil {
+            finish(token, MobileServiceResult(status: "unsupported", message: "Device snapshots are unavailable on this renderer."))
+            return
+        }
         if let secure = request.secureStorage {
             secureStorageActive = true
             secureStorage.perform(secure) { [weak self] result in

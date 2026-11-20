@@ -1,5 +1,13 @@
 import Foundation
 
+struct MobileDeviceInfoRequest: Codable {
+    let operation: String
+
+    func validate() throws {
+        guard operation == "info" || operation == "battery" else { throw MobileServiceFailure.invalid }
+    }
+}
+
 struct MobileServiceRequest: Codable {
     let id: String
     let notification: MobileNotificationRequest?
@@ -8,12 +16,13 @@ struct MobileServiceRequest: Codable {
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
+    var deviceInfo: MobileDeviceInfoRequest? = nil
     let widget: MobileWidgetRequest?
     let commit: Bool?
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil].filter({ $0 }).count == 1 else {
+              [notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, deviceInfo != nil, widget != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try notification?.validate()
@@ -23,6 +32,7 @@ struct MobileServiceRequest: Codable {
         try incomingShare?.validate()
         try secureStorage?.validate()
         try widget?.validate()
+        try deviceInfo?.validate()
     }
 }
 
