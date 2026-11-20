@@ -38,9 +38,13 @@ public enum GofastrBackgroundRefresh {
             completion.finish(false)
         }
         // Submit the next run first so a crash or expiry still leaves one pending.
-        if let minutes = MobileRefreshPreference(defaults: .standard).intervalMinutes { _ = submit(minutes) }
+        // `perform` runs on the main thread too, so a cancel is never undone here.
+        DispatchQueue.main.async {
+            if let minutes = MobileRefreshPreference(defaults: .standard).intervalMinutes { _ = submit(minutes) }
+        }
         ready {
             queue.async {
+                guard completion.begin() else { return }
                 let succeeded = (try? run(runMillis)) != nil
                 completion.finish(succeeded)
             }
@@ -104,6 +108,13 @@ private final class MobileRefreshCompletion {
     private var task: BGTask?
 
     init(_ task: BGTask) { self.task = task }
+
+    /// False once the task has expired, so expired work never starts.
+    func begin() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return task != nil
+    }
 
     func finish(_ success: Bool) {
         lock.lock()
