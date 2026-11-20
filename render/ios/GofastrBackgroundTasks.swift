@@ -39,14 +39,15 @@ public enum GofastrBackgroundRefresh {
         }
         // Submit the next run first so a crash or expiry still leaves one pending.
         // `perform` runs on the main thread too, so a cancel is never undone here.
+        // The run starts only after that, so the task never completes before its replacement exists.
         DispatchQueue.main.async {
             if let minutes = MobileRefreshPreference(defaults: .standard).intervalMinutes { _ = submit(minutes) }
-        }
-        ready {
-            queue.async {
-                guard completion.begin() else { return }
-                let succeeded = (try? run(runMillis)) != nil
-                completion.finish(succeeded)
+            ready {
+                queue.async {
+                    guard completion.begin() else { return }
+                    let succeeded = (try? run(runMillis)) != nil
+                    completion.finish(succeeded)
+                }
             }
         }
     }
