@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -23,6 +24,7 @@ func TestDeviceFeatureOutcomesSettleOnce(t *testing.T) {
 		{"widget", ServiceRequest{ID: "device", Widget: &widgets.Request{Operation: widgets.Status}}, ServiceResult{Status: EffectCompleted, Widget: &widgets.State{Published: true}}},
 		{"apple", ServiceRequest{ID: "device", Authentication: &authentication.Request{Operation: authentication.Apple, Nonce: "nonce"}}, ServiceResult{Status: EffectCompleted, Authentication: &authentication.Result{AuthorizationCode: "code", IdentityToken: "identity-token", User: "subject"}}},
 		{"oauth", ServiceRequest{ID: "device", Authentication: &authentication.Request{Operation: authentication.OAuth, AuthorizationURL: "https://example.com/", RedirectURI: "dev.example.app:/oauth", State: "state"}}, ServiceResult{Status: EffectCompleted, Authentication: &authentication.Result{AuthorizationCode: "code", State: "state"}}},
+		{"refresh", ServiceRequest{ID: "device", Refresh: &refresh.Request{Operation: refresh.Schedule, IntervalMinutes: 60}}, ServiceResult{Status: EffectCompleted, Refresh: &refresh.State{Scheduled: true}}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -102,5 +104,36 @@ func TestDeviceFeatureResultsCannotCrossServicesOrFailure(t *testing.T) {
 	encoded, _ := json.Marshal(ServiceResult{Status: EffectCompleted, SecureStorage: &securestore.Result{}})
 	if string(encoded) != `{"status":"completed","secureStorage":{"found":false}}` {
 		t.Fatalf("required missing-secret flag lost: %s", encoded)
+	}
+}
+
+func TestBackgroundRefreshResultsMatchTheRequest(t *testing.T) {
+	request := ServiceRequest{ID: "device", Refresh: &refresh.Request{Operation: refresh.Cancel}}
+	if request.capability() != CapabilityBackgroundRefresh || request.Validate() != nil {
+		t.Fatal("cancel refresh request rejected")
+	}
+	for _, outcome := range []ServiceResult{
+		{Status: EffectCompleted},
+		{Status: EffectCompleted, Refresh: &refresh.State{Scheduled: true}},
+		{Status: EffectCompleted, Refresh: &refresh.State{}, Widget: &widgets.State{}},
+		{Status: EffectFailed, Refresh: &refresh.State{}},
+	} {
+		if request.accept(outcome) == nil {
+			t.Fatalf("accepted %+v", outcome)
+		}
+	}
+	if err := request.accept(ServiceResult{Status: EffectCompleted, Refresh: &refresh.State{}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := request.accept(ServiceResult{Status: EffectDenied, Permission: "denied"}); err != nil {
+		t.Fatal(err)
+	}
+	widget := ServiceRequest{ID: "device", Widget: &widgets.Request{Operation: widgets.Status}}
+	if widget.accept(ServiceResult{Status: EffectCompleted, Widget: &widgets.State{}, Refresh: &refresh.State{}}) == nil {
+		t.Fatal("widget accepted refresh content")
+	}
+	encoded, _ := json.Marshal(ServiceResult{Status: EffectCompleted, Refresh: &refresh.State{}})
+	if string(encoded) != `{"status":"completed","refresh":{"scheduled":false}}` {
+		t.Fatalf("required unscheduled flag lost: %s", encoded)
 	}
 }

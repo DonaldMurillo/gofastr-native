@@ -10,12 +10,15 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
+	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
@@ -26,6 +29,42 @@ import (
 var lifecycle sync.RWMutex
 var runtime *nativeui.Runtime
 var screens *nativeui.App
+var stateDir string
+
+// background records when the OS last ran the demo's refresh. A real app
+// would sync its data here instead.
+var background = refresh.NewRunner(func(ctx context.Context) error {
+	lifecycle.RLock()
+	directory := stateDir
+	lifecycle.RUnlock()
+	if directory == "" {
+		return errors.New("featuresnative: not started")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(directory, "last-refresh"), []byte(time.Now().UTC().Format(time.RFC3339)), 0o600)
+})
+
+// BackgroundRefresh runs one refresh when iOS wakes the app.
+func BackgroundRefresh(timeoutMillis int64) error { return background.Run(timeoutMillis) }
+
+// CancelBackgroundRefresh stops a running refresh when iOS expires the task.
+func CancelBackgroundRefresh() { background.Cancel() }
+
+func lastRefresh() string {
+	lifecycle.RLock()
+	directory := stateDir
+	lifecycle.RUnlock()
+	stamp, err := os.ReadFile(filepath.Join(directory, "last-refresh"))
+	if directory == "" || err != nil {
+		return "never"
+	}
+	if at, err := time.Parse(time.RFC3339, string(stamp)); err == nil {
+		return at.Format("2006-01-02 15:04 MST")
+	}
+	return "never"
+}
 
 func Start(dataDir string) error {
 	lifecycle.Lock()
@@ -41,14 +80,17 @@ func Start(dataDir string) error {
 	if err != nil {
 		return err
 	}
-	screens, runtime = app, r
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return err
+	}
+	screens, runtime, stateDir = app, r, dataDir
 	return nil
 }
 
 func Stop() error {
 	lifecycle.Lock()
 	defer lifecycle.Unlock()
-	screens, runtime = nil, nil
+	screens, runtime, stateDir = nil, nil, ""
 	return nil
 }
 func Root() string { return "/features" }
@@ -119,6 +161,8 @@ func newApp() (*nativeui.App, error) {
 				}
 			case result.Widget != nil:
 				message = fmt.Sprintf("Widget snapshot published: %t.", result.Widget.Published)
+			case result.Refresh != nil:
+				message = fmt.Sprintf("Background refresh scheduled: %t.", result.Refresh.Scheduled)
 			default:
 				item := result.IncomingShare
 				inboxMu.Lock()
@@ -130,6 +174,8 @@ func newApp() (*nativeui.App, error) {
 					message = "The share inbox is empty or the share was discarded."
 				}
 			}
+		} else if result.Message != "" {
+			message += ". " + result.Message
 		}
 		return nativeui.Result{Announcement: message}, nil
 	}
@@ -172,6 +218,7 @@ func newApp() (*nativeui.App, error) {
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 			{ID: "location", Title: "Location", Destination: "/features/location"},
 			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
+			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
 		}}}, nil
 	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
 		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
@@ -228,6 +275,15 @@ func newApp() (*nativeui.App, error) {
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
+		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
+				{ID: "schedule", Label: "Schedule", Primary: true}, {ID: "status", Label: "Check schedule"}, {ID: "cancel", Label: "Cancel refresh"},
+			}}, nil
+		}, Actions: map[string]nativeui.Handle{
+			"schedule": service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Schedule, IntervalMinutes: 60}}),
+			"status":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Status}}),
+			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
+		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
 	}
 	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 }

@@ -14,12 +14,13 @@ struct MobileServiceRequest: Codable {
     let widget: MobileWidgetRequest?
     let contacts: MobileContactsRequest?
     let authentication: MobileAuthenticationRequest?
+    let refresh: MobileRefreshRequest?
     let commit: Bool?
     var scan: MobileScanRequest? = nil
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil].filter({ $0 }).count == 1 else {
+              [browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
@@ -35,6 +36,7 @@ struct MobileServiceRequest: Codable {
         try scan?.validate()
         try authentication?.validate()
         try calendar?.validate()
+        try refresh?.validate()
     }
 }
 
@@ -397,6 +399,7 @@ struct MobileServiceResult: Codable {
     var contacts: MobileContactSelection?
     var scan: MobileScanResult?
     var authentication: MobileAuthenticationResult?
+    var refresh: MobileRefreshState?
 
     var wire: [String: Any] {
         var value: [String: Any] = ["status": status]
@@ -416,6 +419,7 @@ struct MobileServiceResult: Codable {
             if let location { value["location"] = location.wire }
             if let widget, let data = try? JSONEncoder().encode(widget), let encoded = try? JSONSerialization.jsonObject(with: data) { value["widget"] = encoded }
             if let authentication, let data = try? JSONEncoder().encode(authentication), let encoded = try? JSONSerialization.jsonObject(with: data) { value["authentication"] = encoded }
+            if let refresh { value["refresh"] = ["scheduled": refresh.scheduled] }
         }
         return value
     }

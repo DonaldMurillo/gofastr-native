@@ -100,6 +100,10 @@ do not provide these sign-in services. Successful login requires app and
 provider configuration; the simulator demo only exercises system UI and
 graceful cancellation or failure.
 
+[Background refresh](../background-refresh.md) schedules periodic Go work
+through `BGTaskScheduler` on iOS. It has no Android adapter. Simulator builds
+and contract tests pass; a physical-device run is NOT RUN.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

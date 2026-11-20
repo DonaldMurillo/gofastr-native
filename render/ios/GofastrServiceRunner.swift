@@ -45,6 +45,7 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
                 "widgets/v1": Bundle.main.object(forInfoDictionaryKey: "GofastrWidgets") as? Bool == true ? "available" : "unavailable",
                 "sign-in-with-apple/v1": MobileAuthentication.appleEnabled ? "available" : "unavailable",
                 "oauth-web-login/v1": "available",
+                "background-refresh/v1": GofastrBackgroundRefresh.enabled ? "available" : "unavailable",
                 "audio/v1": purpose?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "available" : "unavailable"]
     }
 
@@ -127,6 +128,15 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
             guard Self.capabilities()["widgets/v1"] == "available" else { finish(token, MobileServiceResult(status: "unsupported")); return }
             durableServiceActive = true
             MobileWidgetStore(appGroup: Bundle.main.object(forInfoDictionaryKey: "GofastrAppGroup") as? String ?? "").perform(widget) { [weak self] result in self?.finishDictionary(token, result) }
+            return
+        }
+        if let refresh = request.refresh {
+            durableServiceActive = true
+            GofastrBackgroundRefresh.perform(refresh) { [weak self] result in
+                guard let self, self.settlement.active == token else { return }
+                self.durableServiceActive = false
+                self.finish(token, result)
+            }
             return
         }
         if let notification = request.notification { performNotification(notification, token: token); return }

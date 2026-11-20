@@ -512,6 +512,12 @@ public final class GofastrNativeRenderer {
         }
     }
 
+    /// Runs `work` once the backend start queued by `makeWindow()` has returned.
+    /// `work` must move long tasks off the startup queue.
+    public func afterStart(_ work: @escaping () -> Void) {
+        host.queue.async(execute: work)
+    }
+
     public func stop() {
         guard Thread.isMainThread else { DispatchQueue.main.async { self.stop() }; return }
         stopped = true

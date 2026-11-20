@@ -81,7 +81,11 @@ type app struct {
 	Widgets         bool
 	SignInWithApple bool
 	AppGroup        string
-	Extensions      []compiledExtension
+	// BackgroundRefresh registers a BGAppRefreshTask that calls the bound
+	// package's BackgroundRefresh(timeoutMillis int64) error, cancelled by
+	// CancelBackgroundRefresh().
+	BackgroundRefresh bool
+	Extensions        []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")
 	// that WebView adapters in the app declare. Android WebView builds only.
 	WebViewFeatures []string
