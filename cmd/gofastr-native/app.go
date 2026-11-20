@@ -74,6 +74,7 @@ type app struct {
 	ReceiveShares   bool
 	SecureStorage   bool
 	BiometricUsage  string
+	LocationUsage   string
 	Widgets         bool
 	AppGroup        string
 	Extensions      []compiledExtension

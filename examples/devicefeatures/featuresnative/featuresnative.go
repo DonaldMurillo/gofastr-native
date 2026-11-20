@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -93,8 +94,17 @@ func newApp() (*nativeui.App, error) {
 	}
 	respond := func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
 		message := "Device result: " + string(result.Status)
+		if result.Message != "" {
+			message = result.Message
+		}
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Location != nil:
+				if fix := result.Location.Fix; fix != nil {
+					message = fmt.Sprintf("Location %.5f, %.5f ±%.0f m (%s)", fix.Latitude, fix.Longitude, fix.AccuracyMeters, result.Location.Permission)
+				} else {
+					message = fmt.Sprintf("Location permission: %s. Services enabled: %t.", result.Location.Permission, result.Location.ServicesEnabled)
+				}
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -126,11 +136,19 @@ func newApp() (*nativeui.App, error) {
 	}
 	return nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
+			{ID: "location", Title: "Location", Destination: "/features/location"},
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 		}}}, nil
 	}},
+		deviceRoute("/features/location", "Location", "Read one foreground location fix on Android. Status never requests permission.", []nativeui.Action{
+			{ID: "status", Label: "Status", Primary: true}, {ID: "precise", Label: "Current (precise)"}, {ID: "approximate", Label: "Current (approximate)"},
+		}, map[string]nativeui.Handle{
+			"status":      service(nativeui.ServiceRequest{Location: &location.Request{Operation: location.Status}}),
+			"precise":     service(nativeui.ServiceRequest{Location: &location.Request{Operation: location.Current, Accuracy: location.Precise}}),
+			"approximate": service(nativeui.ServiceRequest{Location: &location.Request{Operation: location.Current, Accuracy: location.Approximate}}),
+		}),
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{

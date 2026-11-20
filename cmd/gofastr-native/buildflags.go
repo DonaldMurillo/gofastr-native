@@ -16,6 +16,7 @@ type buildFlags struct {
 	fs *flag.FlagSet
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
+	locationUsage                                                   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
@@ -38,6 +39,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		urlScheme:       fs.String("url-scheme", "", "application-specific deep-link scheme (native renderer)"),
 		receiveShares:   fs.Bool("receive-shares", false, "enable the private incoming-share inbox"),
 		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
+		locationUsage:   fs.String("location-usage", "", "Android foreground location purpose text"),
 		biometricUsage:  fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:         fs.Bool("widgets", false, "package a home-screen widget"),
 		appGroup:        fs.String("app-group", "", "iOS app-group identifier"),
@@ -164,6 +166,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.HostTemplate = *f.hostTemplate
 	a.Renderer = *f.renderer
 	a.DebugTrace = *f.debugTrace
+	a.LocationUsage = *f.locationUsage
 	a.CameraUsage = strings.TrimSpace(*f.cameraUsage)
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme

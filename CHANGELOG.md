@@ -8,6 +8,14 @@ This repository holds two Go modules, tagged separately:
 
 ## Unreleased
 
+### Phone apps
+
+- Added typed foreground `device/location` requests and opt-in native Android
+  `location/v1` support via `--location-usage`, with permission-only status,
+  precise/approximate current fixes, bounded cache age and timeout, and
+  cancellation on backgrounding. The device-features demo includes location.
+  UIKit location is not implemented; the flag is rejected for iOS.
+
 ### Internal
 
 - De-duplicated production and test code with no intended behavior change:

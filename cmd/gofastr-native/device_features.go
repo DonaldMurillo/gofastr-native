@@ -8,8 +8,17 @@ import (
 )
 
 func validateDeviceFeatures(a app, platform string) error {
-	if (a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
+	if (a.LocationUsage != "" || a.ReceiveShares || a.SecureStorage || a.Widgets || a.AppGroup != "" || a.BiometricUsage != "") && a.Renderer != "native" {
 		return errors.New("device feature flags require --renderer native")
+	}
+	if !uitext.Plain(a.LocationUsage, 512) {
+		return errors.New("--location-usage must be at most 512 UTF-8 bytes without control characters")
+	}
+	if strings.TrimSpace(a.LocationUsage) == "" && a.LocationUsage != "" {
+		return errors.New("--location-usage requires a purpose")
+	}
+	if a.LocationUsage != "" && strings.HasPrefix(platform, "ios-") {
+		return errors.New("--location-usage is supported only on Android")
 	}
 	if a.Widgets && a.URLScheme == "" {
 		return errors.New("--widgets requires --url-scheme for widget navigation")

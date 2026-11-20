@@ -43,6 +43,7 @@ public abstract class GofastrActivity extends Activity {
     protected boolean cameraEnabled() { return false; }
     protected boolean microphoneEnabled() { return false; }
     protected boolean incomingSharesEnabled() { return false; }
+    protected boolean locationEnabled() { return false; }
     protected boolean secureStorageEnabled() { return false; }
     protected boolean biometricsEnabled() { return false; }
     protected boolean widgetsEnabled() { return false; }
@@ -92,6 +93,7 @@ public abstract class GofastrActivity extends Activity {
                 for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
+                caps.put("location/v1", locationEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));

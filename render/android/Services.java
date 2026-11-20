@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 public final class Services {
     private final GofastrActivity host;
     private final SecureStorage secureStorage;
+    private final DeviceLocation location;
     private Consumer<JSONObject> result;
     private Consumer<Uri> picked;
     private Runnable permissionGranted;
@@ -35,14 +36,15 @@ public final class Services {
     private int maximumDuration,maximumBytes;
     private boolean recordingFinishing,disposed;
     private boolean fileTask;
-    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406;
-    Services(GofastrActivity host){this.host=host;this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
+    private boolean locationPermissionPending;
+    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406, LOCATION=407;
+    Services(GofastrActivity host){this.host=host;this.location=new DeviceLocation(host);this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
     private void finish(JSONObject outcome) {
         if(disposed)return;
         if(fileTask){JSONObject file=outcome.optJSONObject("file");outcome=JSON.object("status",outcome.optString("status","failed"));if(file!=null)GofastrActivity.put(outcome,"file",file);}
-        Consumer<JSONObject> callback=result;result=null;picked=null;permissionGranted=null;activityCode=0;
+        Consumer<JSONObject> callback=result;result=null;picked=null;permissionGranted=null;locationPermissionPending=false;activityCode=0;
         fileTask=false;
         if(callback!=null)callback.accept(outcome);
     }
@@ -110,6 +112,10 @@ public final class Services {
                 if(!host.incomingSharesEnabled()){finish(outcome("unsupported","The share inbox is disabled."));return;}
                 IncomingShares.perform(host,request.getJSONObject("incomingShare"),this::finish);
             }
+            else if(request.has("location")) {
+                if(!host.locationEnabled()){finish(outcome("unsupported","Location is disabled."));return;}
+                location(request.getJSONObject("location"));
+            }
             else if(request.has("secureStorage")) {
                 if(!host.secureStorageEnabled()){finish(outcome("unsupported","Secure storage is disabled."));return;}
                 JSONObject secure=request.getJSONObject("secureStorage");
@@ -125,6 +131,19 @@ public final class Services {
             }
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
+    }
+    private void location(JSONObject request) {
+        DeviceLocation.validate(request);
+        String accuracy=request.optString("accuracy");
+        String permission=accuracy.equals("precise")?Manifest.permission.ACCESS_FINE_LOCATION:Manifest.permission.ACCESS_COARSE_LOCATION;
+        if(request.optString("operation").equals("current") && host.checkSelfPermission(permission)!=PackageManager.PERMISSION_GRANTED) {
+            permissionGranted=()->location.perform(request,this::finish);
+            locationPermissionPending=true;
+            location.requested();
+            host.requestPermissions(accuracy.equals("precise")?new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION}:new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},LOCATION);
+            return;
+        }
+        location.perform(request,this::finish);
     }
     private void share(JSONObject request) {
         host.workers.execute(()->{
@@ -197,8 +216,8 @@ public final class Services {
     }
     private void releaseRecorder(){if(recorder!=null){try{recorder.reset();recorder.release();}catch(Exception ignored){}recorder=null;}if(recordingFile!=null){recordingFile.delete();recordingFile=null;}}
     boolean back(){if(recordingDialog!=null){stopRecording(false);return true;}return busy();}
-    void pause(){if(recorder!=null)stopRecording(false);secureStorage.cancel();}
-    void dispose(){disposed=true;secureStorage.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
+    void pause(){if(recorder!=null)stopRecording(false);secureStorage.cancel();location.cancel();}
+    void dispose(){disposed=true;secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
         if(code==SHARE){finish(outcome(status==Activity.RESULT_OK?"completed":"cancelled","Share sheet closed. Android does not confirm delivery."));return;}
@@ -209,8 +228,11 @@ public final class Services {
         callback.accept(uri);
     }
     void permissionsResult(int code,int[] grants) {
-        if((code!=MICROPHONE && code!=NOTIFICATION) || result==null)return;
+        if((code!=MICROPHONE && code!=NOTIFICATION && code!=LOCATION) || result==null)return;
+        if(code==LOCATION && !locationPermissionPending)return;
+        locationPermissionPending=false;
         Runnable granted=permissionGranted;permissionGranted=null;
+        if(code==LOCATION && granted!=null && (location.permission().equals("precise") || location.permission().equals("approximate"))){granted.run();return;}
         if(grants.length>0 && grants[0]==PackageManager.PERMISSION_GRANTED && granted!=null)granted.run();
         else finish(outcome("denied","Permission was denied."));
     }

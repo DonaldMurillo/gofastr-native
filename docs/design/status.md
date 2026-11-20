@@ -53,6 +53,14 @@ The WebView renderer live-refreshes screens without a collection too: a data
 change reads the screen's markup again and swaps it into place, keeping
 mounted components, focus and scroll.
 
+Foreground location has a typed `device/location` contract and an opt-in native
+Android `location/v1` adapter. Status does not prompt; current reads request
+precise or approximate access, have bounded cache age and timeout, and cancel
+when hidden. UIKit location remains unimplemented. Android 14 emulator checks
+cover no-prompt status, precise permission grant, permission denial, GPS and
+network mock fixes, and the services-off failure message. Physical-device
+provider accuracy and lifecycle acceptance for location are NOT RUN.
+
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.

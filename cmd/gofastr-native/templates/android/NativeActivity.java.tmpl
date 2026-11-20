@@ -20,6 +20,7 @@ public final class MainActivity extends GofastrActivity {
     @Override protected boolean cameraEnabled() { return {{if .CameraUsage}}true{{else}}false{{end}}; }
     @Override protected boolean microphoneEnabled() { return {{if .MicrophoneUsage}}true{{else}}false{{end}}; }
     @Override protected boolean incomingSharesEnabled() { return {{.ReceiveShares}}; }
+    @Override protected boolean locationEnabled() { return {{if .LocationUsage}}true{{else}}false{{end}}; }
     @Override protected boolean secureStorageEnabled() { return {{.SecureStorage}}; }
     @Override protected boolean biometricsEnabled() { return {{if .BiometricUsage}}true{{else}}false{{end}}; }
     @Override protected boolean widgetsEnabled() { return {{.Widgets}}; }
