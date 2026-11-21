@@ -16,7 +16,7 @@ struct MobileComponent: Decodable, Equatable {
         payload = try values.decode(String.self, forKey: .payload)
         destinations = try values.decodeIfPresent([String: String].self, forKey: .destinations) ?? [:]
         guard !id.isEmpty, !name.isEmpty, !payload.isEmpty,
-              payload.utf8.count <= Self.maximumPayloadBytes, destinations.count <= 128,
+              payload.utf8.count <= Self.maximumPayloadBytes, destinations.count <= 200,
               destinations.allSatisfy({ !$0.key.isEmpty && !$0.value.isEmpty && $0.value.utf8.count <= 4096 }),
               (try? JSONSerialization.jsonObject(with: Data(payload.utf8), options: [.fragmentsAllowed])) != nil else {
             throw MobileComponentFailure.invalidPayload

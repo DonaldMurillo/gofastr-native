@@ -90,18 +90,20 @@ const (
 // provisioningProfile is the part of a decoded .mobileprovision the build
 // checks. It never holds the profile's raw contents.
 type provisioningProfile struct {
-	Name, UUID     string
-	TeamIDs        []string
-	Prefix         string
-	AppIdentifier  string
-	TeamEntitled   string
-	Expiry         time.Time
-	Devices        []string
-	AllDevices     bool
-	GetTaskAllow   bool
-	KeychainGroups []string
-	AppGroups      []string
-	CertSHA1s      []string
+	APSEnvironment  string
+	Name, UUID      string
+	TeamIDs         []string
+	Prefix          string
+	AppIdentifier   string
+	TeamEntitled    string
+	Expiry          time.Time
+	Devices         []string
+	AllDevices      bool
+	GetTaskAllow    bool
+	KeychainGroups  []string
+	AppGroups       []string
+	SignInWithApple []string
+	CertSHA1s       []string
 }
 
 func plistRoot(content []byte) (provisioningNode, error) {
@@ -150,11 +152,13 @@ func parseProvisioningProfile(content []byte) (provisioningProfile, error) {
 		return p, errors.New("profile has no valid ExpirationDate")
 	}
 	entitlements := root.field("Entitlements")
+	p.APSEnvironment = strings.TrimSpace(entitlements.field("aps-environment").Text)
 	p.AppIdentifier = strings.TrimSpace(entitlements.field("application-identifier").Text)
 	p.TeamEntitled = strings.TrimSpace(entitlements.field("com.apple.developer.team-identifier").Text)
 	p.GetTaskAllow = entitlements.field("get-task-allow").boolean()
 	p.KeychainGroups = entitlements.field("keychain-access-groups").strings()
 	p.AppGroups = entitlements.field("com.apple.security.application-groups").strings()
+	p.SignInWithApple = entitlements.field(entSignInWithApple).strings()
 	for _, cert := range root.field("DeveloperCertificates").Children {
 		if cert.XMLName.Local != "data" {
 			continue
@@ -258,11 +262,12 @@ func (p provisioningProfile) check(req profileRequirement, now time.Time) error 
 type entitlementSet map[string]any
 
 const (
-	entApplicationID  = "application-identifier"
-	entTeamID         = "com.apple.developer.team-identifier"
-	entGetTaskAllow   = "get-task-allow"
-	entKeychainGroups = "keychain-access-groups"
-	entAppGroups      = "com.apple.security.application-groups"
+	entApplicationID   = "application-identifier"
+	entTeamID          = "com.apple.developer.team-identifier"
+	entGetTaskAllow    = "get-task-allow"
+	entKeychainGroups  = "keychain-access-groups"
+	entAppGroups       = "com.apple.security.application-groups"
+	entSignInWithApple = "com.apple.developer.applesignin"
 )
 
 // deviceEntitlements builds the entitlements for one bundle. Only the app
@@ -291,6 +296,10 @@ func (e entitlementSet) allowedBy(p provisioningProfile) error {
 		switch v := e[key].(type) {
 		case string:
 			switch key {
+			case "aps-environment":
+				if v != p.APSEnvironment || v != "development" && v != "production" {
+					problems = append(problems, key+" "+v+" not granted")
+				}
 			case entApplicationID:
 				if !patternMatches(p.AppIdentifier, v) {
 					problems = append(problems, key+" "+v+" not granted")
@@ -316,6 +325,8 @@ func (e entitlementSet) allowedBy(p provisioningProfile) error {
 					}
 				case entAppGroups:
 					granted = contains(p.AppGroups, item)
+				case entSignInWithApple:
+					granted = contains(p.SignInWithApple, item)
 				}
 				if !granted {
 					problems = append(problems, key+" "+item+" not granted")

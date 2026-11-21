@@ -4,14 +4,23 @@ package featuresnative
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/DonaldMurillo/gofastr-native/device/background"
+	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	bgjobs "github.com/DonaldMurillo/gofastr-native/device/background"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
+	"github.com/DonaldMurillo/gofastr-native/device/refresh"
+	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
@@ -21,15 +30,48 @@ import (
 var lifecycle sync.RWMutex
 var runtime *nativeui.Runtime
 var screens *nativeui.App
+var stateDir string
+
+// background records when the OS last ran the demo's refresh. A real app
+// would sync its data here instead.
+var background = refresh.NewRunner(func(ctx context.Context) error {
+	lifecycle.RLock()
+	directory := stateDir
+	lifecycle.RUnlock()
+	if directory == "" {
+		return errors.New("featuresnative: not started")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(directory, "last-refresh"), []byte(time.Now().UTC().Format(time.RFC3339)), 0o600)
+})
+
+// BackgroundRefresh runs one refresh when iOS wakes the app.
+func BackgroundRefresh(timeoutMillis int64) error { return background.Run(timeoutMillis) }
+
+// CancelBackgroundRefresh stops a running refresh when iOS expires the task.
+func CancelBackgroundRefresh() { background.Cancel() }
+
+func lastRefresh() string {
+	lifecycle.RLock()
+	directory := stateDir
+	lifecycle.RUnlock()
+	stamp, err := os.ReadFile(filepath.Join(directory, "last-refresh"))
+	if directory == "" || err != nil {
+		return "never"
+	}
+	if at, err := time.Parse(time.RFC3339, string(stamp)); err == nil {
+		return at.Format("2006-01-02 15:04 MST")
+	}
+	return "never"
+}
 
 func Start(dataDir string) error {
 	lifecycle.Lock()
 	defer lifecycle.Unlock()
 	if runtime != nil {
 		return nil
-	}
-	if err := os.MkdirAll(dataDir, 0700); err != nil {
-		return err
 	}
 	app, err := newAppWithData(dataDir)
 	if err != nil {
@@ -39,14 +81,17 @@ func Start(dataDir string) error {
 	if err != nil {
 		return err
 	}
-	screens, runtime = app, r
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return err
+	}
+	screens, runtime, stateDir = app, r, dataDir
 	return nil
 }
 
 func Stop() error {
 	lifecycle.Lock()
 	defer lifecycle.Unlock()
-	screens, runtime = nil, nil
+	screens, runtime, stateDir = nil, nil, ""
 	return nil
 }
 func Root() string { return "/features" }
@@ -85,6 +130,7 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 	var timestampMu sync.Mutex
 	timestamp := filepath.Join(dataDir, "background-last-run")
 	var next *sharein.Item
+	var scanMessage string
 	service := func(request nativeui.ServiceRequest) nativeui.Handle {
 		request.ID = "device"
 		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
@@ -108,6 +154,10 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Scan != nil:
+				message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
+			case result.Calendar != nil:
+				message = calendarMessage(*result.Calendar)
 			case result.Background != nil:
 				message = fmt.Sprintf("Background job scheduled: %t.", result.Background.Scheduled)
 			case result.SecureStorage != nil:
@@ -120,6 +170,8 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 				}
 			case result.Widget != nil:
 				message = fmt.Sprintf("Widget snapshot published: %t.", result.Widget.Published)
+			case result.Refresh != nil:
+				message = fmt.Sprintf("Background refresh scheduled: %t.", result.Refresh.Scheduled)
 			default:
 				item := result.IncomingShare
 				inboxMu.Lock()
@@ -131,6 +183,8 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 					message = "The share inbox is empty or the share was discarded."
 				}
 			}
+		} else if result.Message != "" {
+			message += ". " + result.Message
 		}
 		return nativeui.Result{Announcement: message}, nil
 	}
@@ -139,14 +193,49 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
-	app, err := nativeui.New(Root(), nativeui.Route{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", List: &nativeui.List{Rows: []nativeui.Row{
+	signIn := func(operation authentication.Operation) nativeui.Handle {
+		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
+			state := demoToken()
+			request := authentication.Request{Operation: operation, Nonce: state}
+			if operation == authentication.OAuth {
+				redirect := "dev.gofastr.features:/oauth"
+				challenge := sha256.Sum256([]byte(demoToken()))
+				query := url.Values{"response_type": {"code"}, "client_id": {"demo"}, "redirect_uri": {redirect},
+					"state": {state}, "code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])},
+					"code_challenge_method": {"S256"}}
+				request = authentication.Request{Operation: operation, State: state, RedirectURI: redirect,
+					AuthorizationURL: "https://example.com/?" + query.Encode(), PreferEphemeralSession: true}
+			}
+			return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "sign-in", Authentication: &request}}, nil
+		}
+	}
+	scanRespond := func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+		message := "Device result: " + string(result.Status)
+		if result.Scan != nil {
+			message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
+		}
+		inboxMu.Lock()
+		scanMessage = message
+		inboxMu.Unlock()
+		return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/features/scanned"}}, nil
+	}
+	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
+			{ID: "calendar", Title: "Calendar events", Destination: "/features/calendar"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
+			{ID: "location", Title: "Location", Destination: "/features/location"},
+			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
+			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
 			{ID: "background", Title: "Background tasks (Android)", Destination: "/features/background"},
 		}}}, nil
-	}},
+	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
+		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			inboxMu.Lock()
+			defer inboxMu.Unlock()
+			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
+		}},
 		nativeui.Route{Path: "/features/background", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			timestampMu.Lock()
 			defer timestampMu.Unlock()
@@ -156,10 +245,10 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			}
 			return nativeui.Screen{Title: "Background tasks", Text: "Last recorded run: " + last, Actions: []nativeui.Action{{ID: "once", Label: "Schedule once"}, {ID: "periodic", Label: "Schedule every 15 minutes"}, {ID: "status", Label: "Check status"}, {ID: "cancel", Label: "Cancel"}, {ID: "refresh", Label: "Refresh timestamp"}}}, nil
 		}, Actions: map[string]nativeui.Handle{
-			"once":     service(nativeui.ServiceRequest{Background: &background.Request{Operation: background.Schedule, Identifier: "demo", Task: "timestamp", DelayMinutes: 1}}),
-			"periodic": service(nativeui.ServiceRequest{Background: &background.Request{Operation: background.Schedule, Identifier: "demo", Task: "timestamp", Periodic: true, IntervalMinutes: 15}}),
-			"status":   service(nativeui.ServiceRequest{Background: &background.Request{Operation: background.Status, Identifier: "demo"}}),
-			"cancel":   service(nativeui.ServiceRequest{Background: &background.Request{Operation: background.Cancel, Identifier: "demo"}}),
+			"once":     service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Schedule, Identifier: "demo", Task: "timestamp", DelayMinutes: 1}}),
+			"periodic": service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Schedule, Identifier: "demo", Task: "timestamp", Periodic: true, IntervalMinutes: 15}}),
+			"status":   service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Status, Identifier: "demo"}}),
+			"cancel":   service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Cancel, Identifier: "demo"}}),
 			"refresh": func(context.Context, nativeui.Request) (nativeui.Result, error) {
 				timestampMu.Lock()
 				defer timestampMu.Unlock()
@@ -190,6 +279,28 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			"status": secure(securestore.Status, ""), "put": secure(securestore.Put, securestore.Device), "get": secure(securestore.Get, securestore.Device), "delete": secure(securestore.Delete, securestore.Device),
 			"biometric-put": secure(securestore.Put, securestore.Biometric), "biometric-get": secure(securestore.Get, securestore.Biometric), "biometric-delete": secure(securestore.Delete, securestore.Biometric), "authenticate": secure(securestore.Authenticate, securestore.Biometric),
 		}),
+		nativeui.Route{Path: "/features/sign-in", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{Title: "Native sign-in", Text: "This demo tests presentation only. It has no OAuth provider and never signs you in.",
+				Actions: []nativeui.Action{{ID: "apple", Label: "Sign in with Apple", Primary: true}, {ID: "oauth", Label: "Open OAuth login"}}}, nil
+		}, Actions: map[string]nativeui.Handle{"apple": signIn(authentication.Apple), "oauth": signIn(authentication.OAuth)},
+			Services: map[string]nativeui.ServiceRespond{"sign-in": func(_ context.Context, _ nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
+				return nativeui.Result{Announcement: "Sign-in result: " + string(outcome.Status) + ". No app account was created."}, nil
+			}}},
+		deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar.", []nativeui.Action{
+			{ID: "calendar-add", Label: "Add sample event", Primary: true},
+			{ID: "calendar-status", Label: "Calendar status"},
+			{ID: "calendar-read", Label: "Read next 7 days"},
+		}, map[string]nativeui.Handle{
+			"calendar-status": service(nativeui.ServiceRequest{Calendar: &calendar.Request{Operation: calendar.Status}}),
+			"calendar-add": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				start := time.Now().AddDate(0, 0, 1).Truncate(time.Minute)
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Add, Event: &calendar.Event{Title: "GoFastr sample event", Start: start, End: start.Add(time.Hour)}}}}, nil
+			},
+			"calendar-read": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				now := time.Now()
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Read, From: now, To: now.AddDate(0, 0, 7), Limit: calendar.MaxLimit}}}, nil
+			},
+		}),
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
@@ -197,7 +308,17 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
-	)
+		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
+				{ID: "schedule", Label: "Schedule", Primary: true}, {ID: "status", Label: "Check schedule"}, {ID: "cancel", Label: "Cancel refresh"},
+			}}, nil
+		}, Actions: map[string]nativeui.Handle{
+			"schedule": service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Schedule, IntervalMinutes: 60}}),
+			"status":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Status}}),
+			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
+		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
+	}
+	app, err := nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -214,10 +335,33 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 	}})
 }
 
+func demoToken() string {
+	var input [32]byte
+	rand.Read(input[:])
+	return base64.RawURLEncoding.EncodeToString(input[:])
+}
+
 func preview(value string) string {
 	runes := []rune(value)
 	if len(runes) > 160 {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+func calendarMessage(result calendar.Result) string {
+	if result.Authorization != "" {
+		return "Calendar authorization: " + result.Authorization
+	}
+	if result.Identifier != "" {
+		return "Sample event added."
+	}
+	if len(result.Events) == 0 {
+		return "No calendar events in the next 7 days."
+	}
+	lines := make([]string, 0, len(result.Events))
+	for _, event := range result.Events {
+		lines = append(lines, event.Title+" — "+event.Start.Format(time.RFC3339))
+	}
+	return strings.Join(lines, "\n")
 }

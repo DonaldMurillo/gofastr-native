@@ -365,13 +365,22 @@ func (s *Session) finish(state State, reason, message string) {
 	if recorder != nil {
 		s.closeSegment(recorder, last)
 	}
-	s.mu.Lock()
-	s.state, s.reason, s.message, s.ended = state, reason, message, time.Now()
-	s.mu.Unlock()
+	ended := time.Now()
 	if s.config.Record {
-		s.writeManifest()
 		enforceBudget(s.config.Budget, s)
+		store.Lock()
+		defer store.Unlock()
+		recording, pending := s.recording()
+		recording.State, recording.Reason, recording.Ended = state, reason, ended
+		if directory := s.directory(); directory != "" && !recording.Started.IsZero() {
+			if err := saveManifest(directory, recording, pending); err != nil {
+				state, reason, message = Failed, "storage", "The recording could not be finalized: "+err.Error()
+			}
+		}
 	}
+	s.mu.Lock()
+	s.state, s.reason, s.message, s.ended = state, reason, message, ended
+	s.mu.Unlock()
 	changed()
 }
 
