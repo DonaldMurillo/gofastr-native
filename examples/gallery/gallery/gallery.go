@@ -627,7 +627,7 @@ func Matrix(ctx context.Context) string {
 var KnownCapabilities = []nativeui.Capability{nativeui.CapabilityNavigation, nativeui.CapabilityEditor, nativeui.CapabilityDrafts, nativeui.CapabilityShare,
 	nativeui.CapabilityHaptics, nativeui.CapabilitySheets, nativeui.CapabilityAnnouncement, nativeui.CapabilityPresentation, nativeui.CapabilityFiles,
 	nativeui.CapabilityPhotos, nativeui.CapabilityCamera, nativeui.CapabilityNotifications, nativeui.CapabilitySharing, nativeui.CapabilityBrowser, nativeui.CapabilityClipboard,
-	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy,
+	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityLocation, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy,
 	nativeui.CapabilityCalendar}
 
 func demoImages() ([]nativeui.Image, error) {

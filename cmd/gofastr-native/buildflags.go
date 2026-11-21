@@ -32,8 +32,8 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:                fs,
 		networkStatus:     fs.Bool("network-status", false, "enable Android network status queries"),
-		location:          fs.Bool("location", false, "enable foreground iOS location services"),
-		locationUsage:     fs.String("location-usage", "", "iOS when-in-use location purpose text"),
+		location:          fs.Bool("location", false, "enable foreground location services (native iOS and Android)"),
+		locationUsage:     fs.String("location-usage", "", "iOS when-in-use location purpose text; required on iOS, unused on Android"),
 		calendar:          fs.Bool("calendar", false, "enable iOS calendar events"),
 		calendarUsage:     fs.String("calendar-usage", "Add and read calendar events you choose.", "calendar permission purpose text"),
 		platform:          fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),

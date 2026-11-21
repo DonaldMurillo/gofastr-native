@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 public final class Services {
     private final GofastrActivity host;
     private final SecureStorage secureStorage;
+    private final DeviceLocation location;
     private Consumer<JSONObject> result;
     private Consumer<Uri> picked;
     private Runnable permissionGranted;
@@ -37,7 +38,7 @@ public final class Services {
     private boolean recordingFinishing,disposed;
     private boolean fileTask;
     private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406, CALENDAR=407;
-    Services(GofastrActivity host){this.host=host;this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
+    Services(GofastrActivity host){this.host=host;this.location=new DeviceLocation(host);this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
     private void finish(JSONObject outcome) {
@@ -173,6 +174,10 @@ public final class Services {
                 if(!host.incomingSharesEnabled()){finish(outcome("unsupported","The share inbox is disabled."));return;}
                 IncomingShares.perform(host,request.getJSONObject("incomingShare"),this::finish);
             }
+            else if(request.has("location")) {
+                if(!host.locationEnabled()){finish(outcome("unsupported","Location is disabled."));return;}
+                location.perform(request.getJSONObject("location"),this::finish);
+            }
             else if(request.has("secureStorage")) {
                 if(!host.secureStorageEnabled()){finish(outcome("unsupported","Secure storage is disabled."));return;}
                 JSONObject secure=request.getJSONObject("secureStorage");
@@ -261,8 +266,8 @@ public final class Services {
     }
     private void releaseRecorder(){if(recorder!=null){try{recorder.reset();recorder.release();}catch(Exception ignored){}recorder=null;}if(recordingFile!=null){recordingFile.delete();recordingFile=null;}}
     boolean back(){if(recordingDialog!=null){stopRecording(false);return true;}return busy();}
-    void pause(){if(recorder!=null)stopRecording(false);secureStorage.cancel();}
-    void dispose(){disposed=true;secureStorage.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
+    void pause(){if(recorder!=null)stopRecording(false);secureStorage.cancel();location.pause();}
+    void dispose(){disposed=true;secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
         if(code==CALENDAR){finish(outcome("completed","Calendar editor closed. Android does not confirm the event was saved."));return;}
@@ -274,6 +279,7 @@ public final class Services {
         callback.accept(uri);
     }
     void permissionsResult(int code,int[] grants) {
+        if(code==DeviceLocation.PERMISSION_REQUEST){if(result!=null)location.permissionsResult(grants);return;}
         if((code!=MICROPHONE && code!=NOTIFICATION) || result==null)return;
         Runnable granted=permissionGranted;permissionGranted=null;
         if(grants.length>0 && grants[0]==PackageManager.PERMISSION_GRANTED && granted!=null)granted.run();

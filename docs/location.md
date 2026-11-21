@@ -1,10 +1,11 @@
-# Foreground location on iOS
+# Foreground location on iOS and Android
 
-`device/location` defines typed CoreLocation requests through
-`nativeui.ServiceRequest.Location`. The native iOS adapter is opt-in and
-advertises `location/v1` only when its build flag and purpose text are present.
-Android and WebView do not implement this service. A capability is not a
-permission grant or a promise that system location services are enabled.
+`device/location` defines typed foreground location requests through
+`nativeui.ServiceRequest.Location`. The native iOS (CoreLocation) and native
+Android (`LocationManager`) adapters are opt-in and advertise `location/v1`
+only when built with `--location`. WebView does not implement this service.
+A capability is not a permission grant or a promise that system location
+services are enabled.
 
 ## Build and try the demo
 
@@ -16,11 +17,23 @@ GOWORK=off go run ./cmd/gofastr-native build --platform ios-sim --renderer nativ
   --out dist/mobile/location-demo
 ```
 
-`--location` requires the native renderer and an iOS platform.
-`--location-usage` is required, must be nonblank, and is limited to 512 UTF-8
-bytes without control characters. It writes
+`--location` requires the native renderer and an iOS or Android platform.
+On iOS, `--location-usage` is required, must be nonblank, and is limited to
+512 UTF-8 bytes without control characters. It writes
 `NSLocationWhenInUseUsageDescription`; it never requests always authorization
-or adds background modes. Supplying purpose text without `--location` fails.
+or adds background modes. On Android `--location-usage` is optional and
+unused: the system permission dialog shows no app-supplied text. Supplying
+purpose text without `--location` fails on both.
+
+```sh
+GOWORK=off go run ./cmd/gofastr-native build --platform android-emu --renderer native \
+  --pkg ./examples/devicefeatures/featuresnative --id dev.gofastr.locationdemo \
+  --name "Location Demo" --location --out dist/mobile/location-demo-android
+```
+
+The Android build adds `ACCESS_COARSE_LOCATION` and `ACCESS_FINE_LOCATION` to
+the manifest. It never declares `ACCESS_BACKGROUND_LOCATION` and uses no Play
+Services dependency.
 
 Open **Location** in the device-features demo. **Current position** is the
 primary action; **More actions** contains **Location status**, **Authorize
@@ -77,11 +90,33 @@ and entering the background stop updates, invalidate the timer, detach the
 delegate and settle once. Late callbacks cannot settle a subsequent operation.
 `authorize` waits for a permission outcome unless cancelled or backgrounded.
 
+### Android behavior
+
+The Android adapter follows the same table on the activity's main looper.
+Each operation takes a new generation; `finish` removes the listener and
+deadline, and callbacks from an older generation are ignored.
+
+- `Accuracy` picks a provider: `best` prefers GPS (with fine permission), then
+  the fused provider (API 31+), then network; `balanced` and `coarse` prefer
+  network, then fused, then GPS. With no enabled provider the operation fails.
+- The permission prompt asks for coarse and fine location, or coarse only for
+  `coarse` accuracy. Android 12+ lets the person choose approximate; that
+  reports `precise: false` and the read continues at reduced accuracy.
+- The activity pauses while the system permission dialog is showing; that
+  pause does not cancel. Any other pause cancels. An interrupted permission
+  request (no grant results) also cancels.
+- Unknown vertical accuracy, speed and bearing are reported as `-1`. Fixes
+  without a horizontal accuracy or with out-of-range coordinates are skipped.
+
 ## Permissions and outcomes
 
 Permission values are `not_determined`, `denied`, `restricted`, `when_in_use`,
-and `always`. The adapter can observe an existing always grant but never asks
-for one. Reduced accuracy is accepted; requesting `best` does not override
+and `always`. The iOS adapter can observe an existing always grant but never
+asks for one. Android reports `when_in_use` when coarse or fine location is
+granted, `not_determined` before the app has asked, and `denied` once it has
+asked and holds no grant; it then does not prompt again, so the app must point
+the person to system settings. Android never reports `restricted` or `always`.
+Reduced accuracy is accepted; requesting `best` does not override
 the person's approximate-location setting or request temporary full accuracy.
 
 | Service status | Location content |
@@ -111,7 +146,7 @@ Each `Fix` contains:
 - `VerticalAccuracyMeters`: nonnegative meters, or `-1` for unknown.
 - `SpeedMetersPerSecond`: nonnegative meters per second, or `-1` for unknown.
 - `CourseDegrees`: [0, 360), or `-1` for unknown.
-- `TimestampMillis`: nonnegative Unix milliseconds from CoreLocation.
+- `TimestampMillis`: nonnegative Unix milliseconds from CoreLocation or `Location.getTime()`.
 
 `Accept()` validates permission, operation-specific fix counts, coordinate
 ranges, finite numbers, accuracy and unknown-value sentinels. Current/track
@@ -156,7 +191,13 @@ iOS 26.5 simulator acceptance passed with Xcode 26.6: status and authorize
 reported the pregranted permission, and current and duration-bounded tracking
 displayed `37.3349, -122.0090`. This does not exercise the first-use prompt.
 
-NOT RUN: first-use permission dialogs, denial/restriction and services-off UI,
+Android: `go test ./cmd/gofastr-native` with `ANDROID_HOME` set compiles
+`DeviceLocation.java` against the SDK and the generated Go bindings, and Go
+tests cover the opt-in manifest and activity. NOT RUN on Android: emulator or
+device runs, permission dialogs, provider fixes, services-off and
+cancellation behavior, and TalkBack.
+
+NOT RUN on iOS: first-use permission dialogs, denial/restriction and services-off UI,
 approximate-accuracy settings, cancellation/background behavior through the
 UI, VoiceOver, real GPS hardware, physical-device installation, and store
 distribution. See [physical-device acceptance](ios-device-acceptance.md) and

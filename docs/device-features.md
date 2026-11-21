@@ -14,15 +14,16 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
-| Foreground location | `ServiceRequest.Location` | Not implemented | CoreLocation, when-in-use authorization, bounded updates |
+| Foreground location | `ServiceRequest.Location` | LocationManager, coarse/fine runtime permission, bounded updates | CoreLocation, when-in-use authorization, bounded updates |
 | Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
 | Network status | `ServiceRequest.Network` | One-shot ConnectivityManager snapshot (`network/v1`); see [network status](network-status.md) | Not implemented |
 | Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
 
-[Location](location.md) is an additional iOS-only opt-in service. Build the
-demo with `--location --location-usage "Show nearby places in the foreground."`
-to enable its Location section. It reports permission, current position and
-up to five samples over five seconds; it never requests background access.
+[Location](location.md) is an additional opt-in service on iOS and Android.
+Build the demo with `--location --location-usage "Show nearby places in the foreground."`
+to enable its Location section (`--location-usage` is required on iOS and
+optional on Android). It reports permission, current position and up to five
+samples over five seconds; it never requests background access.
 The other three features remain shared across Android and iOS.
 
 The browser is a separate, user-initiated service in `device/browser`. It accepts
@@ -91,7 +92,8 @@ builds the demo, boots a fresh simulator, grants location permission, sets a
 simulated position and drives all four actions through the UI. iOS 26.5
 simulator acceptance passed with visible current and tracking coordinates.
 First-use prompts, denial UI and physical-device location checks are NOT RUN;
-see [location acceptance limits](location.md#checks-and-acceptance).
+see [location acceptance limits](location.md#checks-and-acceptance). Android
+location has SDK compilation checks only; emulator and device runs are NOT RUN.
 
 ## Contact picker
 
