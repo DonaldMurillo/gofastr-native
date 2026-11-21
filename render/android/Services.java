@@ -8,6 +8,7 @@ import android.database.Cursor;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.CalendarContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Base64;
@@ -36,7 +37,7 @@ public final class Services {
     private int maximumDuration,maximumBytes;
     private boolean recordingFinishing,disposed;
     private boolean fileTask;
-    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406;
+    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406, CALENDAR=407;
     Services(GofastrActivity host){this.host=host;this.location=new DeviceLocation(host);this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
@@ -96,12 +97,70 @@ public final class Services {
             intent.setClipData(ClipData.newRawUri("Photo",uri));picked=callback;activityCode=CAMERA;host.startActivityForResult(intent,CAMERA);
         }catch(Exception e){failed(e);}
     }
+    private static boolean calendarText(String text,int maximum) {
+        if(text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>maximum)return false;
+        for(int i=0;i<text.length();) {
+            int point=text.codePointAt(i);i+=Character.charCount(point);
+            if(Character.isISOControl(point) || point>=0xd800 && point<=0xdfff)return false;
+        }
+        return true;
+    }
+    private static final java.util.regex.Pattern CALENDAR_TIME=java.util.regex.Pattern.compile("([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]{1,9}))?(?:Z|([+-])([0-9]{2}):([0-9]{2}))");
+    /** Days since 1970-01-01 in the proleptic Gregorian calendar, as Go's time package counts them. */
+    private static long calendarDay(long year,int month,int day) {
+        year-=month<=2?1:0; // year >= 0 here, so plain division floors.
+        long era=year/400,yoe=year-era*400,doy=(153*(month+(month>2?-3:9))+2)/5+day-1,doe=yoe*365+yoe/4-yoe/100+doy;
+        return era*146097+doe-719468;
+    }
+    /** Parses Go's RFC 3339 time. Returns the instant, the UTC midnight of its wall-clock date, and 1 when the wall clock is midnight. */
+    static long[] calendarTime(String value) {
+        java.util.regex.Matcher match=CALENDAR_TIME.matcher(value);
+        if(!match.matches())throw new IllegalArgumentException("Invalid calendar time");
+        int year=Integer.parseInt(match.group(1)),month=Integer.parseInt(match.group(2)),day=Integer.parseInt(match.group(3));
+        int hour=Integer.parseInt(match.group(4)),minute=Integer.parseInt(match.group(5)),second=Integer.parseInt(match.group(6));
+        int[] lengths={31,year%4==0 && (year%100!=0 || year%400==0)?29:28,31,30,31,30,31,31,30,31,30,31};
+        if(year<1 || month<1 || month>12 || day<1 || day>lengths[month-1] || hour>23 || minute>59 || second>59)throw new IllegalArgumentException("Invalid calendar time");
+        long nanos=match.group(7)==null?0:Long.parseLong((match.group(7)+"00000000").substring(0,9));
+        int offset=0;
+        if(match.group(8)!=null) {
+            int hours=Integer.parseInt(match.group(9)),minutes=Integer.parseInt(match.group(10));
+            if(hours>23 || minutes>59)throw new IllegalArgumentException("Invalid calendar offset");
+            offset=(match.group(8).equals("-")?-1:1)*(hours*60+minutes);
+        }
+        long midnight=calendarDay(year,month,day)*86400000L;
+        long instant=midnight+(hour*3600L+minute*60L+second)*1000L+nanos/1000000L-offset*60000L;
+        if(instant==-62135596800000L)throw new IllegalArgumentException("Zero calendar time");
+        return new long[]{instant,midnight,hour==0 && minute==0 && second==0 && nanos==0?1:0};
+    }
+    private void calendar(JSONObject request) throws Exception {
+        if(!"edit".equals(request.optString("operation"))){finish(outcome("unsupported","Android supports only the calendar editor."));return;}
+        JSONObject event=request.getJSONObject("event");
+        if(request.has("from") || request.has("to") || request.has("limit") || !event.optString("identifier").isEmpty())throw new IllegalArgumentException("Invalid calendar request");
+        String title=event.getString("title"),location=event.optString("location"),notes=event.optString("notes");
+        long[] start=calendarTime(event.getString("start")),end=calendarTime(event.getString("end"));
+        boolean allDay=event.getBoolean("allDay");
+        if(title.trim().isEmpty() || !calendarText(title,200) || !calendarText(location,200) || !calendarText(notes,2000) || end[0]<start[0] ||
+           allDay && (start[2]==0 || end[2]==0 || end[1]<=start[1])) {
+            throw new IllegalArgumentException("Invalid calendar event");
+        }
+        // Android stores all-day events at UTC midnight of each calendar date.
+        long begin=allDay?start[1]:start[0],until=allDay?end[1]:end[0];
+        Intent intent=new Intent(Intent.ACTION_INSERT,CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,begin).putExtra(CalendarContract.EXTRA_EVENT_END_TIME,until)
+            .putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY,allDay).putExtra(CalendarContract.Events.TITLE,title)
+            .putExtra(CalendarContract.Events.EVENT_LOCATION,location).putExtra(CalendarContract.Events.DESCRIPTION,notes);
+        activityCode=CALENDAR;
+        try{host.startActivityForResult(intent,CALENDAR);}
+        catch(ActivityNotFoundException e){finish(outcome("unsupported","No calendar app is installed."));}
+        catch(SecurityException e){finish(outcome("failed","The calendar editor could not be opened."));}
+    }
     public void releaseCapture(){if(cameraFile!=null){host.revokeUriPermission(TransferProvider.uri(host,cameraFile),Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);TransferProvider.remove(cameraFile);cameraFile=null;}}
     public void shareText(String text,Consumer<JSONObject> callback){run(JSON.object("share",JSON.object("text",text)),callback);}
     public void run(JSONObject request,Consumer<JSONObject> callback) {
         if(!begin(callback))return;
         try {
-            if(request.has("clipboard")) {
+            if(request.has("calendar")) calendar(request.getJSONObject("calendar"));
+            else if(request.has("clipboard")) {
                 ClipboardManager clipboard=(ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(ClipData.newPlainText("",request.getJSONObject("clipboard").optString("text")));finish(outcome("completed","Copied to clipboard."));
             }else if(request.has("share")) share(request.getJSONObject("share"));
@@ -211,6 +270,7 @@ public final class Services {
     void dispose(){disposed=true;secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
+        if(code==CALENDAR){finish(outcome("completed","Calendar editor closed. Android does not confirm the event was saved."));return;}
         if(code==SHARE){finish(outcome(status==Activity.RESULT_OK?"completed":"cancelled","Share sheet closed. Android does not confirm delivery."));return;}
         Consumer<Uri> callback=picked;picked=null;activityCode=0;
         if(status!=Activity.RESULT_OK){releaseCapture();finish(JSON.object("status","cancelled"));return;}

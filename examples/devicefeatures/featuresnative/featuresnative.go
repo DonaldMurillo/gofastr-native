@@ -187,6 +187,10 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
 	}
+	withService := func(route nativeui.Route, id string, respond nativeui.ServiceRespond) nativeui.Route {
+		route.Services[id] = respond
+		return route
+	}
 	signIn := func(operation authentication.Operation) nativeui.Handle {
 		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
 			state := demoToken()
@@ -258,11 +262,16 @@ func newApp() (*nativeui.App, error) {
 			Services: map[string]nativeui.ServiceRespond{"sign-in": func(_ context.Context, _ nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
 				return nativeui.Result{Announcement: "Sign-in result: " + string(outcome.Status) + ". No app account was created."}, nil
 			}}},
-		deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar.", []nativeui.Action{
+		withService(deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar on iOS. On Android, Open calendar editor shows the system editor; closing it does not confirm a save.", []nativeui.Action{
 			{ID: "calendar-add", Label: "Add sample event", Primary: true},
 			{ID: "calendar-status", Label: "Calendar status"},
 			{ID: "calendar-read", Label: "Read next 7 days"},
+			{ID: "calendar-edit", Label: "Open calendar editor"},
 		}, map[string]nativeui.Handle{
+			"calendar-edit": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				start := time.Now().Truncate(time.Hour).Add(time.Hour)
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "calendar-editor", Calendar: &calendar.Request{Operation: calendar.Edit, Event: &calendar.Event{Title: "GoFastr sample event", Start: start, End: start.Add(time.Hour)}}}}, nil
+			},
 			"calendar-status": service(nativeui.ServiceRequest{Calendar: &calendar.Request{Operation: calendar.Status}}),
 			"calendar-add": func(context.Context, nativeui.Request) (nativeui.Result, error) {
 				start := time.Now().AddDate(0, 0, 1).Truncate(time.Minute)
@@ -272,7 +281,7 @@ func newApp() (*nativeui.App, error) {
 				now := time.Now()
 				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Read, From: now, To: now.AddDate(0, 0, 7), Limit: calendar.MaxLimit}}}, nil
 			},
-		}),
+		}), "calendar-editor", calendarEditorRespond),
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
@@ -305,6 +314,15 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+// calendarEditorRespond reports the Android editor outcome. The editor does
+// not say whether the person saved the event.
+func calendarEditorRespond(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+	if result.Status == nativeui.EffectCompleted {
+		return nativeui.Result{Announcement: "Calendar editor closed. Saving is not confirmed."}, nil
+	}
+	return nativeui.Result{Announcement: "Calendar editor: " + string(result.Status)}, nil
 }
 
 func calendarMessage(result calendar.Result) string {

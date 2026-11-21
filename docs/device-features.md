@@ -17,6 +17,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Foreground location | `ServiceRequest.Location` | LocationManager, coarse/fine runtime permission, bounded updates | CoreLocation, when-in-use authorization, bounded updates |
 | Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
 | Network status | `ServiceRequest.Network` | One-shot ConnectivityManager snapshot (`network/v1`); see [network status](network-status.md) | Not implemented |
+| Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
 
 [Location](location.md) is an additional opt-in service on iOS and Android.
 Build the demo with `--location --location-usage "Show nearby places in the foreground."`

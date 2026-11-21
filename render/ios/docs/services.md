@@ -16,10 +16,12 @@ The opt-in native build flag `--calendar` enables `calendar/v1`.
 `--calendar-usage` overrides the default purpose text used for
 `NSCalendarsFullAccessUsageDescription`,
 `NSCalendarsWriteOnlyAccessUsageDescription`, and legacy
-`NSCalendarsUsageDescription`. Disabled builds advertise unavailable;
-Android advertises unavailable and returns unsupported.
+`NSCalendarsUsageDescription`. Disabled builds advertise unavailable.
+Android advertises available but implements only `edit`.
 
-`device/calendar.Request` supports status (no prompt), add, and read.
+`device/calendar.Request` supports status (no prompt), add, and read. The
+Android-only `edit` operation (system editor) validates here and returns
+unsupported; see [calendar events](../../../docs/calendar-events.md).
 On iOS 17+, add requests write-only access and read requests full access;
 older systems use legacy event access. Denied access returns a denied outcome.
 Adds save once to the default calendar for new events. EventKit work runs on

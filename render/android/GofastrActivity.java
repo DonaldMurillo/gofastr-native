@@ -91,11 +91,10 @@ public abstract class GofastrActivity extends Activity {
             try {
                 backend.start(getFilesDir().getAbsolutePath()+"/app");
                 Map<String,String> caps = new LinkedHashMap<>();
-                for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
+                for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "calendar", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
                 caps.put("browser/v1", "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
-                caps.put("calendar/v1", "unavailable");
                 caps.put("location/v1", locationEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 if(networkStatusEnabled())caps.put("network/v1", "available");

@@ -27,6 +27,12 @@ This repository holds two Go modules, tagged separately:
   fine location only, never background location. Reads are cancelled when the
   activity pauses, except while the permission dialog is showing. SDK compile
   tests cover the adapter; emulator and physical-device runs are NOT RUN.
+- Android calendar event editor through `device/calendar` and `calendar/v1`:
+  a new `edit` operation opens the system calendar editor prefilled with the
+  event. Android supports only `edit`; closing the editor does not confirm
+  saving, so the result carries no event identifier. The iOS EventKit
+  adapter and the WebView adapter report `edit` as unsupported. Gallery and
+  Notes gain "Add to calendar" actions.
 
 ### Internal
 
