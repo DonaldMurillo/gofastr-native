@@ -17,6 +17,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Foreground location | `ServiceRequest.Location` | LocationManager, coarse/fine runtime permission, bounded updates | CoreLocation, when-in-use authorization, bounded updates |
 | Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
 | Network status | `ServiceRequest.Network` | One-shot ConnectivityManager snapshot (`network/v1`); see [network status](network-status.md) | Not implemented |
+| Speech | `ServiceRequest.Speech` | TextToSpeech and one-utterance SpeechRecognizer (`text-to-speech/v1`, `speech-recognition/v1`); see [speech](android.md#speech) | Not implemented; the runtime refuses the request |
 
 [Location](location.md) is an additional opt-in service on iOS and Android.
 Build the demo with `--location --location-usage "Show nearby places in the foreground."`

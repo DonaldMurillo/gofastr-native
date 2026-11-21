@@ -27,6 +27,14 @@ This repository holds two Go modules, tagged separately:
   fine location only, never background location. Reads are cancelled when the
   activity pauses, except while the permission dialog is showing. SDK compile
   tests cover the adapter; emulator and physical-device runs are NOT RUN.
+- Native Android text-to-speech and single-utterance speech recognition in
+  `device/speech`, with `text-to-speech/v1` and `speech-recognition/v1`
+  capabilities. Recognition needs `--microphone-usage` and an installed
+  recognition provider, and returns one bounded transcript. Both operations
+  are cancelled when the app is backgrounded. The runtime refuses speech
+  requests from UIKit and WebView renderers. `examples/speech/speechnative`
+  demonstrates both. Audible playback and live transcription on a device are
+  NOT RUN.
 
 ### Internal
 
