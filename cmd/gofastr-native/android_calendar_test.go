@@ -62,7 +62,7 @@ func TestAndroidCalendarTimeMatchesGo(t *testing.T) {
     public static void main(String[] args) {
         for (String value : new String[]{` + cases.String() + `}) {
             long[] parsed = calendarTime(value);
-            System.out.println(parsed[0] + " " + parsed[1] + " " + parsed[2]);
+            System.out.print(parsed[0] + " " + parsed[1] + " " + parsed[2] + "\n");
         }
         for (String value : new String[]{"0001-01-01T00:00:00Z", "0000-12-31T00:00:00Z", "2026-02-29T00:00:00Z", "2026-01-01T24:00:00Z", "2026-01-01T00:00:60Z", "2026-01-01T00:00:00+24:00", "2026-01-01 00:00:00Z", "2026-01-01T00:00:00"}) {
             try { calendarTime(value); throw new AssertionError("accepted " + value); } catch (IllegalArgumentException expected) {}

@@ -1,0 +1,4 @@
+# Check out every text file with LF endings on all platforms. Several tests
+# compare generated Android and Swift sources byte for byte, and a CRLF
+# checkout (core.autocrlf on Windows) makes them fail.
+* text=auto eol=lf
