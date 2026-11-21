@@ -8,7 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
+
+	"github.com/DonaldMurillo/gofastr-native/device/browser"
 )
 
 // Open requests a handoff to the operating system's HTTP(S) handler.
@@ -19,12 +20,12 @@ type Open struct {
 var hostLabel = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$`)
 
 // Validate checks the URL before it can be admitted as a device service.
+// It accepts only URLs that browser.Request also accepts, then also checks
+// the host and port, because the URL leaves the app.
 func (request Open) Validate() error {
 	invalid := errors.New("links: a valid HTTP or HTTPS URL without credentials is required")
 	value := request.URL
-	if len(value) > 4096 || strings.Contains(value, "\\") || strings.IndexFunc(value, func(r rune) bool {
-		return unicode.IsControl(r) || unicode.IsSpace(r)
-	}) >= 0 {
+	if (browser.Request{URL: value}).Validate() != nil || strings.Contains(value, "\\") {
 		return invalid
 	}
 	if _, err := url.PathUnescape(value); err != nil {
