@@ -99,11 +99,14 @@ A Go action can return a `nativeui.Result` with a `ServiceRequest` whose
 (`device/links`). Give the request an ID and register the matching
 `ServiceRespond` on the route, as with the other device services. Native
 Android provides `nativeui.CapabilityOpenURL` (`open-url/v1`). The
-service accepts absolute HTTP(S) URLs without credentials (use punycode for
-internationalized hosts) and uses Android's browser or other selected handler.
+service accepts absolute HTTP(S) URLs of at most 2048 bytes without
+credentials (use punycode for internationalized hosts), the same rules as
+`device/browser`, and uses Android's browser or other selected handler.
 A completed result means Android accepted the handoff, not that a page loaded.
 No handler returns `unsupported`. Use Go navigation for destinations inside
-the same app.
+the same app. Native iOS does not advertise `open-url/v1`; there, the
+in-app `browser/v1` service ([UIKit service notes](../render/ios/docs/services.md#in-app-browser))
+shows web pages, and Android reports `browser/v1` unavailable.
 
 Inbound Android App Links are separate and opt-in:
 

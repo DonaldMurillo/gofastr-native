@@ -8,6 +8,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Feature | Go request | Android adapter | iOS adapter |
 | --- | --- | --- | --- |
 | In-app browser | `ServiceRequest.Browser` | Unavailable | SFSafariViewController (`browser/v1`) |
+| Open web URL in another app | `ServiceRequest.OpenURL` | `ACTION_VIEW` handoff (`open-url/v1`); see [Android](android.md#opening-web-urls-and-receiving-android-app-links) | Not implemented |
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
@@ -24,6 +25,9 @@ The browser is a separate, user-initiated service in `device/browser`. It accept
 only bounded absolute HTTP/HTTPS URLs without credentials. Reader mode and
 Done/Close/Cancel labels are optional; dismissal reports completed, not page-load
 success. Android and WebView do not fall back to opening an external browser.
+`ServiceRequest.OpenURL` (`device/links`) is the separate external handoff:
+it accepts only URLs the browser service would accept, plus stricter host and
+port checks, and is implemented on native Android only.
 Try **About → Open docs** in the native Starter example. See the
 [UIKit service notes](../render/ios/docs/services.md#in-app-browser).
 
