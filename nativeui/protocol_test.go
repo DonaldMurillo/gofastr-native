@@ -1,6 +1,9 @@
 package nativeui
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestRendererContractRejectsSilentFallback(t *testing.T) {
 	hello := Hello{Minimum: 1, Maximum: 1, Renderer: "webview", Capabilities: map[Capability]Support{
@@ -29,5 +32,63 @@ func TestRendererContractRejectsSilentFallback(t *testing.T) {
 		if _, err := Negotiate(incompatible); err == nil {
 			t.Fatalf("accepted incompatible peer: %+v", incompatible)
 		}
+	}
+}
+
+// TestNegotiateAcceptsEveryBuiltInCapability guards the hello bound: a native
+// Android build with every opt-in flag advertises all built-in capabilities.
+func TestNegotiateAcceptsEveryBuiltInCapability(t *testing.T) {
+	all := map[Capability]Support{}
+	for _, capability := range []Capability{
+		CapabilityAnnouncement,
+		CapabilityAudio,
+		CapabilityBackgroundRefresh,
+		CapabilityBrowser,
+		CapabilityCalendar,
+		CapabilityCamera,
+		CapabilityClipboard,
+		CapabilityContacts,
+		CapabilityDeviceInfo,
+		CapabilityDrafts,
+		CapabilityEditor,
+		CapabilityFiles,
+		CapabilityHaptics,
+		CapabilityIAP,
+		CapabilityIncomingShares,
+		CapabilityLive,
+		CapabilityLocation,
+		CapabilityNavigation,
+		CapabilityNetwork,
+		CapabilityNotifications,
+		CapabilityOAuthWebLogin,
+		CapabilityOpenURL,
+		CapabilityPhotos,
+		CapabilityPresentation,
+		CapabilityPrivacy,
+		CapabilityPush,
+		CapabilityScanner,
+		CapabilitySecureStorage,
+		CapabilityShare,
+		CapabilitySharing,
+		CapabilitySheets,
+		CapabilitySignInWithApple,
+		CapabilitySpeechRecognition,
+		CapabilityTextToSpeech,
+		CapabilityWidgets,
+	} {
+		if !knownCapability(capability) {
+			t.Fatalf("%s is not known", capability)
+		}
+		all[capability] = SupportAvailable
+	}
+	if _, err := Negotiate(Hello{Minimum: 1, Maximum: 1, Renderer: "android", Capabilities: all}); err != nil {
+		t.Fatal(err)
+	}
+	many := map[Capability]Support{}
+	for i := 0; i <= maxHelloCapabilities; i++ {
+		many[Capability(fmt.Sprintf("extension-%d/v1", i))] = SupportAvailable
+	}
+	if _, err := negotiate(Hello{Minimum: 1, Maximum: 1, Renderer: "android", Capabilities: many}, func(Capability) bool { return true }); err == nil {
+		t.Fatal("oversized hello accepted")
 	}
 }
