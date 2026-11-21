@@ -8,9 +8,13 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	"github.com/DonaldMurillo/gofastr-native/device/browser"
+	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
+	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
@@ -30,10 +34,14 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
 			{ID: "info", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}},
 			{ID: "battery", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}},
+			{ID: "browser", Browser: &browser.Request{URL: "https://example.com", ReaderMode: true, DismissLabel: "close"}},
+			{ID: "oauth", Authentication: &authentication.Request{Operation: authentication.OAuth, AuthorizationURL: "https://example.com/authorize", RedirectURI: "dev.example.app:/oauth", State: "state"}},
+			{ID: "push", Push: &push.Request{Operation: push.Register}},
 		},
-		"audio":  audio.Document{File: file, DurationMillis: 1},
-		"result": nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
-		"reply":  map[string]any{"version": 1, "instance": "instance", "revision": 0, "serviceId": "opaque-service", "dataVersion": "epoch:2", "changed": true},
+		"contacts": contacts.Selection{Contacts: []contacts.Contact{{ID: "opaque", GivenName: "Ada", FamilyName: "Lovelace", Phones: []contacts.Labeled{{Label: "mobile", Value: "+123"}}}}},
+		"audio":    audio.Document{File: file, DurationMillis: 1},
+		"result":   nativeui.ServiceResult{Status: nativeui.EffectCompleted, File: &file, DurationMillis: 1},
+		"reply":    map[string]any{"version": 1, "instance": "instance", "revision": 0, "serviceId": "opaque-service", "dataVersion": "epoch:2", "changed": true},
 	}
 	encoded, err := json.Marshal(fixture)
 	if err != nil {
@@ -62,13 +70,31 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 	}
 }
 
+func TestNotificationRoutesRetryAfterRendererResume(t *testing.T) {
+	native, err := Sources.ReadFile("GofastrNative.swift")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(native), "public func resume()")
+	end := strings.Index(string(native), "private func lockProtectedScreens()")
+	if start < 0 || end <= start {
+		t.Fatal("missing renderer resume boundary")
+	}
+	resume := string(native)[start:end]
+	active := strings.Index(resume, "host.active = true")
+	flush := strings.Index(resume, "MobileNotificationRouter.shared.flush()")
+	if active < 0 || flush <= active {
+		t.Fatal("notification routes must retry after the renderer becomes active")
+	}
+}
+
 func TestServiceRunnerAndVisibleLiveContracts(t *testing.T) {
 	requireTokenMap(t, map[string][]string{
 		"GofastrServiceRunner.swift": {
 			"request.deviceInfo != nil", `status: "unsupported", message: "Device snapshots are unavailable on this renderer."`,
 			"public final class GofastrServiceRunner", "public init(presenter: UIViewController, openRoute: @escaping (String) -> Bool)",
 			"public static func capabilities() -> [String: String]", "public func perform(requestJSON: String, completion: @escaping (String) -> Void)", "public func cancel()",
-			"NSMicrophoneUsageDescription", "UNUserNotificationCenterDelegate", "UNNotificationDefaultActionIdentifier", "self.pending = route", "completionHandler([.banner, .sound])",
+			"NSMicrophoneUsageDescription", "UNUserNotificationCenterDelegate", "UNNotificationDefaultActionIdentifier", "self.routes.pending = route", "completionHandler([.banner, .sound])",
 			"request.scheduledDate()", "requestAuthorization(options: [.alert, .sound])", "getPendingNotificationRequests", "removePendingNotificationRequests",
 			"UIActivityViewController(activityItems: items", "completionWithItemsHandler", "removeItem(at: temporary)", "UIPasteboard.general.string = clipboard.text",
 			"settlement.finish(token)", "queue.async", "DispatchQueue.main.async",
@@ -112,6 +138,7 @@ const serviceChecks = `
 import AVFoundation
 
 struct ServiceFixtures: Decodable {
+    let contacts: MobileContactSelection
     let requests: [MobileServiceRequest]
     let audio: MobileAudioDocument
     let result: MobileServiceResult
@@ -139,9 +166,95 @@ enum ServiceChecks {
     static func main() throws {
         let decoder = JSONDecoder()
         let fixture = try decoder.decode(ServiceFixtures.self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
+        let contactsRequest = MobileContactsRequest(multiple: false, fields: ["phone"])
+        try contactsRequest.accept(fixture.contacts)
+        let contactResult = MobileServiceResult(status: "completed", contacts: fixture.contacts)
+        let contactRoundTrip = try decoder.decode(MobileServiceResult.self, from: Data(contactResult.json.utf8))
+        try contactsRequest.accept(contactRoundTrip.contacts!)
+        precondition(contactRoundTrip.contacts!.contacts[0].phones![0].value == "+123")
+        rejected { try MobileContactsRequest(multiple: false, fields: ["bad"]).validate() }
+        rejected { try MobileContactsRequest(multiple: false, fields: ["phone", "phone"]).validate() }
+        rejected { try contactsRequest.accept(MobileContactSelection(contacts: [])) }
+        rejected { try contactsRequest.accept(MobileContactSelection(contacts: fixture.contacts.contacts + fixture.contacts.contacts)) }
+        rejected { try MobileContactsRequest(multiple: false, fields: []).accept(fixture.contacts) }
         for request in fixture.requests { try request.validate() }
+        precondition(fixture.requests[6].push?.operation == "register")
+        let push = MobilePushRequest(operation: "register")
+        try push.accept(MobilePushState(permission: "authorized", registered: true, token: "abcdef", environment: "development"))
+        try MobilePushRequest(operation: "status").accept(MobilePushState(permission: "notDetermined", registered: false))
+        rejected { try MobilePushRequest(operation: "").validate() }
+        rejected { try push.accept(MobilePushState(permission: "", registered: false)) }
+        rejected { try push.accept(MobilePushState(permission: "authorized", registered: false, token: "ab")) }
+        for token in ["AABB", "z0", "a", String(repeating: "ab", count: 257)] {
+            rejected { try push.accept(MobilePushState(permission: "authorized", registered: true, token: token)) }
+        }
+        rejected { try MobilePushRequest(operation: "unregister").accept(MobilePushState(permission: "authorized", registered: true)) }
+        let pushResult = MobileServiceResult(status: "completed", push: MobilePushState(permission: "authorized", registered: true, token: "aabb"))
+        let pushJSON = try JSONSerialization.data(withJSONObject: pushResult.wire)
+        let decodedPush = try decoder.decode(MobileServiceResult.self, from: pushJSON)
+        precondition(decodedPush.push?.token == "aabb")
+        precondition(MobilePushState.environment(profile: Data()) == nil)
+        let profile = Data(#"<?xml version="1.0"?><plist version="1.0"><dict><key>Entitlements</key><dict><key>aps-environment</key><string>production</string></dict></dict></plist>"#.utf8)
+        precondition(MobilePushState.environment(profile: profile) == "production")
+        precondition(MobileServiceResult(status: "failed", push: pushResult.push).wire["push"] == nil)
+        precondition(MobilePushRoute.route(remote: true, identifier: "remote", userInfo: ["gofastr.route": "/settings/push"]) == "/settings/push")
+        precondition(MobilePushRoute.route(remote: false, identifier: "foreign", userInfo: ["gofastr.route": "/settings/push"]) == nil)
+        precondition(MobilePushRoute.route(remote: false, identifier: "gofastr.notification.test", userInfo: ["gofastr.route": "/notes/1"]) == "/notes/1")
+        precondition(MobilePushRoute.route(remote: true, identifier: "", userInfo: [:]) == nil)
+        precondition(!MobilePushRoute.shouldPresent(remote: true, identifier: "gofastr.notification.remote", userInfo: [:]))
+        precondition(MobilePushRoute.shouldPresent(remote: false, identifier: "gofastr.notification.local", userInfo: [:]))
+        precondition(MobilePushRoute.shouldPresent(remote: true, identifier: "", userInfo: ["gofastr.route": "/settings/push"]))
+        for remote in [true, false] {
+            let queue = MobileNotificationRouteQueue()
+            var active = false
+            var opened: [String] = []
+            let open: (String) -> Bool = { route in
+                guard active else { return false }
+                opened.append(route)
+                return true
+            }
+            queue.pending = MobilePushRoute.route(remote: remote, identifier: "gofastr.notification.test", userInfo: ["gofastr.route": "/settings/push"])
+            queue.flush(nil)
+            queue.flush(open)
+            // The notification observer may run before the renderer resumes.
+            queue.flush(open)
+            precondition(queue.pending == "/settings/push" && opened.isEmpty)
+            active = true
+            queue.flush(open)
+            queue.flush(open)
+            precondition(queue.pending == nil && opened == ["/settings/push"])
+        }
+        for route in ["", "//host/path", "https://host/path", "/a/../b", "/%2e%2e/b", "/%2fhost", "/bad\\route", "/a#b", "/a b", "/a%00b", "/bad%"] {
+            precondition(MobilePushRoute.route(remote: true, identifier: "", userInfo: ["gofastr.route": route]) == nil)
+        }
         precondition(fixture.requests[0].commit == nil, "false commit is omitted by canonical Go JSON")
         precondition(fixture.requests[3].commit == true)
+        precondition(fixture.requests[4].browser?.readerMode == true)
+        for url in ["", "/relative", "file:///etc/passwd", "https://user@example.com", "https:///path", "https://example.com/\n", String(repeating: "x", count: 2049)] {
+            do {
+                try MobileBrowserRequest(url: url, readerMode: nil, dismissLabel: nil).validate()
+                preconditionFailure("invalid browser URL accepted")
+            } catch {}
+        }
+        do {
+            try MobileBrowserRequest(url: "https://example.com", readerMode: nil, dismissLabel: "other").validate()
+            preconditionFailure("invalid browser label accepted")
+        } catch {}
+        let oauth = fixture.requests[5].authentication!
+        let accepted = oauth.acceptCallback(URL(string: "dev.example.app:/oauth?code=code&state=state")!)
+        precondition(accepted?.authorizationCode == "code" && accepted?.state == "state")
+        for callback in [
+            "other.app:/oauth?code=code&state=state", "dev.example.app:/elsewhere?code=code&state=state",
+            "dev.example.app://other/oauth?code=code&state=state",
+            "dev.example.app:/oauth?code=code&state=other", "dev.example.app:/oauth?code=code",
+            "dev.example.app:/oauth?code=code&state=state&state=state", "dev.example.app:/oauth?code=code&code=extra&state=state",
+            "dev.example.app:/oauth?error=access_denied&state=state", "dev.example.app:/oauth?code=code&state=state#fragment",
+        ] {
+            precondition(oauth.acceptCallback(URL(string: callback)!) == nil)
+        }
+        precondition(MobileServiceResult(status: "cancelled", authentication: accepted).wire["authentication"] == nil)
+        let authWire = MobileServiceResult(status: "completed", authentication: accepted).wire["authentication"] as? [String: String]
+        precondition(authWire == ["authorizationCode": "code", "state": "state"])
         precondition(fixture.reply.serviceId == "opaque-service" && fixture.reply.dataVersion == "epoch:2" && fixture.reply.changed == true)
         let roundTrip = try decoder.decode(MobileServiceResult.self, from: Data(fixture.result.json.utf8))
         precondition(roundTrip.file == fixture.audio.file && roundTrip.durationMillis == 1)
@@ -200,7 +313,7 @@ enum ServiceChecks {
         rejected { try MobileShareRequest(title: nil, text: nil, files: [half, half]).validate() }
         rejected { try MobileShareRequest(title: nil, text: nil, files: []).validate() }
         let maximumFile = MobileFileExport(name: "maximum.bin", mediaType: "application/octet-stream", data: Data(repeating: 255, count: 1_048_576).base64EncodedString())
-        let maximumShare = MobileServiceRequest(id: "maximum", notification: nil, share: MobileShareRequest(title: "Share", text: String(repeating: "\u{1}", count: 65_536), files: [maximumFile]), clipboard: nil, audio: nil, incomingShare: nil, secureStorage: nil, widget: nil, commit: nil)
+        let maximumShare = MobileServiceRequest(id: "maximum", notification: nil, share: MobileShareRequest(title: "Share", text: String(repeating: "\u{1}", count: 65_536), files: [maximumFile]), clipboard: nil, audio: nil, incomingShare: nil, secureStorage: nil, location: nil, widget: nil, contacts: nil, authentication: nil, refresh: nil, commit: nil)
         try maximumShare.validate()
         let maximumJSON = try JSONEncoder().encode(maximumShare)
         precondition(maximumJSON.count <= MobileServiceBounds.maximumJSON, "the bounded JSON envelope must allow escaped slashes and legal 64 KiB text plus a full 1 MiB file")

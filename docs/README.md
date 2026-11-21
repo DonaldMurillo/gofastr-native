@@ -21,6 +21,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Presentation and selection behaviors](presentation-behaviors.md)
 - [Editor behavior](editor-behavior.md): checkpoints and drafts with the `behavior` package.
 - [Image previews](image-previews.md)
+- [iOS maps](maps.md): compiled MapKit pins and optional user location.
 - [Component gallery](component-gallery.md): every screen contract, one at a time.
 
 ## Hosting a GoFastr web app
@@ -31,9 +32,11 @@ own guide in [`tui/README.md`](../tui/README.md).
 
 - [Device features](device-features.md): share-in, secure storage, widgets, Android device snapshots.
 - [Device and battery snapshots](deviceinfo.md)
+- [Background refresh](background-refresh.md): periodic work while the iOS app is closed.
 - [Files](files-services.md)
 - [Photos](photos-services.md)
 - [Secure storage](secure-storage.md)
+- [Location](location.md): opt-in iOS permission, current position and bounded foreground updates.
 - [Share-in](share-in.md)
 - [Widgets](widgets.md)
 - [Video capture](capture.md): Android camera recording and WHIP streaming with GPS and camera direction, on the native and WebView renderers. Covers segmented and loop recording, impact locks and the dash cam example.

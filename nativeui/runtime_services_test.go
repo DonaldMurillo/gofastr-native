@@ -39,7 +39,7 @@ func serviceConnection(t *testing.T, runtime *Runtime) string {
 	reply := serviceCommand(t, context.Background(), runtime, Command{Kind: "hello", Hello: &Hello{Minimum: 1, Maximum: 1, Renderer: "webview", Capabilities: map[Capability]Support{
 		CapabilityNavigation: SupportAvailable, CapabilityEditor: SupportAvailable, CapabilityNotifications: SupportUnavailable,
 		CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
-		CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback,
+		CapabilityContacts: SupportAvailable, CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback,
 	}}})
 	if reply.Error != nil {
 		t.Fatal(reply.Error)

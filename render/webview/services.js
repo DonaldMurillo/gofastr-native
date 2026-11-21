@@ -29,10 +29,13 @@
       .find(type => window.MediaRecorder.isTypeSupported?.(type)) || '';
   };
   const fallbackCapabilities = () => ({
+    'contacts/v1': 'unavailable',
     'notifications/v1': 'unavailable',
+    'browser/v1': 'unavailable',
     'sharing/v1': typeof navigator.share === 'function' || typeof Blob === 'function' && typeof atob === 'function' && typeof URL.createObjectURL === 'function' ? 'fallback' : 'unavailable',
     'clipboard/v1': window.isSecureContext && typeof navigator.clipboard?.writeText === 'function' ? 'fallback' : 'unavailable',
     'audio/v1': audioType() ? 'fallback' : 'unavailable',
+    'iap/v1': 'unavailable',
     'live/v1': 'available',
   });
   const capabilities = () => discovered ||= (async () => {
@@ -42,14 +45,14 @@
     let timer;
     try { facts = await Promise.race([host.capabilities(), new Promise(resolve => { timer = setTimeout(resolve, 2000); })]); } catch (_) {}
     finally { clearTimeout(timer); }
-    const result = { 'live/v1': 'available' };
-    for (const capability of ['notifications/v1', 'sharing/v1', 'clipboard/v1', 'audio/v1']) {
+    const result = { 'live/v1': 'available', 'browser/v1': 'unavailable', 'iap/v1': 'unavailable' };
+    for (const capability of ['notifications/v1', 'sharing/v1', 'clipboard/v1', 'audio/v1', 'contacts/v1']) {
       result[capability] = ['available', 'fallback', 'unavailable'].includes(facts?.[capability]) ? facts[capability] : 'unavailable';
     }
     return result;
   })();
   const kindOf = request => {
-    const kinds = ['notification', 'share', 'clipboard', 'audio', 'deviceInfo'].filter(key => request?.[key] != null);
+    const kinds = ['browser', 'notification', 'share', 'clipboard', 'audio', 'contacts', 'iap', 'deviceInfo'].filter(key => request?.[key] != null);
     if (kinds.includes('deviceInfo') && (!['info', 'battery'].includes(request.deviceInfo.operation) || Object.keys(request.deviceInfo).some(key => key !== 'operation'))) throw new Error('Invalid device snapshot request.');
     return kinds.length === 1 ? kinds[0] : '';
   };
@@ -145,6 +148,10 @@
       outcome.file = result.file;
       outcome.durationMillis = result.durationMillis;
     } else if (result.file) throw new Error('Only accepted audio can return private bytes.');
+    if (result.contacts != null) {
+      if (view.kind !== 'contacts' || result.status !== 'completed') throw new Error('Unexpected contact payload.');
+      outcome.contacts = result.contacts;
+    }
     return outcome;
   };
   const performHost = async view => {
@@ -313,7 +320,7 @@
     if (!kind || typeof serviceId !== 'string' || !serviceId || issued.has(serviceId)) throw new Error('The service has no new issued identity. It was not repeated.');
     const prefix = 'gfw-service-' + ++sequence;
     const dialog = element('dialog', '', { 'data-gfw-service': kind, 'data-gfw-service-id': serviceId, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': prefix + '-title', 'aria-describedby': prefix + '-status' });
-    const heading = element('h2', request[kind].title || { notification: 'Reminder', share: 'Share', clipboard: 'Copy text', audio: 'Record audio', deviceInfo: 'Device snapshot' }[kind], { id: prefix + '-title', tabindex: '-1' });
+    const heading = element('h2', request[kind].title || { browser: 'Browser', notification: 'Reminder', share: 'Share', clipboard: 'Copy text', contacts: 'Pick contact', audio: 'Record audio', iap: 'In-app purchases', deviceInfo: 'Device snapshot' }[kind], { id: prefix + '-title', tabindex: '-1' });
     const view = { root, request: JSON.parse(JSON.stringify(request)), kind, dialog, heading, opener, respond, host: bridge(), downloadURLs: new Set(), chunks: [] };
     window.__gofastr_foreground?.claim(view);
     issued.add(serviceId);
@@ -325,8 +332,18 @@
       if (kind === 'deviceInfo') {
         feedback(view, 'Device snapshots are unavailable on this renderer.');
         button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Device snapshots are unavailable on this renderer.' }));
-      } else if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
-      else if (kind === 'notification') {
+      } else if (kind === 'iap') {
+        const message = 'In-app purchases require the native iOS renderer.';
+        feedback(view, message);
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message }));
+      } else if (kind === 'browser') {
+        feedback(view, 'The in-app browser is unavailable in this renderer. No page was opened.');
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'The in-app browser requires a supported native renderer. No page was opened.' }));
+      } else if (view.host) button(view, { notification: request.notification?.operation === 'schedule' ? 'Schedule reminder' : request.notification?.operation === 'cancel' ? 'Cancel reminder' : 'Check reminder status', share: 'Share…', clipboard: 'Copy text', contacts: 'Pick contact…', audio: 'Record audio…' }[kind], 'data-gfw-service-perform', () => void performHost(view));
+      else if (kind === 'contacts') {
+        feedback(view, 'Contact picking requires a native device host.');
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported' }));
+      } else if (kind === 'notification') {
         feedback(view, 'Scheduled reminders are unavailable in a plain browser. No timer or notification was created.');
         button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Scheduled reminders require a native device host. No reminder was scheduled.' }));
       } else if (kind === 'clipboard') {
