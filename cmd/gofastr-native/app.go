@@ -71,6 +71,7 @@ type app struct {
 	CameraUsage     string
 	MicrophoneUsage string
 	URLScheme       string
+	AppLinkHosts    []string
 	ReceiveShares   bool
 	SecureStorage   bool
 	NetworkStatus   bool
@@ -82,6 +83,12 @@ type app struct {
 	Widgets         bool
 	SignInWithApple bool
 	Push            bool
+	// PushConfig is google-services.json and PushLibraries the directory
+	// push-libraries filled; both set enables FCM push on Android.
+	PushConfig      string
+	PushLibraries   string
+	PushPermissions string // merged library manifest entries, generated XML
+	PushComponents  string
 	AppGroup        string
 	// BackgroundRefresh registers a BGAppRefreshTask that calls the bound
 	// package's BackgroundRefresh(timeoutMillis int64) error, cancelled by

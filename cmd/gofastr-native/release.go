@@ -807,6 +807,7 @@ func newReleaseReport(a app, platform string) *releaseReport {
 		on   bool
 		name string
 	}{{a.CameraUsage != "", "camera"}, {a.MicrophoneUsage != "", "microphone"}, {a.URLScheme != "", "url-scheme"},
+		{len(a.AppLinkHosts) != 0, "app-links"},
 		{a.NetworkStatus, "network-status"}, {a.Push, "push"}, {a.ReceiveShares, "receive-shares"}, {a.SecureStorage, "secure-storage"}, {a.Calendar, "calendar"}, {a.Location, "location"}, {a.Widgets, "widgets"}, {a.AppGroup != "", "app-group"},
 		{a.SignInWithApple, "sign-in-with-apple"}} {
 		if f.on {

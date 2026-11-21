@@ -8,6 +8,7 @@ import android.database.Cursor;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.CalendarContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Base64;
@@ -24,9 +25,11 @@ public final class Services {
     private final GofastrActivity host;
     private final SecureStorage secureStorage;
     private final DeviceLocation location;
+    private final Speech speech;
     private Consumer<JSONObject> result;
     private Consumer<Uri> picked;
     private Runnable permissionGranted;
+    private Runnable speechAfterPermission;
     private int activityCode;
     private File cameraFile,recordingFile;
     private MediaRecorder recorder;
@@ -34,10 +37,10 @@ public final class Services {
     private Runnable recordingLimit;
     private long recordingStarted;
     private int maximumDuration,maximumBytes;
-    private boolean recordingFinishing,disposed;
+    private boolean recordingFinishing,disposed,foreground;
     private boolean fileTask;
-    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406;
-    Services(GofastrActivity host){this.host=host;this.location=new DeviceLocation(host);this.secureStorage=new SecureStorage(host,host.workers);TransferProvider.clean(host);}
+    private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406, CALENDAR=407;
+    Services(GofastrActivity host){this.host=host;this.location=new DeviceLocation(host);this.secureStorage=new SecureStorage(host,host.workers);this.speech=new Speech(host);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
     private void finish(JSONObject outcome) {
@@ -96,21 +99,83 @@ public final class Services {
             intent.setClipData(ClipData.newRawUri("Photo",uri));picked=callback;activityCode=CAMERA;host.startActivityForResult(intent,CAMERA);
         }catch(Exception e){failed(e);}
     }
+    private static boolean calendarText(String text,int maximum) {
+        if(text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>maximum)return false;
+        for(int i=0;i<text.length();) {
+            int point=text.codePointAt(i);i+=Character.charCount(point);
+            if(Character.isISOControl(point) || point>=0xd800 && point<=0xdfff)return false;
+        }
+        return true;
+    }
+    private static final java.util.regex.Pattern CALENDAR_TIME=java.util.regex.Pattern.compile("([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]{1,9}))?(?:Z|([+-])([0-9]{2}):([0-9]{2}))");
+    /** Days since 1970-01-01 in the proleptic Gregorian calendar, as Go's time package counts them. */
+    private static long calendarDay(long year,int month,int day) {
+        year-=month<=2?1:0; // year >= 0 here, so plain division floors.
+        long era=year/400,yoe=year-era*400,doy=(153*(month+(month>2?-3:9))+2)/5+day-1,doe=yoe*365+yoe/4-yoe/100+doy;
+        return era*146097+doe-719468;
+    }
+    /** Parses Go's RFC 3339 time. Returns the instant, the UTC midnight of its wall-clock date, and 1 when the wall clock is midnight. */
+    static long[] calendarTime(String value) {
+        java.util.regex.Matcher match=CALENDAR_TIME.matcher(value);
+        if(!match.matches())throw new IllegalArgumentException("Invalid calendar time");
+        int year=Integer.parseInt(match.group(1)),month=Integer.parseInt(match.group(2)),day=Integer.parseInt(match.group(3));
+        int hour=Integer.parseInt(match.group(4)),minute=Integer.parseInt(match.group(5)),second=Integer.parseInt(match.group(6));
+        int[] lengths={31,year%4==0 && (year%100!=0 || year%400==0)?29:28,31,30,31,30,31,31,30,31,30,31};
+        if(year<1 || month<1 || month>12 || day<1 || day>lengths[month-1] || hour>23 || minute>59 || second>59)throw new IllegalArgumentException("Invalid calendar time");
+        long nanos=match.group(7)==null?0:Long.parseLong((match.group(7)+"00000000").substring(0,9));
+        int offset=0;
+        if(match.group(8)!=null) {
+            int hours=Integer.parseInt(match.group(9)),minutes=Integer.parseInt(match.group(10));
+            if(hours>23 || minutes>59)throw new IllegalArgumentException("Invalid calendar offset");
+            offset=(match.group(8).equals("-")?-1:1)*(hours*60+minutes);
+        }
+        long midnight=calendarDay(year,month,day)*86400000L;
+        long instant=midnight+(hour*3600L+minute*60L+second)*1000L+nanos/1000000L-offset*60000L;
+        if(instant==-62135596800000L)throw new IllegalArgumentException("Zero calendar time");
+        return new long[]{instant,midnight,hour==0 && minute==0 && second==0 && nanos==0?1:0};
+    }
+    private void calendar(JSONObject request) throws Exception {
+        if(!"edit".equals(request.optString("operation"))){finish(outcome("unsupported","Android supports only the calendar editor."));return;}
+        JSONObject event=request.getJSONObject("event");
+        if(request.has("from") || request.has("to") || request.has("limit") || !event.optString("identifier").isEmpty())throw new IllegalArgumentException("Invalid calendar request");
+        String title=event.getString("title"),location=event.optString("location"),notes=event.optString("notes");
+        long[] start=calendarTime(event.getString("start")),end=calendarTime(event.getString("end"));
+        boolean allDay=event.getBoolean("allDay");
+        if(title.trim().isEmpty() || !calendarText(title,200) || !calendarText(location,200) || !calendarText(notes,2000) || end[0]<start[0] ||
+           allDay && (start[2]==0 || end[2]==0 || end[1]<=start[1])) {
+            throw new IllegalArgumentException("Invalid calendar event");
+        }
+        // Android stores all-day events at UTC midnight of each calendar date.
+        long begin=allDay?start[1]:start[0],until=allDay?end[1]:end[0];
+        Intent intent=new Intent(Intent.ACTION_INSERT,CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,begin).putExtra(CalendarContract.EXTRA_EVENT_END_TIME,until)
+            .putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY,allDay).putExtra(CalendarContract.Events.TITLE,title)
+            .putExtra(CalendarContract.Events.EVENT_LOCATION,location).putExtra(CalendarContract.Events.DESCRIPTION,notes);
+        activityCode=CALENDAR;
+        try{host.startActivityForResult(intent,CALENDAR);}
+        catch(ActivityNotFoundException e){finish(outcome("unsupported","No calendar app is installed."));}
+        catch(SecurityException e){finish(outcome("failed","The calendar editor could not be opened."));}
+    }
     public void releaseCapture(){if(cameraFile!=null){host.revokeUriPermission(TransferProvider.uri(host,cameraFile),Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);TransferProvider.remove(cameraFile);cameraFile=null;}}
     public void shareText(String text,Consumer<JSONObject> callback){run(JSON.object("share",JSON.object("text",text)),callback);}
     public void run(JSONObject request,Consumer<JSONObject> callback) {
         if(!begin(callback))return;
         try {
-            if(request.has("clipboard")) {
+            if(request.has("calendar")) calendar(request.getJSONObject("calendar"));
+            else if(request.has("clipboard")) {
                 ClipboardManager clipboard=(ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(ClipData.newPlainText("",request.getJSONObject("clipboard").optString("text")));finish(outcome("completed","Copied to clipboard."));
-            }else if(request.has("share")) share(request.getJSONObject("share"));
+            }else if(request.has("openURL")) openURL(request.getJSONObject("openURL").optString("url"));
+            else if(request.has("deviceInfo")) finish(DeviceInfo.snapshot(host,request.getJSONObject("deviceInfo")));
+            else if(request.has("share")) share(request.getJSONObject("share"));
             else if(request.has("notification")) notification(request.getJSONObject("notification"));
             else if(request.has("audio")) record(request.getJSONObject("audio"));
+            else if(request.has("speech")) speech(request.getJSONObject("speech"));
             else if(request.has("network")) {
                 if(!host.networkStatusEnabled()){finish(outcome("unsupported","Network status is disabled."));return;}
                 finish(NetworkStatus.perform(host,request.getJSONObject("network")));
             }
+            else if(request.has("push")) push(request.getJSONObject("push"));
             else if(request.has("incomingShare")) {
                 if(!host.incomingSharesEnabled()){finish(outcome("unsupported","The share inbox is disabled."));return;}
                 IncomingShares.perform(host,request.getJSONObject("incomingShare"),this::finish);
@@ -133,6 +198,7 @@ public final class Services {
                 HomeWidget.perform(host,request.getJSONObject("widget"),this::finish);
             }
             else if(request.has("iap")) finish(outcome("unsupported","In-app purchases require the native iOS renderer."));
+            else if(request.has("contacts")) contacts(request.getJSONObject("contacts"));
             else if(request.has("scan")) {
                 Extensions.ServiceFactory scanner=Extensions.service(host,"scanner/v1");
                 if(scanner==null){finish(outcome("unsupported","Barcode scanning is not compiled into this app."));return;}
@@ -140,6 +206,20 @@ public final class Services {
             }
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
+    }
+    private void openURL(String value) {
+        java.net.URI url = WebLinks.parse(value);
+        if (url == null) { finish(outcome("failed","The web URL is invalid.")); return; }
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url.toASCIIString()).normalizeScheme())
+                .addCategory(Intent.CATEGORY_BROWSABLE);
+        try {
+            host.startActivity(intent);
+            finish(outcome("completed","Link handed off to Android."));
+        } catch (ActivityNotFoundException e) {
+            finish(outcome("unsupported","No app can open this web URL."));
+        } catch (SecurityException e) {
+            finish(outcome("denied","Android blocked this web URL."));
+        }
     }
     private void share(JSONObject request) {
         host.workers.execute(()->{
@@ -162,6 +242,13 @@ public final class Services {
             }catch(Exception e){host.main.post(()->failed(e));}
         });
     }
+    private void contacts(JSONObject request) {
+        String field=Contacts.field(request);
+        if(field==null){finish(outcome("unsupported","Android picks one phone number or one email address."));return;}
+        Intent intent=Contacts.picker(field);
+        if(intent.resolveActivity(host.getPackageManager())==null){finish(outcome("unsupported","No contact picker is available."));return;}
+        choose(intent,uri->background(()->JSON.object("status","completed","contacts",Contacts.read(host,uri,field))));
+    }
     private void notification(JSONObject request) throws Exception {
         String operation=request.optString("operation"),id=request.getString("identifier");
         NotificationManager manager=(NotificationManager)host.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -180,6 +267,15 @@ public final class Services {
         ReminderReceiver.schedule(host,request,when);
         finish(JSON.object("status","completed","identifier",id,"permission","authorized","message","Reminder scheduled. Android may delay delivery to save battery."));
     }
+    private void push(JSONObject request) {
+        if(!Push.available()){finish(outcome("unsupported","Push notifications are not enabled for this build."));return;}
+        if("register".equals(request.optString("operation")) && Build.VERSION.SDK_INT>=33 && host.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+            permissionGranted=()->push(request);
+            host.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATION);return;
+        }
+        NotificationManager manager=(NotificationManager)host.getSystemService(Context.NOTIFICATION_SERVICE);
+        Push.perform(host,request,manager.areNotificationsEnabled(),this::finish);
+    }
     private void record(JSONObject request) {
         if(!host.canUseMicrophone()){finish(outcome("unsupported","Microphone access is not enabled for this build."));return;}
         if(host.checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){permissionGranted=()->record(request);host.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},MICROPHONE);return;}
@@ -195,6 +291,21 @@ public final class Services {
             recordingDialog.setOnCancelListener(d->stopRecording(false));recordingDialog.show();
             recordingLimit=()->stopRecording(true);host.main.postDelayed(recordingLimit,maximumDuration*1000L);
         }catch(Exception e){releaseRecorder();failed(e);}
+    }
+    private void speech(JSONObject request) {
+        if("recognize".equals(request.optString("operation"))) {
+            if(!host.canUseMicrophone() || !android.speech.SpeechRecognizer.isRecognitionAvailable(host)){
+                finish(outcome("unsupported","Speech recognition is not available for this build or device."));return;
+            }
+            if(host.checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
+                permissionGranted=()->{
+                    if(foreground)speech.run(request,this::finish);
+                    else speechAfterPermission=()->speech.run(request,this::finish);
+                };
+                host.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},MICROPHONE);return;
+            }
+        }
+        speech.run(request,this::finish);
     }
     private void stopRecording(boolean keep) {
         if(recorder==null || recordingFinishing)return;recordingFinishing=true;
@@ -212,10 +323,12 @@ public final class Services {
     }
     private void releaseRecorder(){if(recorder!=null){try{recorder.reset();recorder.release();}catch(Exception ignored){}recorder=null;}if(recordingFile!=null){recordingFile.delete();recordingFile=null;}}
     boolean back(){if(recordingDialog!=null){stopRecording(false);return true;}return busy();}
-    void pause(){if(recorder!=null)stopRecording(false);secureStorage.cancel();location.pause();}
-    void dispose(){disposed=true;secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
+    void resume(){foreground=true;Runnable speechStart=speechAfterPermission;speechAfterPermission=null;if(speechStart!=null)speechStart.run();}
+    void pause(){foreground=false;if(recorder!=null)stopRecording(false);speech.cancel();secureStorage.cancel();location.pause();}
+    void dispose(){disposed=true;speechAfterPermission=null;speech.cancel();secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
+        if(code==CALENDAR){finish(outcome("completed","Calendar editor closed. Android does not confirm the event was saved."));return;}
         if(code==SHARE){finish(outcome(status==Activity.RESULT_OK?"completed":"cancelled","Share sheet closed. Android does not confirm delivery."));return;}
         Consumer<Uri> callback=picked;picked=null;activityCode=0;
         if(status!=Activity.RESULT_OK){releaseCapture();finish(JSON.object("status","cancelled"));return;}

@@ -10,7 +10,8 @@ It has two parts, each its own Go module:
   actions are Go `nativeui` definitions. A bundled renderer draws them with
   UIKit, Android views or a WebView, so apps write no Swift, Java, HTML or
   CSS. Device services (contacts, files, photos, audio, notifications, secure storage,
-  incoming shares, widgets) are typed Go requests. The `gofastr-native` CLI
+  incoming shares, widgets, Android device and battery snapshots) are typed Go
+  requests. The `gofastr-native` CLI
   builds and runs the app with the platforms' command-line tools: no Xcode
   project, no Gradle. It can also run an existing GoFastr web app inside the
   phone app's process, served over an in-memory listener with no socket.
@@ -62,7 +63,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | [`examples/starter`](examples/starter) | What `init` generates, kept in the repository. |
 | [`examples/notes`](examples/notes) | The main phone example: one Notes app with native and WebView renderers, files, photos, reminders, sharing, widgets, and terminal and web presentations of the same service. |
 | [`examples/gallery`](examples/gallery) | Every screen contract `nativeui` supports, one at a time. |
-| [`examples/devicefeatures`](examples/devicefeatures) | Incoming shares, secure storage and widgets through their opt-in APIs. |
+| [`examples/devicefeatures`](examples/devicefeatures) | Incoming shares, secure storage and widgets through their opt-in APIs, plus Android device and battery snapshots. |
 | [`examples/chordharp`](examples/chordharp) | A chord harp with sound, as a terminal app and as an Android and iOS app that share one Go synthesizer. |
 | [`examples/capture`](examples/capture) | Android video capture with GPS, camera direction, recordings and live WHIP streaming, on the native renderer (keeps running in the background) and the WebView renderer. |
 | [`examples/dashcam`](examples/dashcam) | A dash cam on Android: loop recording in short files, locks on impact or by hand, and a list of locked clips. |
@@ -73,7 +74,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 |---|---|
 | `nativeui/` | Screens and actions defined in Go, routing, and the runtime that coordinates drafts and actions. |
 | `behavior/` | Editor checkpoints and draft storage that do not depend on a renderer. |
-| `device/` | Typed requests for device services: `audio`, `contacts`, `files`, `notifications`, `photos`, `securestore`, `sharein`, `sharing`, `widgets`. |
+| `device/` | Typed requests for device services: `audio`, `contacts`, `deviceinfo`, `files`, `notifications`, `photos`, `securestore`, `sharein`, `sharing`, `widgets`. |
 | `extension/` | The API for libraries that add a screen component or a device adapter, with the built-in `media` and `photos` extensions. |
 | `render/ios/`, `render/android/` | The native renderers: UIKit (Swift) and Android (Java), compiled into the app without Xcode or Gradle. |
 | `render/webview/` | The WebView renderer for the same definitions, with its component styles in `render/webview/mobileui`. |

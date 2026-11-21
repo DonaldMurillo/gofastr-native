@@ -40,6 +40,7 @@ public abstract class GofastrActivity extends Activity {
     }
     protected abstract Backend createBackend();
     protected String urlScheme() { return ""; }
+    protected List<String> appLinkHosts() { return Collections.emptyList(); }
     protected boolean cameraEnabled() { return false; }
     protected boolean microphoneEnabled() { return false; }
     protected boolean incomingSharesEnabled() { return false; }
@@ -85,17 +86,18 @@ public abstract class GofastrActivity extends Activity {
         viewport = new FrameLayout(this); shell.addView(viewport, new LinearLayout.LayoutParams(-1, 0, 1));
         tabs = row(); shell.addView(tabs); setContentView(shell); systemBars();
         viewport.addView(text("Opening app...", 18));
-        pendingRoute = routeFrom(getIntent());
-        if (state != null && pendingRoute.isEmpty()) pendingRoute = state.getString("route", "");
+        pendingRoute = state != null && state.containsKey("route") ? state.getString("route", "") : routeFrom(getIntent());
         lifecycle.execute(() -> {
             try {
                 backend.start(getFilesDir().getAbsolutePath()+"/app");
                 Map<String,String> caps = new LinkedHashMap<>();
-                for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
+                for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "calendar", "clipboard", "live", "notifications", "privacy", "deviceinfo"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
+                caps.put("open-url/v1", "available");
                 caps.put("browser/v1", "unavailable");
+                caps.put("text-to-speech/v1", Speech.canSpeak(this) ? "available" : "unavailable");
+                caps.put("speech-recognition/v1", microphoneEnabled() && android.speech.SpeechRecognizer.isRecognitionAvailable(this) ? "available" : "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
-                caps.put("calendar/v1", "unavailable");
                 caps.put("location/v1", locationEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 if(networkStatusEnabled())caps.put("network/v1", "available");
@@ -103,17 +105,25 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("sign-in-with-apple/v1", "unavailable");
                 caps.put("oauth-web-login/v1", "unavailable");
                 caps.put("iap/v1", "unavailable");
+                caps.put("push/v1", Push.available() ? "available" : "unavailable");
+                caps.put("contacts/v1", Contacts.available(this) ? "available" : "unavailable");
                 caps.put("scanner/v1", "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));
                 connection = reply.getString("connection");
-                main.post(() -> { if (!destroyed) { started = true; open(pendingRoute.isEmpty()?backend.root():pendingRoute, new LinkedHashMap<>(), "root", null); } });
+                main.post(() -> {
+                    if (destroyed) return;
+                    started = true;
+                    String route = pendingRoute;
+                    pendingRoute = "";
+                    open(route.isEmpty()?backend.root():route, new LinkedHashMap<>(), "root", null);
+                });
             } catch (Exception e) { main.post(() -> failure("The app could not start.",e)); }
         });
     }
 
-    @Override protected void onResume() { super.onResume(); foreground=true; reopenLocked();if(current!=null){Frame frame=current;frame.recovered=false;if(frame.deferredResponse!=null){JSONObject response=frame.deferredResponse,reply=frame.deferredReply;frame.deferredResponse=null;frame.deferredReply=null;apply(frame,response,reply);}if(!frame.busy)watch(frame);} }
+    @Override protected void onResume() { super.onResume(); foreground=true; services.resume(); reopenLocked();if(current!=null){Frame frame=current;frame.recovered=false;if(frame.deferredResponse!=null){JSONObject response=frame.deferredResponse,reply=frame.deferredReply;frame.deferredResponse=null;frame.deferredReply=null;apply(frame,response,reply);}if(!frame.busy)watch(frame);} }
     @Override public void onConfigurationChanged(Configuration configuration){super.onConfigurationChanged(configuration);setTheme(dark()?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);shell.setBackgroundColor(background());appearance.refresh();systemBars();for(ArrayList<Frame> stack:stacks.values())for(Frame frame:stack)frame.update();toolbar();}
     private void systemBars() {
         getWindow().setStatusBarColor(background());
@@ -171,7 +181,7 @@ public abstract class GofastrActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent); setIntent(intent); String route=routeFrom(intent);
         if (incomingSharesEnabled()) captureIncomingShare(intent, null);
-        if(!route.isEmpty()) { if(started) navigate(route); else pendingRoute=route; }
+        if(!route.isEmpty()) { if(current!=null) navigate(route); else pendingRoute=route; }
     }
     private void captureIncomingShare(Intent intent, Bundle state) {
         if(intent==null)return;
@@ -186,10 +196,12 @@ public abstract class GofastrActivity extends Activity {
     }
     private String routeFrom(Intent intent) {
         if(intent==null) return "";
-        if(intent.getBooleanExtra("gofastr.reminder", false)) return localRoute(intent.getStringExtra("route"));
+        if(intent.getBooleanExtra("gofastr.reminder", false) || intent.getBooleanExtra("gofastr.push", false)) return localRoute(intent.getStringExtra("route"));
         if(!Intent.ACTION_VIEW.equals(intent.getAction()))return "";
         android.net.Uri uri=intent.getData();
-        if(uri==null || urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";
+        if(uri==null) return "";
+        if("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) return localRoute(WebLinks.route(uri.toString(), appLinkHosts()));
+        if(urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";
         String route=(uri.getHost()==null?"":"/"+uri.getHost())+(uri.getEncodedPath()==null?"":uri.getEncodedPath());
         if(uri.getEncodedQuery()!=null) route+="?"+uri.getEncodedQuery();
         return localRoute(route);
@@ -237,6 +249,10 @@ public abstract class GofastrActivity extends Activity {
         shortCall(request, reply -> {
             if(generation!=privacyGeneration){if(reply.has("instance"))retire(reply.optString("instance"));return;}
             navigationPending=false;
+            if(current==null && kind.equals("root") && reply.has("error") && !route.equals(backend.root())) {
+                open(backend.root(), new LinkedHashMap<>(), "root", null);
+                return;
+            }
             if(error(reply, current)) { if(current!=null) watch(current); return; }
             try {
                 Frame f=reuse==null?new Frame():reuse;
@@ -259,6 +275,11 @@ public abstract class GofastrActivity extends Activity {
                     stack.add(f);
                 } else f.update();
                 show(f);
+                if(kind.equals("root") && !pendingRoute.isEmpty()) {
+                    String queued = pendingRoute;
+                    pendingRoute = "";
+                    navigate(queued);
+                }
             } catch(Exception e) { failure("The screen could not open.",e); }
         });
     }

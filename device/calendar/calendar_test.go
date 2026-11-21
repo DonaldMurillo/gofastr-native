@@ -65,3 +65,43 @@ func TestContract(t *testing.T) {
 		}
 	}
 }
+
+func TestEditContract(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	edit := Request{Operation: Edit, Event: &Event{Title: "Lunch", Start: now, End: now.Add(time.Hour)}}
+	if err := edit.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := edit.Accept(Result{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, result := range []Result{{Identifier: "event-1"}, {Authorization: "full"}, {Events: []Event{}}} {
+		if edit.Accept(result) == nil {
+			t.Fatalf("accepted %#v", result)
+		}
+	}
+	offset := time.FixedZone("UTC-5", -5*3600)
+	day := time.Date(2026, 3, 8, 0, 0, 0, 0, offset)
+	for _, event := range []Event{
+		{Title: "Day", AllDay: true, Start: day, End: day.AddDate(0, 0, 1)},
+		{Title: "Days", AllDay: true, Start: time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)},
+	} {
+		if err := (Request{Operation: Edit, Event: &event}).Validate(); err != nil {
+			t.Fatal(event, err)
+		}
+	}
+	for _, event := range []Event{
+		{Title: "Noon", AllDay: true, Start: day.Add(12 * time.Hour), End: day.AddDate(0, 0, 1)},
+		{Title: "Empty", AllDay: true, Start: day, End: day},
+		{Title: "Late end", AllDay: true, Start: day, End: day.Add(25 * time.Hour)},
+	} {
+		if (Request{Operation: Edit, Event: &event}).Validate() == nil {
+			t.Fatalf("accepted %#v", event)
+		}
+	}
+	for _, request := range []Request{{Operation: Edit}, {Operation: Edit, Event: edit.Event, Limit: 1}, {Operation: Edit, Event: &Event{Identifier: "x", Title: "a", Start: now, End: now}}} {
+		if request.Validate() == nil {
+			t.Fatalf("accepted %#v", request)
+		}
+	}
+}

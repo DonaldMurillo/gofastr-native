@@ -10,9 +10,24 @@ This repository holds two Go modules, tagged separately:
 
 ### Added
 
+- Opt-in Android remote push through Firebase Cloud Messaging, built with
+  `--push-config` and `--push-libraries` (the owner downloads the pinned
+  Firebase libraries with `push-libraries` under Google's terms). It uses the
+  same `device/push` contract as iOS APNs: `push.State` gains `Provider`
+  (`apns` or `fcm`), and Go rejects a token without one. Android also keeps
+  received messages in a private inbox read with `next` and settled with
+  `acknowledge`; iOS reports those two operations unsupported. Taps on both
+  platforms open the `gofastr.route` payload key. Delivery through Firebase
+  servers is NOT RUN.
 - iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
   optional user location, a gallery screen and `--location --location-usage`
   opt-in purpose text.
+- The native Android renderer serves `contacts/v1` through the system phone
+  or email row picker, without `READ_CONTACTS`: single selection of one
+  `phone` or `email` field, with the display name in `GivenName`. Other
+  contact requests settle as `unsupported`. Gallery's Device tab has a
+  Choose contact demo, and `scripts/android_smoke.py --contacts` drives it on
+  an emulator.
 - Typed foreground iOS location services in `device/location`: permission
   status, when-in-use authorization, current position and bounded tracking.
   Native builds opt in with `--location --location-usage`; no background
@@ -27,6 +42,31 @@ This repository holds two Go modules, tagged separately:
   fine location only, never background location. Reads are cancelled when the
   activity pauses, except while the permission dialog is showing. SDK compile
   tests cover the adapter; emulator and physical-device runs are NOT RUN.
+- Android calendar event editor through `device/calendar` and `calendar/v1`:
+  a new `edit` operation opens the system calendar editor prefilled with the
+  event. Android supports only `edit`; closing the editor does not confirm
+  saving, so the result carries no event identifier. The iOS EventKit
+  adapter and the WebView adapter report `edit` as unsupported. Gallery and
+  Notes gain "Add to calendar" actions.
+- Native Android text-to-speech and single-utterance speech recognition in
+  `device/speech`, with `text-to-speech/v1` and `speech-recognition/v1`
+  capabilities. Recognition needs `--microphone-usage` and an installed
+  recognition provider, and returns one bounded transcript. Both operations
+  are cancelled when the app is backgrounded. The runtime refuses speech
+  requests from UIKit and WebView renderers. `examples/speech/speechnative`
+  demonstrates both. Audible playback and live transcription on a device are
+  NOT RUN.
+- Snapshot-only device and battery reads in `device/deviceinfo`
+  (`deviceinfo/v1`). Native Android implements them with no permission or
+  build flag; iOS and WebView return unsupported and do not advertise the
+  capability. The device-features demo has a Device and battery screen.
+  Physical-device acceptance is NOT RUN.
+- Native Android `open-url/v1` service (`ServiceRequest.OpenURL`,
+  `device/links`) that hands an HTTP(S) URL to Android's handler, and
+  opt-in verified Android App Links through `--app-link-hosts`. Inbound
+  links for listed hosts open the matching Go screen. iOS does not
+  implement `open-url/v1`. `scripts/android_links_smoke.py` drives them on
+  an emulator; live Digital Asset Links verification is NOT RUN.
 - Android `scanner/v1` through the opt-in `extension/barcode` adapter. The
   `ServiceRequest.Scan` that opens the iOS camera sheet asks Android for a
   camera photo or a selected image, which Go decodes offline with gozxing

@@ -11,8 +11,10 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/browser"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/contacts"
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/iap"
+	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
@@ -22,6 +24,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/device/speech"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
 	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
@@ -29,6 +32,7 @@ import (
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
 	Network        *network.Request        `json:"network,omitempty"`
+	DeviceInfo     *deviceinfo.Request     `json:"deviceInfo,omitempty"`
 	Push           *push.Request           `json:"push,omitempty"`
 	Browser        *browser.Request        `json:"browser,omitempty"`
 	Contacts       *contacts.Request       `json:"contacts,omitempty"`
@@ -36,7 +40,9 @@ type ServiceRequest struct {
 	Notification   *notifications.Request  `json:"notification,omitempty"`
 	Share          *sharing.Request        `json:"share,omitempty"`
 	Clipboard      *sharing.Clipboard      `json:"clipboard,omitempty"`
+	OpenURL        *links.Open             `json:"openURL,omitempty"`
 	Audio          *audio.Request          `json:"audio,omitempty"`
+	Speech         *speech.Request         `json:"speech,omitempty"`
 	IncomingShare  *sharein.Request        `json:"incomingShare,omitempty"`
 	Calendar       *calendar.Request       `json:"calendar,omitempty"`
 	SecureStorage  *securestore.Request    `json:"secureStorage,omitempty"`
@@ -52,6 +58,7 @@ type ServiceRequest struct {
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
 	Network        *network.Result        `json:"network,omitempty"`
+	DeviceInfo     *deviceinfo.Result     `json:"deviceInfo,omitempty"`
 	Push           *push.State            `json:"push,omitempty"`
 	Contacts       *contacts.Selection    `json:"contacts,omitempty"`
 	Status         EffectStatus           `json:"status"`
@@ -60,6 +67,7 @@ type ServiceResult struct {
 	Identifier     string                 `json:"identifier,omitempty"`
 	File           *files.Document        `json:"file,omitempty"`
 	DurationMillis int                    `json:"durationMillis,omitempty"`
+	Transcript     string                 `json:"transcript,omitempty"`
 	IncomingShare  *sharein.Item          `json:"incomingShare,omitempty"`
 	Calendar       *calendar.Result       `json:"calendar,omitempty"`
 	SecureStorage  *securestore.Result    `json:"secureStorage,omitempty"`
@@ -79,7 +87,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Network != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
+	for _, present := range []bool{request.Network != nil, request.DeviceInfo != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.Speech != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
 		if present {
 			operations++
 		}
@@ -90,6 +98,8 @@ func (request ServiceRequest) Validate() error {
 	switch {
 	case request.Network != nil:
 		return request.Network.Validate()
+	case request.DeviceInfo != nil:
+		return request.DeviceInfo.Validate()
 	case request.Browser != nil:
 		return request.Browser.Validate()
 	case request.Contacts != nil:
@@ -104,6 +114,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Share.Validate()
 	case request.Clipboard != nil:
 		return request.Clipboard.Validate()
+	case request.OpenURL != nil:
+		return request.OpenURL.Validate()
 	case request.IncomingShare != nil:
 		return request.IncomingShare.Validate()
 	case request.SecureStorage != nil:
@@ -120,6 +132,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Refresh.Validate()
 	case request.IAP != nil:
 		return request.IAP.Validate()
+	case request.Speech != nil:
+		return request.Speech.Validate()
 	default:
 		return request.Audio.Validate()
 	}
@@ -129,6 +143,8 @@ func (request ServiceRequest) capability() Capability {
 	switch {
 	case request.Network != nil:
 		return CapabilityNetwork
+	case request.DeviceInfo != nil:
+		return CapabilityDeviceInfo
 	case request.Browser != nil:
 		return CapabilityBrowser
 	case request.Contacts != nil:
@@ -143,6 +159,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilitySharing
 	case request.Clipboard != nil:
 		return CapabilityClipboard
+	case request.OpenURL != nil:
+		return CapabilityOpenURL
 	case request.IncomingShare != nil:
 		return CapabilityIncomingShares
 	case request.SecureStorage != nil:
@@ -162,14 +180,28 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityBackgroundRefresh
 	case request.IAP != nil:
 		return CapabilityIAP
+	case request.Speech != nil:
+		if request.Speech.Operation == speech.Speak {
+			return CapabilityTextToSpeech
+		}
+		return CapabilitySpeechRecognition
 	default:
 		return CapabilityAudio
 	}
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
+	if outcome.Transcript != "" && (request.Speech == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: only successful speech recognition may return a transcript")
+	}
 	if outcome.Network != nil && (request.Network == nil || outcome.Status != EffectCompleted) {
 		return errors.New("nativeui: unrelated or unsuccessful network content")
+	}
+	if outcome.DeviceInfo != nil && request.DeviceInfo == nil {
+		return errors.New("nativeui: service result contains unrelated device content")
+	}
+	if outcome.DeviceInfo != nil && outcome.Status != EffectCompleted {
+		return errors.New("nativeui: unsuccessful service cannot return device content")
 	}
 	if outcome.Location != nil && (request.Location == nil || outcome.Status != EffectCompleted) {
 		return errors.New("nativeui: unexpected location content")
@@ -210,6 +242,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return err
 			}
 		}
+		if request.DeviceInfo != nil {
+			if outcome.DeviceInfo == nil {
+				return errors.New("nativeui: device info result is required")
+			}
+			if err := request.DeviceInfo.Accept(*outcome.DeviceInfo); err != nil {
+				return err
+			}
+		}
 		if request.Contacts != nil {
 			if err := request.Contacts.Accept(outcome.Contacts); err != nil {
 				return err
@@ -232,10 +272,15 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 			}
 		}
 		if request.Calendar != nil {
-			if outcome.Calendar == nil {
+			result := outcome.Calendar
+			if result == nil && request.Calendar.Operation == calendar.Edit {
+				// The editor reports only that it closed.
+				result = &calendar.Result{}
+			}
+			if result == nil {
 				return errors.New("nativeui: calendar result required")
 			}
-			if err := request.Calendar.Accept(*outcome.Calendar); err != nil {
+			if err := request.Calendar.Accept(*result); err != nil {
 				return err
 			}
 		}
@@ -294,6 +339,11 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: successful recording requires audio content")
 			}
 			return request.Audio.Accept(*outcome.File, outcome.DurationMillis)
+		}
+		if request.Speech != nil {
+			if err := request.Speech.Accept(outcome.Transcript); err != nil {
+				return err
+			}
 		}
 	case EffectCancelled, EffectDenied, EffectUnsupported, EffectFailed:
 	default:
