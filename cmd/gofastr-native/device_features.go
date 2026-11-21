@@ -15,8 +15,8 @@ func validateDeviceFeatures(a app, platform string) error {
 		if a.Renderer != "native" {
 			return errors.New("location flags require --renderer native")
 		}
-		if platform != "ios-sim" && platform != "ios-device" {
-			return errors.New("--location is supported only on iOS")
+		if platform != "ios-sim" && platform != "ios-device" && !strings.HasPrefix(platform, "android") {
+			return errors.New("--location is supported only on iOS and Android")
 		}
 	}
 	if !uitext.Plain(a.LocationUsage, 512) {
@@ -25,7 +25,7 @@ func validateDeviceFeatures(a app, platform string) error {
 	if a.LocationUsage != "" && !a.Location {
 		return errors.New("--location-usage requires --location")
 	}
-	if a.Location && strings.TrimSpace(a.LocationUsage) == "" {
+	if a.Location && strings.HasPrefix(platform, "ios") && strings.TrimSpace(a.LocationUsage) == "" {
 		return errors.New("iOS location requires --location-usage for when-in-use authorization")
 	}
 	if a.SignInWithApple && (a.Renderer != "native" || platform != "ios-sim" && platform != "ios-device") {

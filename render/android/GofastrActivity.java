@@ -43,6 +43,7 @@ public abstract class GofastrActivity extends Activity {
     protected boolean cameraEnabled() { return false; }
     protected boolean microphoneEnabled() { return false; }
     protected boolean incomingSharesEnabled() { return false; }
+    protected boolean locationEnabled() { return false; }
     protected boolean secureStorageEnabled() { return false; }
     protected boolean networkStatusEnabled() { return false; }
     protected boolean biometricsEnabled() { return false; }
@@ -95,6 +96,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("browser/v1", "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
                 caps.put("calendar/v1", "unavailable");
+                caps.put("location/v1", locationEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 if(networkStatusEnabled())caps.put("network/v1", "available");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");

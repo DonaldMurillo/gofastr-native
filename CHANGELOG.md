@@ -20,6 +20,13 @@ This repository holds two Go modules, tagged separately:
   displays the results. Automated iOS 26.5 simulator UI acceptance covers
   pregranted permission and simulated current/tracking coordinates.
   First-use prompts, physical GPS and physical-device acceptance are NOT RUN.
+- Native Android implements the same `device/location` contract and
+  `location/v1` capability: status, authorize, current position and bounded
+  tracking through `LocationManager`, opted in with `--location`
+  (`--location-usage` is optional on Android). The manifest gains coarse and
+  fine location only, never background location. Reads are cancelled when the
+  activity pauses, except while the permission dialog is showing. SDK compile
+  tests cover the adapter; emulator and physical-device runs are NOT RUN.
 
 ### Internal
 

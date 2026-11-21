@@ -95,6 +95,14 @@ The WebView renderer live-refreshes screens without a collection too: a data
 change reads the screen's markup again and swaps it into place, keeping
 mounted components, focus and scroll.
 
+Native Android implements the same [location](../location.md) contract with
+`LocationManager`, opted in with `--location`: status without a prompt,
+when-in-use authorization, one current fix with a deadline, and bounded
+tracking. It declares coarse and fine location only and cancels when the
+activity pauses, except during the permission dialog. SDK compilation against
+the generated bindings is automated. Emulator runs, permission dialogs,
+real providers and physical-device acceptance for Android location are NOT RUN.
+
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
