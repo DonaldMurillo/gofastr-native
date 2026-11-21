@@ -98,6 +98,10 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if request.deviceInfo != nil {
+            finish(token, MobileServiceResult(status: "unsupported", message: "Device snapshots are unavailable on this renderer."))
+            return
+        }
         if let locationRequest = request.location {
             locationActive = true
             location.perform(locationRequest) { [weak self] result in
@@ -116,6 +120,10 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
         }
         if let push = request.push {
             guard Self.capabilities()["push/v1"] == "available" else { finish(token, MobileServiceResult(status: "unsupported")); return }
+            guard !MobilePushRequest.inboxOperations.contains(push.operation) else {
+                finish(token, MobileServiceResult(status: "unsupported", message: "iOS has no push inbox; it opens a tapped notification's route directly."))
+                return
+            }
             durableServiceActive = true
             GofastrPush.perform(push) { [weak self] result in
                 self?.durableServiceActive = false

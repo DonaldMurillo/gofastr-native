@@ -16,10 +16,12 @@ The opt-in native build flag `--calendar` enables `calendar/v1`.
 `--calendar-usage` overrides the default purpose text used for
 `NSCalendarsFullAccessUsageDescription`,
 `NSCalendarsWriteOnlyAccessUsageDescription`, and legacy
-`NSCalendarsUsageDescription`. Disabled builds advertise unavailable;
-Android advertises unavailable and returns unsupported.
+`NSCalendarsUsageDescription`. Disabled builds advertise unavailable.
+Android advertises available but implements only `edit`.
 
-`device/calendar.Request` supports status (no prompt), add, and read.
+`device/calendar.Request` supports status (no prompt), add, and read. The
+Android-only `edit` operation (system editor) validates here and returns
+unsupported; see [calendar events](../../../docs/calendar-events.md).
 On iOS 17+, add requests write-only access and read requests full access;
 older systems use legacy event access. Denied access returns a denied outcome.
 Adds save once to the default calendar for new events. EventKit work runs on
@@ -50,7 +52,9 @@ profile granting APNs, and preserves that profile's development/production value
 The simulator embeds APNs entitlements in the executable's
 `__TEXT,__entitlements` section rather than its macOS code signature.
 
-`device/push.Request` supports `register`, `unregister`, and `status`.
+`device/push.Request` supports `register`, `unregister`, and `status` on iOS.
+The Android-only inbox operations `next` and `acknowledge` complete as
+unsupported, because iOS opens a tapped notification's route directly.
 Register asks for alert, sound and badge permission, then registers with APNs.
 It settles once on the app-delegate token/failure callback or a 45-second timeout;
 denial returns denied without a token. Status never prompts or registers.
@@ -60,8 +64,8 @@ to `GofastrPush.didRegister(deviceToken:)` and `didFailToRegister(error:)`;
 custom hosts must forward those callbacks and call `GofastrPush.prepare()`
 at launch before creating the window.
 
-Completed state includes permission, OS registration, and an optional lowercase
-hex token (1–256 bytes). A registered app may have no observed token after a
+Completed state includes permission, OS registration, `provider: "apns"`, and
+an optional lowercase hex token (1–256 bytes). A registered app may have no observed token after a
 process restart; explicitly register to obtain the current token. Never treat
 tokens as identity, log them, or assume they are permanent. Send updated tokens
 to an authenticated application server. Environment is optional, read from the

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -21,6 +22,8 @@ func TestDeviceFeatureOutcomesSettleOnce(t *testing.T) {
 		outcome ServiceResult
 	}{
 		{"network", ServiceRequest{ID: "device", Network: &network.Request{Operation: network.Status}}, ServiceResult{Status: EffectCompleted, Network: &network.Result{Connected: true, Transport: "wifi", Validated: true}}},
+		{"battery", ServiceRequest{ID: "device", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}}, ServiceResult{Status: EffectCompleted, DeviceInfo: &deviceinfo.Result{Battery: &deviceinfo.Battery{State: deviceinfo.UnknownState, PowerSource: deviceinfo.UnknownSource}}}},
+		{"info", ServiceRequest{ID: "device", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}}, ServiceResult{Status: EffectCompleted, DeviceInfo: &deviceinfo.Result{Info: &deviceinfo.Info{Platform: "android", Locale: "en-US"}}}},
 		{"inbox", ServiceRequest{ID: "device", IncomingShare: &sharein.Request{Operation: sharein.Next}}, ServiceResult{Status: EffectCompleted, IncomingShare: &sharein.Item{Identifier: "0123456789abcdef0123456789abcdef", Text: "Shared text"}}},
 		{"secure", ServiceRequest{ID: "device", SecureStorage: &securestore.Request{Operation: securestore.Get, Key: "demo", Protection: securestore.Device}}, ServiceResult{Status: EffectCompleted, SecureStorage: &securestore.Result{Found: true, Value: []byte("secret")}}},
 		{"widget", ServiceRequest{ID: "device", Widget: &widgets.Request{Operation: widgets.Status}}, ServiceResult{Status: EffectCompleted, Widget: &widgets.State{Published: true}}},
@@ -82,11 +85,18 @@ func TestDeviceFeatureResultsCannotCrossServicesOrFailure(t *testing.T) {
 	request := ServiceRequest{ID: "device", Widget: &widgets.Request{Operation: widgets.Status}}
 	for _, outcome := range []ServiceResult{
 		{Status: EffectCompleted, Widget: &widgets.State{}, SecureStorage: secure},
+		{Status: EffectCompleted, Widget: &widgets.State{}, DeviceInfo: &deviceinfo.Result{}},
 		{Status: EffectCancelled, Widget: &widgets.State{}},
 		{Status: EffectCompleted},
 	} {
 		if err := request.accept(outcome); err == nil {
 			t.Fatalf("accepted unrelated or missing result: %+v", outcome)
+		}
+	}
+	deviceRequest := ServiceRequest{ID: "device", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}}
+	for _, outcome := range []ServiceResult{{Status: EffectCompleted}, {Status: EffectCancelled, DeviceInfo: &deviceinfo.Result{}}, {Status: EffectCompleted, DeviceInfo: &deviceinfo.Result{}}} {
+		if deviceRequest.accept(outcome) == nil {
+			t.Fatalf("accepted invalid device snapshot: %+v", outcome)
 		}
 	}
 	request = ServiceRequest{ID: "device", SecureStorage: &securestore.Request{Operation: securestore.Delete, Key: "demo", Protection: securestore.Device}}

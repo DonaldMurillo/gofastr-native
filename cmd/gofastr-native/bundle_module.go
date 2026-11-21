@@ -17,7 +17,7 @@ import (
 //	AndroidManifest.xml -> manifest/AndroidManifest.xml
 //	resources.pb        -> resources.pb
 //	res/**              -> res/**
-//	classes.dex         -> dex/classes.dex
+//	classes*.dex        -> dex/classes*.dex
 //	jni/<abi>/*.so      -> lib/<abi>/*.so
 //
 // Any other entry in the proto APK is an error: nothing is dropped
@@ -58,8 +58,14 @@ func buildBundleModule(protoAPK, dexFile, jniDir string, abis []string, dst stri
 	if !seen["manifest/AndroidManifest.xml"] || !seen["resources.pb"] {
 		return fmt.Errorf("%s is not aapt2 --proto-format output (no AndroidManifest.xml or resources.pb)", protoAPK)
 	}
-	if err := add(entry{name: "dex/classes.dex", src: dexFile}); err != nil {
+	dexFiles, err := dexOutputs(dexFile)
+	if err != nil {
 		return err
+	}
+	for _, file := range dexFiles {
+		if err := add(entry{name: "dex/" + filepath.Base(file), src: file}); err != nil {
+			return err
+		}
 	}
 	libs, err := listFiles(jniDir, ".so")
 	if err != nil {

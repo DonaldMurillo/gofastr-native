@@ -15,7 +15,7 @@ func TestPushSettings(t *testing.T) {
 	}
 	connection := hello(t, "uikit", map[nativeui.Capability]nativeui.Support{nativeui.CapabilityPush: nativeui.SupportAvailable})
 	for _, outcome := range []nativeui.ServiceResult{
-		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "authorized", Registered: true, Token: "aabb"}},
+		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "authorized", Registered: true, Token: "aabb", Provider: push.ProviderAPNs}},
 		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "notDetermined"}},
 		{Status: nativeui.EffectCompleted, Push: &push.State{Permission: "authorized", Registered: true}},
 		{Status: nativeui.EffectDenied},

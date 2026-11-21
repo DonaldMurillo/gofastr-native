@@ -189,7 +189,7 @@ The profiles are assumptions taken from renderer source, not device measurements
 | Profile | Renderer | Assumed capabilities |
 |---|---|---|
 | `uikit` | uikit | navigation, editor, drafts, share, haptics, sheets, announcement, presentation, files, live, privacy. No services or extensions. |
-| `android` | android | The uikit set plus sharing, clipboard, notifications. Audio, incoming shares, secure storage and widgets unavailable (build flags off). |
+| `android` | android | The uikit set plus sharing, clipboard, notifications, deviceinfo. Audio, incoming shares, secure storage and widgets unavailable (build flags off). |
 | `webview` | webview | navigation, editor, drafts, announcement, presentation, live. Sheets, share and files as fallback. Haptics, photos and camera unavailable. No services host, so no clipboard, sharing or privacy. |
 | `minimal` | webview | navigation and editor only. |
 

@@ -21,8 +21,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />{{end}}
 {{if and .SecureStorage .BiometricUsage}}    <uses-permission android:name="android.permission.USE_BIOMETRIC" />{{end}}
 {{range .AndroidExtensionPermissions}}    <uses-permission android:name="{{xml .}}" />
-{{end}}{{end}}
+{{end}}{{if .PushConfig}}{{.PushPermissions}}{{end}}{{end}}
 
+{{if eq .Renderer "native"}}    <queries>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+{{if .MicrophoneUsage}}        <intent><action android:name="android.speech.RecognitionService" /></intent>
+{{end}}    </queries>
+{{end}}
     <application
         android:label="{{xml .Name}}"
         android:allowBackup="false"
@@ -81,7 +86,10 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-{{range .AndroidExtensionServices}}        <service android:name="dev.gofastr.nativeui.{{xml .Class}}" android:exported="false"{{if .ForegroundServiceType}} android:foregroundServiceType="{{xml .ForegroundServiceType}}"{{end}} />
+{{if .PushConfig}}        <service android:name="dev.gofastr.nativeui.fcm.GofastrMessagingService" android:exported="false">
+            <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
+        </service>
+{{.PushComponents}}{{end}}{{range .AndroidExtensionServices}}        <service android:name="dev.gofastr.nativeui.{{xml .Class}}" android:exported="false"{{if .ForegroundServiceType}} android:foregroundServiceType="{{xml .ForegroundServiceType}}"{{end}} />
 {{end}}{{end}}
     </application>
 </manifest>

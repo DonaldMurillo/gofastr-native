@@ -48,14 +48,25 @@ under the selected output directory. Run installs only the selected app package.
 - The media library owns its compiled factory. Keyed images and attachment cards
   update without replacing editors. Local audio has play/pause/seek controls and
   releases playback on backgrounding, navigation, or component removal.
+- [Device and battery snapshots](deviceinfo.md) expose model, manufacturer, OS/API,
+  locale, app version, battery percentage, charging source/state and power-save
+  mode through `deviceinfo/v1`. No permission or build flag is required; reads
+  are snapshots, not subscriptions.
 - Clipboard writes and rich sharing require an admitted Go action. Sharing uses
   private, randomly named content URIs with temporary grants. Transfer storage is
   capped and old transfers expire after 24 hours. Closing the share sheet does not
   prove recipient delivery.
+- Calendar `edit` requests open the installed calendar editor without calendar
+  permission. Closing it does not confirm saving. Missing apps report
+  unsupported; `status`, `add` and `read` report unsupported.
+  See [calendar events](calendar-events.md) for bounds and acceptance limits.
 - Recording requires `--microphone-usage`, then Android permission at the user's
   explicit action. AAC/M4A recording is foreground-only, bounded by the request
   and the framework's 60 second / 1 MiB ceiling. Notes requests 512 KiB. Cancelled
   or backgrounded recordings do not become attachments.
+- [Speech services](#speech) speak text and transcribe one utterance using
+  installed Android providers. Recognition uses the same microphone opt-in
+  as recording and returns text, not audio.
 - Reminders use app-scoped notification channels and inexact alarms. Scheduling
   validates future local time and requests notification permission when needed.
   Status/cancel do not request permission. Stored alarms are restored after a
@@ -96,6 +107,44 @@ to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
 `connectedDevice`, joined with `|`. A library may ship only an Android adapter.
 The [capture library](capture.md) uses all of these for background video
 capture, location and camera direction, with live WHIP streaming.
+
+- Remote push is opt-in Firebase Cloud Messaging with a private message inbox;
+  see [push notifications](push.md) for licensing, flags and validation.
+
+## Speech
+
+Return a `nativeui.ServiceRequest` with a `device/speech.Request` from an
+explicit action. Register its ID in the route's `Services` map:
+
+```go
+return nativeui.Result{Service: &nativeui.ServiceRequest{
+    ID: "dictation",
+    Speech: &speech.Request{Operation: speech.Recognize, Language: "en-US"},
+}}, nil
+```
+
+Use `speech.Speak` with `Text` to speak without microphone access.
+`Language` is an optional BCP 47 language tag. Spoken text and final
+transcripts must be nonblank and at most 4,000 UTF-8 bytes. A completed
+recognition returns the best final result as `ServiceResult.Transcript`.
+Synthesis completes after the provider reports playback finished; it returns
+no audio or transcript. Neither operation saves anything to app storage.
+
+These adapters are native Android only. Screen requirements can use
+`CapabilityTextToSpeech` or `CapabilitySpeechRecognition` to require provider
+availability. Availability is not a permission grant or a guarantee that a
+language is installed. Recognition asks for microphone permission when invoked
+and only if built with `--microphone-usage`. Both operations are cancellable and
+stop when the app is backgrounded. Recognition ends after one utterance or
+times out within 30 seconds. Providers may use their own online services.
+
+```sh
+GOWORK=off go run ./cmd/gofastr-native run --platform android-emu --renderer native \
+  --pkg ./examples/speech/speechnative --device Pixel_5_API_34 \
+  --microphone-usage 'Transcribe speech when the user taps Dictate.' \
+  --out dist/mobile/speech
+python scripts/android_speech_smoke.py --serial emulator-5554
+```
 
 ## Opening web URLs and receiving Android App Links
 
@@ -225,6 +274,9 @@ Android SDK and actual generated Go bindings when a full SDK/JDK is present.
 The smoke test requires an emulator, creates its own notes, and never clears app
 data. Results, screenshots, and UI XML go under `dist/android-acceptance/`.
 Only one UI automation process should drive that emulator at a time.
+For the devicefeatures app, use `scripts/android_smoke.py --deviceinfo` instead
+of `--services`; it compares device metadata with Android properties and restores
+battery simulation after checking a 42% AC-charging snapshot.
 
 November 6, 2026 validation used Windows, JDK 17, SDK/build-tools 36, NDK 27.1,
 and an isolated Android 14 x86-64 emulator. Both renderer options build as APKs.
