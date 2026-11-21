@@ -14,6 +14,7 @@ import (
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
 	fs            *flag.FlagSet
+	networkStatus *bool
 	location      *bool
 	locationUsage *string
 	calendar      *bool
@@ -30,6 +31,7 @@ type buildFlags struct {
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
 		fs:                fs,
+		networkStatus:     fs.Bool("network-status", false, "enable Android network status queries"),
 		location:          fs.Bool("location", false, "enable foreground iOS location services"),
 		locationUsage:     fs.String("location-usage", "", "iOS when-in-use location purpose text"),
 		calendar:          fs.Bool("calendar", false, "enable iOS calendar events"),
@@ -184,6 +186,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.MicrophoneUsage = strings.TrimSpace(*f.microphoneUsage)
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
+	a.NetworkStatus = *f.networkStatus
 	a.SignInWithApple = *f.signInWithApple
 	a.BackgroundRefresh = *f.backgroundRefresh
 	a.Push = *f.push
