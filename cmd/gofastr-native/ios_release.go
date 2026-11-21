@@ -112,7 +112,7 @@ func buildIOSDevice(r *runner, a app, out string, o releaseOptions) (string, err
 		rep.IOS.CertificateSHA1 = identity
 	}
 	decode := !r.dryRun || profileDecoderInjected
-	exact := a.AppGroup != "" || a.ReceiveShares || a.Widgets
+	exact := a.AppGroup != "" || a.ReceiveShares || a.Widgets || a.Push
 	for _, id := range signer.order {
 		b := signer.bundles[id]
 		if !decode {
@@ -136,6 +136,16 @@ func buildIOSDevice(r *runner, a app, out string, o releaseOptions) (string, err
 		}
 		b.profile = &profile
 		b.entitlements = deviceEntitlements(profile, id, s.teamID, a.AppGroup, b.keychain)
+		if id == a.ID && a.SignInWithApple {
+			b.entitlements[entSignInWithApple] = []string{"Default"}
+		}
+		if id == a.ID && a.Push {
+			environment := profile.APSEnvironment
+			if environment != "development" && environment != "production" {
+				return "", errors.New("push requires a provisioning profile with aps-environment")
+			}
+			b.entitlements["aps-environment"] = environment
+		}
 		if id != a.ID {
 			if _, leaked := b.entitlements[entKeychainGroups]; leaked {
 				return "", fmt.Errorf("%s would carry keychain-access-groups; extensions must never share the app's private Keychain group", id)

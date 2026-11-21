@@ -73,10 +73,20 @@ type app struct {
 	URLScheme       string
 	ReceiveShares   bool
 	SecureStorage   bool
+	Calendar        bool
+	CalendarUsage   string
 	BiometricUsage  string
+	Location        bool
+	LocationUsage   string
 	Widgets         bool
+	SignInWithApple bool
+	Push            bool
 	AppGroup        string
-	Extensions      []compiledExtension
+	// BackgroundRefresh registers a BGAppRefreshTask that calls the bound
+	// package's BackgroundRefresh(timeoutMillis int64) error, cancelled by
+	// CancelBackgroundRefresh().
+	BackgroundRefresh bool
+	Extensions        []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")
 	// that WebView adapters in the app declare. Android WebView builds only.
 	WebViewFeatures []string

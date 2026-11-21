@@ -9,7 +9,7 @@ It has two parts, each its own Go module:
 - **Phone apps** (`github.com/DonaldMurillo/gofastr-native`). Screens and
   actions are Go `nativeui` definitions. A bundled renderer draws them with
   UIKit, Android views or a WebView, so apps write no Swift, Java, HTML or
-  CSS. Device services (files, photos, audio, notifications, secure storage,
+  CSS. Device services (contacts, files, photos, audio, notifications, secure storage,
   incoming shares, widgets) are typed Go requests. The `gofastr-native` CLI
   builds and runs the app with the platforms' command-line tools: no Xcode
   project, no Gradle. It can also run an existing GoFastr web app inside the
@@ -73,7 +73,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 |---|---|
 | `nativeui/` | Screens and actions defined in Go, routing, and the runtime that coordinates drafts and actions. |
 | `behavior/` | Editor checkpoints and draft storage that do not depend on a renderer. |
-| `device/` | Typed requests for device services: `audio`, `files`, `notifications`, `photos`, `securestore`, `sharein`, `sharing`, `widgets`. |
+| `device/` | Typed requests for device services: `audio`, `contacts`, `files`, `notifications`, `photos`, `securestore`, `sharein`, `sharing`, `widgets`. |
 | `extension/` | The API for libraries that add a screen component or a device adapter, with the built-in `media` and `photos` extensions. |
 | `render/ios/`, `render/android/` | The native renderers: UIKit (Swift) and Android (Java), compiled into the app without Xcode or Gradle. |
 | `render/webview/` | The WebView renderer for the same definitions, with its component styles in `render/webview/mobileui`. |
