@@ -115,7 +115,7 @@ func (a app) androidBindPackages() []string {
 func (a app) AndroidExtensionPermissions() []string {
 	seen := map[string]bool{"android.permission.INTERNET": true, "android.permission.POST_NOTIFICATIONS": true,
 		"android.permission.RECEIVE_BOOT_COMPLETED": true, "android.permission.RECORD_AUDIO": a.MicrophoneUsage != "",
-		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != ""}
+		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != "", "android.permission.ACCESS_NETWORK_STATE": a.NetworkStatus}
 	var permissions []string
 	for _, definition := range a.Extensions {
 		if definition.manifest.Android == nil {

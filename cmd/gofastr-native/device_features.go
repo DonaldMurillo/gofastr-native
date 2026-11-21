@@ -8,6 +8,9 @@ import (
 )
 
 func validateDeviceFeatures(a app, platform string) error {
+	if a.NetworkStatus && (a.Renderer != "native" || platform != "android-emu") {
+		return errors.New("--network-status requires Android and --renderer native")
+	}
 	if a.Location || a.LocationUsage != "" {
 		if a.Renderer != "native" {
 			return errors.New("location flags require --renderer native")
