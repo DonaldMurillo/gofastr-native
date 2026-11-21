@@ -49,12 +49,14 @@ public abstract class GofastrActivity extends Activity {
     protected boolean networkStatusEnabled() { return false; }
     protected boolean biometricsEnabled() { return false; }
     protected boolean widgetsEnabled() { return false; }
+    protected boolean backgroundRefreshEnabled() { return false; }
     private static final ExecutorService lifecycle = Executors.newSingleThreadExecutor();
     final ExecutorService workers = Executors.newFixedThreadPool(4);
     private final ExecutorService snapshots = Executors.newSingleThreadExecutor();
     private final ExecutorService watches = Executors.newSingleThreadExecutor();
     final Handler main = new Handler(Looper.getMainLooper());
     private Backend backend;
+    private boolean backendAcquired;
     private String connection = "", activeTab = "", pendingRoute = "";
     private final Map<String,ArrayList<Frame>> stacks = new LinkedHashMap<>();
     private LinearLayout shell, bar, tabs;
@@ -89,7 +91,8 @@ public abstract class GofastrActivity extends Activity {
         pendingRoute = state != null && state.containsKey("route") ? state.getString("route", "") : routeFrom(getIntent());
         lifecycle.execute(() -> {
             try {
-                backend.start(getFilesDir().getAbsolutePath()+"/app");
+                BackendRuntime.acquire(backend,getFilesDir().getAbsolutePath()+"/app");
+                backendAcquired = true;
                 Map<String,String> caps = new LinkedHashMap<>();
                 for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "calendar", "clipboard", "live", "notifications", "privacy", "deviceinfo"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
@@ -108,6 +111,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("push/v1", Push.available() ? "available" : "unavailable");
                 caps.put("contacts/v1", Contacts.available(this) ? "available" : "unavailable");
                 caps.put("scanner/v1", "unavailable");
+                caps.put("background-refresh/v1", backgroundRefreshEnabled() ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));
@@ -218,7 +222,7 @@ public abstract class GofastrActivity extends Activity {
         // are ordered even when Android recreates the Activity.
         snapshots.shutdown(); workers.shutdown(); watches.shutdown();
         lifecycle.execute(() -> {
-            try { snapshots.awaitTermination(15,TimeUnit.SECONDS); workers.awaitTermination(15,TimeUnit.SECONDS); backend.stop(); }
+            try { snapshots.awaitTermination(15,TimeUnit.SECONDS); workers.awaitTermination(15,TimeUnit.SECONDS); if (backendAcquired) BackendRuntime.release(backend); }
             catch(Exception e) { Log.e("gofastr-native","stop failed",e); }
         });
         super.onDestroy();

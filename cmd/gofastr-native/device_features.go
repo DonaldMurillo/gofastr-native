@@ -40,8 +40,8 @@ func validateDeviceFeatures(a app, platform string) error {
 	if a.Calendar && (strings.TrimSpace(a.CalendarUsage) == "" || !uitext.Plain(a.CalendarUsage, 512)) {
 		return errors.New("--calendar requires a plain nonempty --calendar-usage of at most 512 bytes")
 	}
-	if a.BackgroundRefresh && !strings.HasPrefix(platform, "ios") {
-		return errors.New("--background-refresh is available on iOS only")
+	if a.BackgroundRefresh && !strings.HasPrefix(platform, "ios") && !strings.HasPrefix(platform, "android") {
+		return errors.New("--background-refresh is available on iOS and Android only")
 	}
 	if (a.PushConfig == "") != (a.PushLibraries == "") {
 		return errors.New("--push-config and --push-libraries are used together")

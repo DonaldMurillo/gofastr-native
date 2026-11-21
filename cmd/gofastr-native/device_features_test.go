@@ -100,8 +100,8 @@ func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 		}
 	}
 	a.BackgroundRefresh = true
-	if validateDeviceFeatures(a, "android-emu") == nil {
-		t.Fatal("Android background refresh accepted")
+	if validateDeviceFeatures(a, "go") == nil {
+		t.Fatal("background refresh accepted without a mobile platform")
 	}
 	if err := validateDeviceFeatures(a, "ios-device"); err != nil {
 		t.Fatal(err)

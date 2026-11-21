@@ -34,7 +34,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 
 - [Device features](device-features.md): share-in, secure storage, widgets, Android device snapshots.
 - [Device and battery snapshots](deviceinfo.md)
-- [Background refresh](background-refresh.md): periodic work while the iOS app is closed.
+- [Background refresh](background-refresh.md): periodic work while the iOS or Android app is closed.
 - [Files](files-services.md)
 - [Photos](photos-services.md)
 - [Barcode scanner](scanner.md): `scanner/v1` on iOS (live camera) and Android (photo or image).

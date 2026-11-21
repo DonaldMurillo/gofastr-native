@@ -53,10 +53,10 @@ var background = refresh.NewRunner(func(ctx context.Context) error {
 	return os.WriteFile(filepath.Join(directory, "last-refresh"), []byte(time.Now().UTC().Format(time.RFC3339)), 0o600)
 })
 
-// BackgroundRefresh runs one refresh when iOS wakes the app.
+// BackgroundRefresh runs one refresh when iOS or Android wakes the app.
 func BackgroundRefresh(timeoutMillis int64) error { return background.Run(timeoutMillis) }
 
-// CancelBackgroundRefresh stops a running refresh when iOS expires the task.
+// CancelBackgroundRefresh stops a running refresh when the OS ends the task.
 func CancelBackgroundRefresh() { background.Cancel() }
 
 func lastRefresh() string {
@@ -341,7 +341,7 @@ func newApp() (*nativeui.App, error) {
 			},
 		}),
 		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
+			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. The OS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
 				{ID: "schedule", Label: "Schedule", Primary: true}, {ID: "status", Label: "Check schedule"}, {ID: "cancel", Label: "Cancel refresh"},
 			}}, nil
 		}, Actions: map[string]nativeui.Handle{

@@ -69,7 +69,8 @@ Flags (build, run):
   --location         Enable foreground location services (native iOS and Android)
   --location-usage   When-in-use purpose text; required with --location on iOS
   --widgets     package a home-screen widget; requires --url-scheme
-  --background-refresh  let Go schedule periodic work while the app is closed (iOS);
+  --background-refresh  let Go schedule periodic work while the app is closed
+                (iOS BGTaskScheduler, Android JobScheduler);
                 the --pkg package must export BackgroundRefresh(int64) error
                 and CancelBackgroundRefresh()
   --push        enable APNs registration (iOS native only)

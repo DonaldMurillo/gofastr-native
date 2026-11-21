@@ -22,6 +22,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
 | Remote push | `ServiceRequest.Push` | Firebase Cloud Messaging and a private inbox (`--push-config`, `--push-libraries`) | APNs registration and tap routing (`--push`); no inbox |
 | Speech | `ServiceRequest.Speech` | TextToSpeech and one-utterance SpeechRecognizer (`text-to-speech/v1`, `speech-recognition/v1`); see [speech](android.md#speech) | Not implemented; the runtime refuses the request |
+| Background refresh | `ServiceRequest.Refresh` | Periodic JobScheduler job; see [background refresh](background-refresh.md) | BGAppRefreshTask |
 
 [Device and battery snapshots](deviceinfo.md) require no opt-in or permission on
 Android. The demo offers Device info and Battery actions; iOS and WebView return
@@ -82,6 +83,12 @@ has no inbox and reports `next` and `acknowledge` unsupported. See
 
 See [share-in](share-in.md), [secure storage](secure-storage.md), and
 [widgets](widgets.md) for bounds, platform behavior, and validation gates.
+
+[Background refresh](background-refresh.md) runs the bound package's
+`BackgroundRefresh` periodically on both platforms. Add `--background-refresh`
+to the demo build above; that page has the iOS command. The Background refresh
+screen shows when the last run wrote its timestamp; scheduling alone does not
+prove that a run happened.
 
 ## Acceptance
 

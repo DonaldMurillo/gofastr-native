@@ -55,7 +55,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		biometricUsage:    fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:           fs.Bool("widgets", false, "package a home-screen widget"),
 		signInWithApple:   fs.Bool("sign-in-with-apple", false, "enable Sign in with Apple (native iOS)"),
-		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS)"),
+		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS, Android)"),
 		push:              fs.Bool("push", false, "enable iOS APNs registration"),
 		appGroup:          fs.String("app-group", "", "iOS app-group identifier"),
 		pushConfig:        fs.String("push-config", "", "Firebase google-services.json enabling Android push notifications"),

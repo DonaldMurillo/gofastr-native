@@ -23,6 +23,13 @@ func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
 	if a.Renderer != "native" {
 		return sources, nil
 	}
+	if a.BackgroundRefresh {
+		service := filepath.Join(filepath.Dir(activity), "BackgroundService.java")
+		if err := r.do("generate background refresh job binding", func() error { return writeRendered("templates/android/BackgroundService.java.tmpl", service, a) }); err != nil {
+			return nil, err
+		}
+		sources = append(sources, service)
+	}
 	entries, err := renderandroid.Sources.ReadDir(".")
 	if err != nil {
 		return nil, err

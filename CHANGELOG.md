@@ -73,6 +73,11 @@ This repository holds two Go modules, tagged separately:
   (MIT, a port of Apache-2.0 ZXing). Android reads QR, Data Matrix, EAN-13,
   EAN-8, UPC-E, Code 128, Code 93, Code 39 and ITF-14; PDF417 and Aztec
   report unsupported. Emulator and hardware acceptance are NOT RUN.
+- Android adapter for `device/refresh` background refresh: `--background-refresh`
+  now builds for the native Android renderer too. The bound package's
+  `BackgroundRefresh` runs from one persisted periodic JobScheduler job, in a
+  process with or without an activity. SDK compile and CLI tests pass; an
+  Android emulator run of this adapter is NOT RUN.
 
 ### Internal
 

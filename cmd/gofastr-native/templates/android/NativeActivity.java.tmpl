@@ -28,4 +28,5 @@ public final class MainActivity extends GofastrActivity {
     @Override protected boolean networkStatusEnabled() { return {{.NetworkStatus}}; }
     @Override protected boolean biometricsEnabled() { return {{if .BiometricUsage}}true{{else}}false{{end}}; }
     @Override protected boolean widgetsEnabled() { return {{.Widgets}}; }
+    @Override protected boolean backgroundRefreshEnabled() { return {{.BackgroundRefresh}}; }
 }
