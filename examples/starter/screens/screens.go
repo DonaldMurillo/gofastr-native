@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/DonaldMurillo/gofastr-native/device/browser"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
@@ -133,7 +134,14 @@ func New(store *Store) (*nativeui.App, error) {
 		nativeui.Route{Path: Root, Screen: list(store), Actions: map[string]nativeui.Handle{"new": push("/items/new"), "about": push("/about")}},
 		nativeui.Route{Path: "/items/new", Screen: editor(store), Actions: editorActions},
 		nativeui.Route{Path: "/items/{id}", Screen: editor(store), Actions: editorActions},
-		nativeui.Route{Path: "/about", Screen: about},
+		nativeui.Route{Path: "/about", Screen: about, Actions: map[string]nativeui.Handle{"docs": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+			return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "docs", Browser: &browser.Request{URL: "https://github.com/DonaldMurillo/gofastr-native", ReaderMode: true}}}, nil
+		}}, Services: map[string]nativeui.ServiceRespond{"docs": func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+			return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/docs/" + string(result.Status)}}, nil
+		}}},
+		nativeui.Route{Path: "/docs/{status}", Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+			return nativeui.Screen{Title: "Browser " + request.Params["status"], Text: "The in-app browser has closed."}, nil
+		}},
 	)
 }
 
@@ -214,7 +222,7 @@ func remove(store *Store) nativeui.Handle {
 }
 
 func about(context.Context, nativeui.Request) (nativeui.Screen, error) {
-	return nativeui.Screen{Title: "About", Text: About}, nil
+	return nativeui.Screen{Title: "About", Text: About, Actions: []nativeui.Action{{ID: "docs", Label: "Open docs", Primary: true}}}, nil
 }
 
 func push(route string) nativeui.Handle {

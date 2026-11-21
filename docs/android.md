@@ -62,15 +62,11 @@ under the selected output directory. Run installs only the selected app package.
   device restart or app update; notification taps open a Go route through the
   navigation guard. Android can delay inexact alarms. Force-stop prevents OS
   delivery until the app runs again. No exact-alarm permission is requested.
-- Foreground location uses `device/location` and `location/v1`. Enable it with
-  `--location-usage 'Show my current position.'` on the native Android renderer.
-  Status reports permission and whether services are enabled without prompting.
-  Current requests precise or approximate permission at the explicit action;
-  Android may grant only approximate access. Reads use LocationManager, allow
-  cached fixes up to 600 seconds old when requested, and time out after 30 seconds
-  by default (configurable up to 60). Backgrounding cancels an active read.
-  No background-location permission or Play Services dependency is used.
-  The flag is rejected for iOS; UIKit does not advertise `location/v1`.
+- Foreground location uses the shared `device/location` contract and
+  `location/v1` (see [location](location.md)). Enable it with `--location` on
+  the native Android renderer; `--location-usage` is optional and unused on
+  Android. The manifest gains `ACCESS_COARSE_LOCATION` and
+  `ACCESS_FINE_LOCATION`, never background location or Play Services.
 - Live reads run separately from commands. They watch only the authorized query
   while the collection is visible. Retired reads can reopen once without replaying
   a write. Editors are never replaced by live-read replies.

@@ -2,10 +2,11 @@ package featuresnative
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/DonaldMurillo/gofastr-native/nativeui"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 )
 
 func TestEveryDemoActionUsesValidSharedServiceContracts(t *testing.T) {
@@ -13,7 +14,7 @@ func TestEveryDemoActionUsesValidSharedServiceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, route := range []string{"/features", "/features/location", "/features/inbox", "/features/secure", "/features/widgets"} {
+	for _, route := range []string{"/features", "/features/inbox", "/features/secure", "/features/widgets", "/features/location", "/features/sign-in", "/features/calendar", "/features/refresh"} {
 		screen, err := app.Render(context.Background(), route, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -32,55 +33,36 @@ func TestEveryDemoActionUsesValidSharedServiceContracts(t *testing.T) {
 	}
 }
 
-func TestLocationFailureMessageReachesStatus(t *testing.T) {
-	for _, outcome := range []struct {
-		status        nativeui.EffectStatus
-		message, want string
+func TestCalendarMessages(t *testing.T) {
+	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		result calendar.Result
+		want   string
 	}{
-		{nativeui.EffectFailed, "Location services are off.", "Location services are off."},
-		{nativeui.EffectFailed, "No location fix arrived in time.", "No location fix arrived in time."},
-		{nativeui.EffectDenied, "", "Device result: denied"},
+		{calendar.Result{Authorization: "full"}, "Calendar authorization: full"},
+		{calendar.Result{Identifier: "event"}, "Sample event added."},
+		{calendar.Result{}, "No calendar events"},
+		{calendar.Result{Events: []calendar.Event{{Title: "GoFastr sample event", Start: now}}}, "GoFastr sample event — 2026-01-02T12:00:00Z"},
 	} {
-		t.Run(outcome.want, func(t *testing.T) {
-			app, err := newApp()
-			if err != nil {
-				t.Fatal(err)
-			}
-			runtime, err := nativeui.NewRuntime(app, nativeui.RuntimeOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			command := func(c nativeui.Command) nativeui.Reply {
-				t.Helper()
-				c.Version = nativeui.ProtocolVersion
-				payload, err := json.Marshal(c)
-				if err != nil {
-					t.Fatal(err)
-				}
-				raw, err := runtime.CommandJSON(context.Background(), string(payload))
-				if err != nil {
-					t.Fatal(err)
-				}
-				var reply nativeui.Reply
-				if err := json.Unmarshal([]byte(raw), &reply); err != nil {
-					t.Fatal(err)
-				}
-				if reply.Error != nil {
-					t.Fatal(reply.Error)
-				}
-				return reply
-			}
-			hello := command(nativeui.Command{Kind: "hello", Hello: &nativeui.Hello{Minimum: 1, Maximum: 1, Renderer: "android", Capabilities: map[nativeui.Capability]nativeui.Support{nativeui.CapabilityNavigation: nativeui.SupportAvailable, nativeui.CapabilityEditor: nativeui.SupportAvailable, nativeui.CapabilityLocation: nativeui.SupportAvailable}}})
-			opened := command(nativeui.Command{Kind: "open", Connection: hello.Connection, Route: "/features/location"})
-			c := nativeui.Command{Kind: "action", Connection: hello.Connection, Instance: opened.Instance, Revision: 1, Action: "precise", RequestID: "read"}
-			command(c)
-			c.Kind = "complete"
-			shown := command(c)
-			c.Kind, c.RequestID, c.ServiceID = "service-result", "observed", shown.ServiceID
-			c.ServiceResult = &nativeui.ServiceResult{Status: outcome.status, Message: outcome.message}
-			if got := command(c).Response.Announcement; got != outcome.want {
-				t.Fatalf("announcement = %q, want %q", got, outcome.want)
-			}
-		})
+		if got := calendarMessage(test.result); !strings.Contains(got, test.want) {
+			t.Fatalf("got %q, want %q", got, test.want)
+		}
 	}
+}
+
+func TestBackgroundRefreshRecordsTheLastRun(t *testing.T) {
+	if err := Start(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Stop() })
+	if lastRefresh() != "never" {
+		t.Fatal("refresh reported before it ran")
+	}
+	if err := BackgroundRefresh(1_000); err != nil {
+		t.Fatal(err)
+	}
+	if lastRefresh() == "never" {
+		t.Fatal("refresh did not record its run")
+	}
+	CancelBackgroundRefresh()
 }

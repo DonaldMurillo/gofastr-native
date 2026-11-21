@@ -129,6 +129,7 @@ public final class Services {
                 if(!host.widgetsEnabled()){finish(outcome("unsupported","Widgets are disabled."));return;}
                 HomeWidget.perform(host,request.getJSONObject("widget"),this::finish);
             }
+            else if(request.has("iap")) finish(outcome("unsupported","In-app purchases require the native iOS renderer."));
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
     }

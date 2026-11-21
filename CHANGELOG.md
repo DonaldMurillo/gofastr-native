@@ -8,13 +8,25 @@ This repository holds two Go modules, tagged separately:
 
 ## Unreleased
 
-### Phone apps
+### Added
 
-- Added typed foreground `device/location` requests and opt-in native Android
-  `location/v1` support via `--location-usage`, with permission-only status,
-  precise/approximate current fixes, bounded cache age and timeout, and
-  cancellation on backgrounding. The device-features demo includes location.
-  UIKit location is not implemented; the flag is rejected for iOS.
+- iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
+  optional user location, a gallery screen and `--location --location-usage`
+  opt-in purpose text.
+- Typed foreground iOS location services in `device/location`: permission
+  status, when-in-use authorization, current position and bounded tracking.
+  Native builds opt in with `--location --location-usage`; no background
+  modes or always-permission prompts are added. The device-features demo
+  displays the results. Automated iOS 26.5 simulator UI acceptance covers
+  pregranted permission and simulated current/tracking coordinates.
+  First-use prompts, physical GPS and physical-device acceptance are NOT RUN.
+- Native Android implements the same `device/location` contract and
+  `location/v1` capability: status, authorize, current position and bounded
+  tracking through `LocationManager`, opted in with `--location`
+  (`--location-usage` is optional on Android). The manifest gains coarse and
+  fine location only, never background location. Reads are cancelled when the
+  activity pauses, except while the permission dialog is showing. SDK compile
+  tests cover the adapter; emulator and physical-device runs are NOT RUN.
 
 ### Internal
 

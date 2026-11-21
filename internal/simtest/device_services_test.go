@@ -147,7 +147,9 @@ func TestNotesLivePagingWebView(t *testing.T) {
 				chromedp.Poll(`document.querySelectorAll('a.gfm-row').length === 10 && !!document.querySelector('[data-gfw-screen]').dataset.gfwInstance`, nil),
 				chromedp.Evaluate(`window.__deviceSeen = new Set(Array.from(document.querySelectorAll('a.gfm-row'), row => row.textContent.match(/Paged seed \d+/)?.[0]).filter(Boolean))`, nil))
 			for batch := 0; batch < 20; batch++ {
+				// Showing live controls can move the link after a cursor window shrinks.
 				check(chromedp.WaitVisible(`[data-gfw-load-more]`, chromedp.ByQuery),
+					chromedp.Poll(`document.querySelector('[data-gfw-screen]').dataset.gfwLiveState === 'watching'`, nil),
 					chromedp.Evaluate(`window.__deviceBeforePage = document.querySelector('[data-gfw-screen]').dataset.gfwInstance`, nil),
 					chromedp.Click(`[data-gfw-load-more]`, chromedp.ByQuery),
 					chromedp.Poll(`!!document.querySelector('[data-gfw-screen]').dataset.gfwInstance && document.querySelector('[data-gfw-screen]').dataset.gfwInstance !== window.__deviceBeforePage`, nil),
@@ -205,6 +207,28 @@ func TestNotesLivePagingWebView(t *testing.T) {
 				t.Fatalf("live collection bridge errors: %v", traffic.errs)
 			}
 		})
+	}
+}
+
+func TestNotesLivePagingWindowBoundary(t *testing.T) {
+	ctx, service, userContext, _ := deviceNotesBrowser(t, mobileui.Android)
+	for index := 0; index < 235; index++ {
+		if _, err := service.Save(userContext, "", fmt.Sprintf("Paged seed %03d", index), "Owner-scoped repository paging fixture"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	check := deviceBrowserCheck(t, ctx)
+	for attempt := 0; attempt < 10; attempt++ {
+		check(chromedp.Navigate(origin+"/notes?page=10"), waitForFileScreen("/notes?page=10"),
+			chromedp.Poll(`document.querySelectorAll('a.gfm-row').length === 100 && !!document.querySelector('[data-gfw-screen]').dataset.gfwInstance`, nil))
+		for batch := 0; batch < 2; batch++ {
+			check(chromedp.WaitVisible(`[data-gfw-load-more]`, chromedp.ByQuery),
+				chromedp.Poll(`document.querySelector('[data-gfw-screen]').dataset.gfwLiveState === 'watching'`, nil),
+				chromedp.Evaluate(`window.__deviceBeforePage = document.querySelector('[data-gfw-screen]').dataset.gfwInstance`, nil),
+				chromedp.Click(`[data-gfw-load-more]`, chromedp.ByQuery),
+				chromedp.Poll(`!!document.querySelector('[data-gfw-screen]').dataset.gfwInstance && document.querySelector('[data-gfw-screen]').dataset.gfwInstance !== window.__deviceBeforePage`, nil),
+				chromedp.Poll(fmt.Sprintf(`document.querySelectorAll('a.gfm-row').length === %d`, (batch+1)*10), nil))
+		}
 	}
 }
 

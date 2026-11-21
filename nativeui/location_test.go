@@ -7,49 +7,44 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/location"
 )
 
-func TestLocationService(t *testing.T) {
-	request := ServiceRequest{ID: "location", Location: &location.Request{Operation: location.Status}}
+func TestLocationServiceWire(t *testing.T) {
+	request := ServiceRequest{ID: "locate", Location: &location.Request{Operation: location.Current}}
 	if err := request.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if request.capability() != CapabilityLocation || !knownCapability(CapabilityLocation) {
-		t.Fatal("location capability missing")
+		t.Fatal("missing location capability")
 	}
-	result := ServiceResult{Status: EffectCompleted, Location: &location.Result{Permission: "undetermined"}}
-	if err := request.accept(result); err != nil {
-		t.Fatal(err)
+	cloned := cloneService(&request)
+	cloned.Location.Operation = location.Status
+	if request.Location.Operation != location.Current {
+		t.Fatal("aliased location request")
 	}
-	for _, status := range []EffectStatus{EffectFailed, EffectDenied, EffectCancelled, EffectUnsupported} {
-		result.Status = status
-		if request.accept(result) == nil {
-			t.Fatalf("%s accepted device content", status)
-		}
-		if err := request.accept(ServiceResult{Status: status}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if request.accept(ServiceResult{Status: EffectCompleted}) == nil {
-		t.Fatal("missing location accepted")
-	}
-	if (ServiceRequest{}).accept(ServiceResult{Status: EffectCompleted, Location: result.Location}) == nil {
-		t.Fatal("unrelated location accepted")
-	}
-	request.Location.Accuracy = location.Precise
-	if request.Validate() == nil {
-		t.Fatal("invalid status accepted")
-	}
-	request.Location.Accuracy = ""
-	request.Location.Operation = location.Current
-	request.Location.Accuracy = location.Precise
-	if request.accept(ServiceResult{Status: EffectCompleted, Location: &location.Result{Permission: "precise", ServicesEnabled: true}}) == nil {
-		t.Fatal("current result without a fix accepted")
-	}
-	request.Location = &location.Request{Operation: location.Status}
-	encoded, err := json.Marshal(request)
+	result := ServiceResult{Status: EffectCompleted, Location: &location.Result{Permission: location.WhenInUse, ServicesEnabled: true, Fixes: []location.Fix{{Latitude: 37.3349, Longitude: -122.009, HorizontalAccuracyMeters: 1}}}}
+	encoded, err := json.Marshal(result)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(encoded) != `{"location":{"operation":"status"},"id":"location"}` && string(encoded) != `{"id":"location","location":{"operation":"status"}}` {
-		t.Fatal(string(encoded))
+	var decoded ServiceResult
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := request.accept(decoded); err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range []EffectStatus{EffectDenied, EffectUnsupported, EffectFailed, EffectCancelled} {
+		if err := request.accept(ServiceResult{Status: status, Permission: "denied"}); err != nil {
+			t.Fatal(err)
+		}
+		decoded.Status = status
+		if request.accept(decoded) == nil {
+			t.Fatal("failure carried fixes")
+		}
+	}
+	if request.accept(ServiceResult{Status: EffectCompleted}) == nil {
+		t.Fatal("missing content accepted")
+	}
+	if (ServiceRequest{ID: "other"}).accept(result) == nil {
+		t.Fatal("unrelated location accepted")
 	}
 }
