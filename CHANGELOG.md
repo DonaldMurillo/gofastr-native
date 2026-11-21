@@ -20,6 +20,11 @@ This repository holds two Go modules, tagged separately:
   displays the results. Automated iOS 26.5 simulator UI acceptance covers
   pregranted permission and simulated current/tracking coordinates.
   First-use prompts, physical GPS and physical-device acceptance are NOT RUN.
+- Android adapter for `device/refresh` background refresh: `--background-refresh`
+  now builds for the native Android renderer too. The bound package's
+  `BackgroundRefresh` runs from one persisted periodic JobScheduler job, in a
+  process with or without an activity. SDK compile and CLI tests pass; an
+  Android emulator run of this adapter is NOT RUN.
 
 ### Internal
 

@@ -21,9 +21,10 @@ under the selected output directory. Run installs only the selected app package.
 
 ## Renderer and services
 
-Opt-in [background tasks](background-tasks.md) use platform JobScheduler to run
-registered Go handlers without an activity. Enable `--background-tasks` for the
-native renderer. No WorkManager, AndroidX, or Gradle dependency is added.
+Opt-in [background refresh](background-refresh.md) runs the bound package's
+`BackgroundRefresh` from a persisted periodic JobScheduler job, with or without
+an activity. Enable `--background-refresh` for the native renderer. No
+WorkManager, AndroidX, or Gradle dependency is added.
 
 - Native lists, search, collapsed filters, refresh, accumulated paging,
   stable-ID selection, row action menus, and declared swipe actions.

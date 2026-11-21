@@ -46,7 +46,7 @@ public abstract class GofastrActivity extends Activity {
     protected boolean secureStorageEnabled() { return false; }
     protected boolean biometricsEnabled() { return false; }
     protected boolean widgetsEnabled() { return false; }
-    protected boolean backgroundTasksEnabled() { return false; }
+    protected boolean backgroundRefreshEnabled() { return false; }
     private static final ExecutorService lifecycle = Executors.newSingleThreadExecutor();
     final ExecutorService workers = Executors.newFixedThreadPool(4);
     private final ExecutorService snapshots = Executors.newSingleThreadExecutor();
@@ -102,7 +102,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("sign-in-with-apple/v1", "unavailable");
                 caps.put("oauth-web-login/v1", "unavailable");
                 caps.put("iap/v1", "unavailable");
-                if (backgroundTasksEnabled()) caps.put("background/v1", "available");
+                caps.put("background-refresh/v1", backgroundRefreshEnabled() ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));

@@ -31,7 +31,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 ## Device services
 
 - [Device features](device-features.md): share-in, secure storage, widgets.
-- [Background refresh](background-refresh.md): periodic work while the iOS app is closed.
+- [Background refresh](background-refresh.md): periodic work while the iOS or Android app is closed.
 - [Files](files-services.md)
 - [Photos](photos-services.md)
 - [Secure storage](secure-storage.md)

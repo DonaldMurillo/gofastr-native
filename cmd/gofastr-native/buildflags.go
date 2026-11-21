@@ -13,12 +13,11 @@ import (
 // buildFlags is the one parser for the flags doctor, build, run, and dev
 // share. Build, run, and dev use the same app and feature validation.
 type buildFlags struct {
-	fs              *flag.FlagSet
-	location        *bool
-	locationUsage   *string
-	calendar        *bool
-	calendarUsage   *string
-	backgroundTasks *bool
+	fs            *flag.FlagSet
+	location      *bool
+	locationUsage *string
+	calendar      *bool
+	calendarUsage *string
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
@@ -51,9 +50,8 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		biometricUsage:    fs.String("biometric-usage", "", "Face ID purpose text"),
 		widgets:           fs.Bool("widgets", false, "package a home-screen widget"),
 		signInWithApple:   fs.Bool("sign-in-with-apple", false, "enable Sign in with Apple (native iOS)"),
-		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS)"),
+		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS, Android)"),
 		push:              fs.Bool("push", false, "enable iOS APNs registration"),
-		backgroundTasks:   fs.Bool("background-tasks", false, "enable Android JobScheduler tasks"),
 		appGroup:          fs.String("app-group", "", "iOS app-group identifier"),
 		dry:               fs.Bool("dry-run", false, "print the steps only"),
 		debugTrace:        fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
@@ -189,7 +187,6 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.SignInWithApple = *f.signInWithApple
 	a.BackgroundRefresh = *f.backgroundRefresh
 	a.Push = *f.push
-	a.BackgroundTasks = *f.backgroundTasks
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
 	a.Location, a.LocationUsage = *f.location, strings.TrimSpace(*f.locationUsage)
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {

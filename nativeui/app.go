@@ -26,7 +26,6 @@ type App struct {
 	root       string
 	routes     []Route
 	extensions *extension.Registry
-	background map[string]BackgroundHandler
 }
 
 // New validates a screen registry. Register literal routes before parameterized
@@ -232,9 +231,6 @@ func unavailableAction(action string) *ActionError {
 func (app *App) result(ctx context.Context, route Route, result Result) (Response, error) {
 	response := Response{Version: 1, Result: result}
 	if result.Service != nil {
-		if r := result.Service.Background; r != nil && r.Operation == "schedule" && app.background[r.Task] == nil {
-			return Response{}, errors.New("nativeui: background task is not registered")
-		}
 		if err := result.Service.Validate(); err != nil {
 			return Response{}, err
 		}

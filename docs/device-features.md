@@ -13,7 +13,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
 | Foreground location | `ServiceRequest.Location` | Not implemented | CoreLocation, when-in-use authorization, bounded updates |
 | Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
-| Deferrable background work | `ServiceRequest.Background` | JobScheduler (opt-in `--background-tasks`) | Unsupported |
+| Background refresh | `ServiceRequest.Refresh` | Periodic JobScheduler job; see [background refresh](background-refresh.md) | BGAppRefreshTask |
 
 [Location](location.md) is an additional iOS-only opt-in service. Build the
 demo with `--location --location-usage "Show nearby places in the foreground."`
@@ -60,13 +60,11 @@ has displayed it. Clear the snapshot when signing out or removing its content.
 See [share-in](share-in.md), [secure storage](secure-storage.md), and
 [widgets](widgets.md) for bounds, platform behavior, and validation gates.
 
-[Background tasks](background-tasks.md) add Android-only Go handlers that can run
-without an activity. Add `--background-tasks` to the Android demo build above.
-The background screen records a durable timestamp; scheduling does not prove
-execution. Android 14 x86-64 emulator checks cover forced one-off execution with
-and without an activity process, periodic scheduling/cancellation, and schedule
-persistence across reboot. See the background-task validation section for the
-remaining gates; forced execution does not prove scheduler timing or constraints.
+[Background refresh](background-refresh.md) runs the bound package's
+`BackgroundRefresh` periodically on both platforms. Add `--background-refresh`
+to the demo build above; that page has the iOS command. The Background refresh
+screen shows when the last run wrote its timestamp; scheduling alone does not
+prove that a run happened.
 
 ## Acceptance
 

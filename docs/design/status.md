@@ -47,20 +47,6 @@ the QR image/Vision fixture and cancellation through the real service wire.
 Hardware camera acceptance: **NOT RUN**; simulator checks do not establish
 physical barcode, permission, interruption or accessibility acceptance.
 
-Android has opt-in [background tasks](../background-tasks.md) using platform
-JobScheduler with typed Go requests and registered cancellable handlers. Jobs
-can start the Go backend without an activity. The device-features demo exposes
-scheduling, status, cancellation, and a stored last-run timestamp. Android 14
-x86-64 emulator checks passed one-off schedule/status and forced execution,
-forced execution after backgrounding and `am kill` with a new service-only Go
-process, periodic schedule/status/cancel, and periodic schedule persistence
-across reboot. The zero-delay platform builder probe succeeded. The separate
-Notes services smoke regression also passed on that emulator. Forced runs do
-not prove normal delivery timing or constraints. Network/charging enforcement,
-Doze, retry timing, long-running interruption, API 24 runtime behavior, other
-Android releases, physical devices, and accessibility acceptance remain NOT RUN.
-iOS and WebView are unsupported.
-
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
 uses the external `mobileui` design system with iOS/Android modes, not desktop
@@ -133,8 +119,15 @@ provider configuration; the simulator demo only exercises system UI and
 graceful cancellation or failure.
 
 [Background refresh](../background-refresh.md) schedules periodic Go work
-through `BGTaskScheduler` on iOS. It has no Android adapter. Simulator builds
-and contract tests pass; a physical-device run is NOT RUN.
+through `BGTaskScheduler` on iOS and a persisted periodic `JobScheduler` job on
+Android. iOS simulator builds and contract tests pass; a physical-device run is
+NOT RUN. The Android adapter compiles against the SDK and the generated gobind
+classes, and CLI tests cover its manifest and generated service. An Android
+emulator run of this adapter is NOT RUN. An earlier version, with per-job
+identifiers and its own Go API, passed forced runs on an Android 14 x86-64
+emulator, including one in a service-only process after `am kill` and schedule
+persistence across reboot. Unforced timing, Doze, API 24 runtime behavior,
+physical devices and accessibility are NOT RUN. WebView is unsupported.
 [In-app purchases and subscriptions](../iap.md) use StoreKit 2 in the native
 iOS renderer. Android and WebView explicitly report the service as unsupported.
 The storefront demo includes a local StoreKit catalog and simulator UI tests.

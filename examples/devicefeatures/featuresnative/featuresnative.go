@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
-	bgjobs "github.com/DonaldMurillo/gofastr-native/device/background"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
@@ -47,10 +46,10 @@ var background = refresh.NewRunner(func(ctx context.Context) error {
 	return os.WriteFile(filepath.Join(directory, "last-refresh"), []byte(time.Now().UTC().Format(time.RFC3339)), 0o600)
 })
 
-// BackgroundRefresh runs one refresh when iOS wakes the app.
+// BackgroundRefresh runs one refresh when iOS or Android wakes the app.
 func BackgroundRefresh(timeoutMillis int64) error { return background.Run(timeoutMillis) }
 
-// CancelBackgroundRefresh stops a running refresh when iOS expires the task.
+// CancelBackgroundRefresh stops a running refresh when the OS ends the task.
 func CancelBackgroundRefresh() { background.Cancel() }
 
 func lastRefresh() string {
@@ -71,9 +70,9 @@ func Start(dataDir string) error {
 	lifecycle.Lock()
 	defer lifecycle.Unlock()
 	if runtime != nil {
-		return nil
+		return errors.New("featuresnative: already started")
 	}
-	app, err := newAppWithData(dataDir)
+	app, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -122,13 +121,7 @@ func Dispatch(route, action, values string) (string, error) {
 }
 
 func newApp() (*nativeui.App, error) {
-	return newAppWithData("")
-}
-
-func newAppWithData(dataDir string) (*nativeui.App, error) {
 	var inboxMu sync.Mutex
-	var timestampMu sync.Mutex
-	timestamp := filepath.Join(dataDir, "background-last-run")
 	var next *sharein.Item
 	var scanMessage string
 	service := func(request nativeui.ServiceRequest) nativeui.Handle {
@@ -158,8 +151,6 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 				message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
 			case result.Calendar != nil:
 				message = calendarMessage(*result.Calendar)
-			case result.Background != nil:
-				message = fmt.Sprintf("Background job scheduled: %t.", result.Background.Scheduled)
 			case result.SecureStorage != nil:
 				if result.SecureStorage.Found {
 					message = fmt.Sprintf("Read %d secret bytes. The value stays out of the UI.", len(result.SecureStorage.Value))
@@ -228,7 +219,6 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			{ID: "location", Title: "Location", Destination: "/features/location"},
 			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
-			{ID: "background", Title: "Background tasks (Android)", Destination: "/features/background"},
 		}}}, nil
 	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
 		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
@@ -236,29 +226,6 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			defer inboxMu.Unlock()
 			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
 		}},
-		nativeui.Route{Path: "/features/background", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-			timestampMu.Lock()
-			defer timestampMu.Unlock()
-			last := "Not run yet."
-			if data, err := os.ReadFile(timestamp); err == nil {
-				last = string(data)
-			}
-			return nativeui.Screen{Title: "Background tasks", Text: "Last recorded run: " + last, Actions: []nativeui.Action{{ID: "once", Label: "Schedule once"}, {ID: "periodic", Label: "Schedule every 15 minutes"}, {ID: "status", Label: "Check status"}, {ID: "cancel", Label: "Cancel"}, {ID: "refresh", Label: "Refresh timestamp"}}}, nil
-		}, Actions: map[string]nativeui.Handle{
-			"once":     service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Schedule, Identifier: "demo", Task: "timestamp", DelayMinutes: 1}}),
-			"periodic": service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Schedule, Identifier: "demo", Task: "timestamp", Periodic: true, IntervalMinutes: 15}}),
-			"status":   service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Status, Identifier: "demo"}}),
-			"cancel":   service(nativeui.ServiceRequest{Background: &bgjobs.Request{Operation: bgjobs.Cancel, Identifier: "demo"}}),
-			"refresh": func(context.Context, nativeui.Request) (nativeui.Result, error) {
-				timestampMu.Lock()
-				defer timestampMu.Unlock()
-				data, err := os.ReadFile(timestamp)
-				if err != nil {
-					return nativeui.Result{Announcement: "No recorded run yet."}, nil
-				}
-				return nativeui.Result{Announcement: "Last recorded run: " + string(data)}, nil
-			},
-		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
@@ -309,7 +276,7 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
 		}),
 		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
+			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. The OS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
 				{ID: "schedule", Label: "Schedule", Primary: true}, {ID: "status", Label: "Check schedule"}, {ID: "cancel", Label: "Cancel refresh"},
 			}}, nil
 		}, Actions: map[string]nativeui.Handle{
@@ -318,21 +285,7 @@ func newAppWithData(dataDir string) (*nativeui.App, error) {
 			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
 		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
 	}
-	app, err := nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
-	if err != nil {
-		return nil, err
-	}
-	return app.WithBackground(map[string]nativeui.BackgroundHandler{"timestamp": func(ctx context.Context) error {
-		timestampMu.Lock()
-		defer timestampMu.Unlock()
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if dataDir == "" {
-			return errors.New("featuresnative: no data directory")
-		}
-		return os.WriteFile(timestamp, []byte(time.Now().UTC().Format(time.RFC3339)), 0600)
-	}})
+	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 }
 
 func demoToken() string {

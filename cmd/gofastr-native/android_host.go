@@ -22,14 +22,14 @@ func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
 	if a.Renderer != "native" {
 		return sources, nil
 	}
-	entries, err := renderandroid.Sources.ReadDir(".")
-	if a.BackgroundTasks {
+	if a.BackgroundRefresh {
 		service := filepath.Join(filepath.Dir(activity), "BackgroundService.java")
-		if err := r.do("generate background job binding", func() error { return writeRendered("templates/android/BackgroundService.java.tmpl", service, a) }); err != nil {
+		if err := r.do("generate background refresh job binding", func() error { return writeRendered("templates/android/BackgroundService.java.tmpl", service, a) }); err != nil {
 			return nil, err
 		}
 		sources = append(sources, service)
 	}
+	entries, err := renderandroid.Sources.ReadDir(".")
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +101,7 @@ func (a app) androidBindPackages() []string {
 func (a app) AndroidExtensionPermissions() []string {
 	seen := map[string]bool{"android.permission.INTERNET": true, "android.permission.POST_NOTIFICATIONS": true,
 		"android.permission.RECEIVE_BOOT_COMPLETED": true, "android.permission.RECORD_AUDIO": a.MicrophoneUsage != "",
-		"android.permission.USE_BIOMETRIC":        a.SecureStorage && a.BiometricUsage != "",
-		"android.permission.ACCESS_NETWORK_STATE": a.BackgroundTasks}
+		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != ""}
 	var permissions []string
 	for _, definition := range a.Extensions {
 		if definition.manifest.Android == nil {

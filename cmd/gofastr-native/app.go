@@ -81,10 +81,10 @@ type app struct {
 	Widgets         bool
 	SignInWithApple bool
 	Push            bool
-	BackgroundTasks bool
 	AppGroup        string
-	// BackgroundRefresh registers a BGAppRefreshTask that calls the bound
-	// package's BackgroundRefresh(timeoutMillis int64) error, cancelled by
+	// BackgroundRefresh registers a BGAppRefreshTask on iOS, or a JobScheduler
+	// service on Android, that calls the bound package's
+	// BackgroundRefresh(timeoutMillis int64) error, cancelled by
 	// CancelBackgroundRefresh().
 	BackgroundRefresh bool
 	Extensions        []compiledExtension

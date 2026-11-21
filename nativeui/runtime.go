@@ -35,7 +35,6 @@ type RuntimeOptions struct {
 // Runtime coordinates local screen instances and commands without owning a
 // navigation stack. Business operations run without the session or registry lock.
 type Runtime struct {
-	background         backgroundRuns
 	app                *App
 	options            RuntimeOptions
 	mu                 sync.Mutex
@@ -184,10 +183,6 @@ func (runtime *Runtime) handle(ctx context.Context, command Command) Reply {
 	reply := Reply{Version: ProtocolVersion, Connection: command.Connection, Instance: command.Instance, RequestID: command.RequestID, Revision: command.Revision}
 	if command.Version != ProtocolVersion {
 		reply.Error = commandFailure("protocol", "The app and renderer use incompatible mobile protocols.")
-		return reply
-	}
-	if command.Kind == "background/run" || command.Kind == "background/stop" {
-		reply.Background = runtime.backgroundCommand(ctx, command)
 		return reply
 	}
 	if command.Kind == "hello" {

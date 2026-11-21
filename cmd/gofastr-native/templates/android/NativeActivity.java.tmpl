@@ -23,5 +23,5 @@ public final class MainActivity extends GofastrActivity {
     @Override protected boolean secureStorageEnabled() { return {{.SecureStorage}}; }
     @Override protected boolean biometricsEnabled() { return {{if .BiometricUsage}}true{{else}}false{{end}}; }
     @Override protected boolean widgetsEnabled() { return {{.Widgets}}; }
-    @Override protected boolean backgroundTasksEnabled() { return {{.BackgroundTasks}}; }
+    @Override protected boolean backgroundRefreshEnabled() { return {{.BackgroundRefresh}}; }
 }

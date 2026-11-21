@@ -43,7 +43,6 @@ const (
 	// CapabilityBackgroundRefresh schedules periodic work while the app is closed.
 	CapabilityBackgroundRefresh Capability = "background-refresh/v1"
 	CapabilityPush              Capability = "push/v1"
-	CapabilityBackground        Capability = "background/v1"
 )
 
 // Support distinguishes a service from an explicitly disclosed fallback.
@@ -117,7 +116,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin, CapabilityBackground:
+	case CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false

@@ -16,4 +16,6 @@ public final class BackgroundService extends BackgroundJobs {
             public String render(String route, String values) throws Exception { return {{.JavaClass}}.render(route, values); }
         };
     }
+    @Override protected void runRefresh(long timeoutMillis) throws Exception { {{.JavaClass}}.backgroundRefresh(timeoutMillis); }
+    @Override protected void cancelRefresh() { {{.JavaClass}}.cancelBackgroundRefresh(); }
 }
