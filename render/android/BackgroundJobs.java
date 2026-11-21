@@ -9,6 +9,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
+import android.os.SystemClock;
 import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,7 +28,7 @@ public abstract class BackgroundJobs extends JobService {
     /** One app-wide job. The ID is fixed so schedule replaces rather than adds. */
     static final int JOB_ID = 0x67667266;
     private final Map<Integer, Run> active = new HashMap<>();
-    private static final class Run { volatile boolean stopped; }
+    private static final class Run { volatile boolean stopped; boolean done; }
     private static JobScheduler scheduler(Context context) { return (JobScheduler)context.getSystemService(Context.JOB_SCHEDULER_SERVICE); }
     private static ComponentName component(Context context) { return new ComponentName(context.getPackageName(), context.getPackageName()+".BackgroundService"); }
 
@@ -68,6 +69,7 @@ public abstract class BackgroundJobs extends JobService {
             try { if (backend != null && !run.stopped) runRefresh(RUN_MILLIS); }
             catch (Exception ignored) {}
             finally {
+                synchronized (run) { run.done = true; }
                 if (backend != null) try { BackendRuntime.release(backend); } catch (Exception ignored) {}
             }
             new Handler(getMainLooper()).post(() -> {
@@ -84,8 +86,24 @@ public abstract class BackgroundJobs extends JobService {
         synchronized (active) { run = active.remove(parameters.getJobId()); }
         if (run != null) {
             run.stopped = true;
-            new Thread(this::cancelRefresh, "gofastr-background-refresh-stop").start();
+            new Thread(() -> stop(run), "gofastr-background-refresh-stop").start();
         }
         return false;
+    }
+
+    /**
+     * Go ignores a cancel that arrives before Run registers its context, so a
+     * stop between the worker's stopped check and that registration would be
+     * lost. Keep cancelling until this run's worker has returned.
+     */
+    private void stop(Run run) {
+        long deadline = SystemClock.uptimeMillis() + RUN_MILLIS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            synchronized (run) {
+                if (run.done) return;
+                cancelRefresh();
+            }
+            try { Thread.sleep(50); } catch (InterruptedException interrupted) { return; }
+        }
     }
 }
