@@ -76,6 +76,14 @@ func TestUnrequestedSymbologyIsNotFound(t *testing.T) {
 	}
 }
 
+func TestLongITFIsNotITF14(t *testing.T) {
+	img := render(t, oned.NewITFWriter(), "1001234567890212", gozxing.BarcodeFormat_ITF, 400, 128, nil)
+	request := scanner.Request{Title: "Scan", Symbologies: []scanner.Symbology{scanner.ITF14}}
+	if got, err := Image(request, img); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("16-digit ITF read as ITF-14: %+v, %v", got, err)
+	}
+}
+
 func TestSupported(t *testing.T) {
 	if got := Supported(all); len(got) != 9 {
 		t.Fatalf("all supported = %v", got)

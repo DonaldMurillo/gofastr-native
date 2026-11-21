@@ -111,6 +111,11 @@ func Image(request scanner.Request, img image.Image) (scanner.Result, error) {
 			continue
 		}
 		text := decoded.GetText()
+		// The ITF reader accepts any length above the longest allowed one,
+		// so a longer generic ITF code is not ITF-14.
+		if symbology == scanner.ITF14 && len(text) != 14 {
+			continue
+		}
 		if symbology == scanner.Code128 {
 			if text, err = gs1(reader, bitmap, decoded); err != nil {
 				return scanner.Result{}, err
