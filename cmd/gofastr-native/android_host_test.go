@@ -67,6 +67,26 @@ func TestNativeAndroidCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	}
 }
 
+// TestNativeAndroidContactsPickerManifest checks that contacts/v1 relies on
+// the system row picker: the picker intents are visible and broad address-book
+// access is never requested.
+func TestNativeAndroidContactsPickerManifest(t *testing.T) {
+	a := nativeApp(t).forAndroid(34)
+	manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wellFormed(t, "native Android manifest", manifest)
+	if bytes.Contains(manifest, []byte("READ_CONTACTS")) {
+		t.Fatal("picker must not request broad contacts access")
+	}
+	for _, kind := range []string{"vnd.android.cursor.dir/phone_v2", "vnd.android.cursor.dir/email_v2"} {
+		if !bytes.Contains(manifest, []byte(kind)) {
+			t.Errorf("missing picker visibility query: %s", kind)
+		}
+	}
+}
+
 // androidHostSources discovers a's extensions, writes its Android host and
 // returns the Java sources javac needs: host, renderer, extensions, the
 // go.Seq stand-ins and gobind's output for every bound package.
@@ -151,6 +171,34 @@ func TestCaptureExtensionCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	}
 	if n := bytes.Count(manifest, []byte(`"android.permission.CAMERA"`)); n != 1 {
 		t.Errorf("manifest declares CAMERA %d times", n)
+	}
+}
+
+func TestBarcodeExtensionCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
+	sdk, err := findAndroidSDK(false)
+	if err != nil {
+		t.Skipf("Android SDK/JDK unavailable: %v", err)
+	}
+	application, err := newApp("github.com/DonaldMurillo/gofastr-native/examples/devicefeatures/featuresnative", "featuresnative", "dev.gofastr.featuresnative", "Device features", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	application.Renderer = "native"
+	a := application.forAndroid(sdk.api)
+	directory, sources := androidHostSources(t, &a)
+	if got := a.androidBindPackages(); len(got) != 2 || got[1] != "github.com/DonaldMurillo/gofastr-native/extension/barcode/barcodebind" {
+		t.Fatalf("bind packages = %v", got)
+	}
+	args := append([]string{"--release", "11", "-encoding", "UTF-8", "-classpath", sdk.androidJar, "-d", filepath.Join(directory, "classes")}, sources...)
+	if output, err := exec.Command(sdk.javac, args...).CombinedOutput(); err != nil {
+		t.Fatalf("barcode Android SDK compile: %v\n%s", err, output)
+	}
+	manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(manifest, []byte(`"android.permission.CAMERA"`)) {
+		t.Fatal("delegated camera capture should not declare CAMERA")
 	}
 }
 
@@ -271,6 +319,34 @@ func TestNativeAndroidDryRunAndPermissionPackaging(t *testing.T) {
 	manifest, _ = render("templates/android/AndroidManifest.xml.tmpl", a)
 	if bytes.Contains(manifest, []byte("RECORD_AUDIO")) || bytes.Contains(manifest, []byte("BROWSABLE")) {
 		t.Fatal("optional permission/link registration was not removed")
+	}
+}
+
+func TestAndroidSpeechServiceVisibility(t *testing.T) {
+	for _, tc := range []struct {
+		name, renderer, mic string
+		speak, recognize    bool
+	}{
+		{"native with microphone", "native", "Transcribe speech.", true, true},
+		{"native without microphone", "native", "", true, false},
+		{"WebView with microphone", "webview", "Record audio.", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := nativeApp(t).forAndroid(36)
+			a.Renderer, a.MicrophoneUsage = tc.renderer, tc.mic
+			manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for action, wanted := range map[string]bool{
+				"android.intent.action.TTS_SERVICE": tc.speak,
+				"android.speech.RecognitionService": tc.recognize,
+			} {
+				if bytes.Contains(manifest, []byte(action)) != wanted {
+					t.Errorf("expected %s visibility: %t", action, wanted)
+				}
+			}
+		})
 	}
 }
 

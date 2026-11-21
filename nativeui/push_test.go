@@ -9,7 +9,7 @@ import (
 
 func TestPushServiceContract(t *testing.T) {
 	request := ServiceRequest{ID: "register", Push: &push.Request{Operation: push.Register}}
-	state := &push.State{Permission: "authorized", Registered: true, Token: "abcd"}
+	state := &push.State{Permission: "authorized", Registered: true, Token: "abcd", Provider: push.ProviderAPNs}
 	if err := request.Validate(); err != nil {
 		t.Fatal(err)
 	}

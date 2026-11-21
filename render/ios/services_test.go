@@ -11,6 +11,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/browser"
 	"github.com/DonaldMurillo/gofastr-native/device/contacts"
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/push"
@@ -34,6 +35,8 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "browser", Browser: &browser.Request{URL: "https://example.com", ReaderMode: true, DismissLabel: "close"}},
 			{ID: "oauth", Authentication: &authentication.Request{Operation: authentication.OAuth, AuthorizationURL: "https://example.com/authorize", RedirectURI: "dev.example.app:/oauth", State: "state"}},
 			{ID: "push", Push: &push.Request{Operation: push.Register}},
+			{ID: "info", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}},
+			{ID: "battery", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}},
 		},
 		"contacts": contacts.Selection{Contacts: []contacts.Contact{{ID: "opaque", GivenName: "Ada", FamilyName: "Lovelace", Phones: []contacts.Labeled{{Label: "mobile", Value: "+123"}}}}},
 		"audio":    audio.Document{File: file, DurationMillis: 1},
@@ -88,6 +91,7 @@ func TestNotificationRoutesRetryAfterRendererResume(t *testing.T) {
 func TestServiceRunnerAndVisibleLiveContracts(t *testing.T) {
 	requireTokenMap(t, map[string][]string{
 		"GofastrServiceRunner.swift": {
+			"request.deviceInfo != nil", `status: "unsupported", message: "Device snapshots are unavailable on this renderer."`,
 			"public final class GofastrServiceRunner", "public init(presenter: UIViewController, openRoute: @escaping (String) -> Bool)",
 			"public static func capabilities() -> [String: String]", "public func perform(requestJSON: String, completion: @escaping (String) -> Void)", "public func cancel()",
 			"NSMicrophoneUsageDescription", "UNUserNotificationCenterDelegate", "UNNotificationDefaultActionIdentifier", "self.routes.pending = route", "completionHandler([.banner, .sound])",
@@ -189,6 +193,11 @@ enum ServiceChecks {
         let pushJSON = try JSONSerialization.data(withJSONObject: pushResult.wire)
         let decodedPush = try decoder.decode(MobileServiceResult.self, from: pushJSON)
         precondition(decodedPush.push?.token == "aabb")
+        precondition(decodedPush.push?.provider == "apns" && (pushResult.wire["push"] as? [String: Any])?["provider"] as? String == "apns")
+        try MobilePushRequest(operation: "next").validate()
+        try MobilePushRequest(operation: "acknowledge", identifier: String(repeating: "a", count: 32)).validate()
+        rejected { try MobilePushRequest(operation: "next").accept(MobilePushState(permission: "authorized", registered: false)) }
+        rejected { try push.accept(MobilePushState(permission: "authorized", registered: true, token: "aabb", provider: "fcm")) }
         precondition(MobilePushState.environment(profile: Data()) == nil)
         let profile = Data(#"<?xml version="1.0"?><plist version="1.0"><dict><key>Entitlements</key><dict><key>aps-environment</key><string>production</string></dict></dict></plist>"#.utf8)
         precondition(MobilePushState.environment(profile: profile) == "production")
@@ -264,6 +273,13 @@ enum ServiceChecks {
         for json in [#"{"id":"bad"}"#, #"{"id":"bad","clipboard":{"text":"x"},"audio":{"title":"Record"}}"#, #"{"id":"","clipboard":{"text":"x"}}"#] {
             rejected { try decoder.decode(MobileServiceRequest.self, from: Data(json.utf8)).validate() }
         }
+        for json in [#"{"id":"device","deviceInfo":{}}"#, #"{"id":"device","deviceInfo":{"operation":"subscribe"}}"#, #"{"id":"device","deviceInfo":{"operation":"info"},"clipboard":{"text":"x"}}"#] {
+            rejected { try decoder.decode(MobileServiceRequest.self, from: Data(json.utf8)).validate() }
+        }
+        let device = try decoder.decode(MobileServiceRequest.self, from: Data(#"{"id":"device","deviceInfo":{"operation":"battery"}}"#.utf8))
+        try device.validate()
+        let deviceRoundTrip = try decoder.decode(MobileServiceRequest.self, from: JSONEncoder().encode(device))
+        precondition(deviceRoundTrip.deviceInfo?.operation == "battery")
         let emptyClipboard = try decoder.decode(MobileServiceRequest.self, from: Data(#"{"id":"clear","clipboard":{"text":""}}"#.utf8))
         try emptyClipboard.validate()
         let hugeClipboard = try decoder.decode(MobileServiceRequest.self, from: JSONSerialization.data(withJSONObject: ["id":"copy", "clipboard":["text":String(repeating:"é", count:32769)]]))

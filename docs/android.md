@@ -50,17 +50,31 @@ WorkManager, AndroidX, or Gradle dependency is added.
   content URI. A worker bounds source bytes, samples decoding, applies orientation,
   and reencodes a JPEG without source metadata. Camera access can be disabled with
   `--camera-usage ''`.
+- The [barcode scanner](scanner.md) (`scanner/v1`) is the opt-in
+  `extension/barcode` adapter. It reads one code offline from a system camera
+  photo or a selected image.
 - The media library owns its compiled factory. Keyed images and attachment cards
   update without replacing editors. Local audio has play/pause/seek controls and
   releases playback on backgrounding, navigation, or component removal.
+- [Device and battery snapshots](deviceinfo.md) expose model, manufacturer, OS/API,
+  locale, app version, battery percentage, charging source/state and power-save
+  mode through `deviceinfo/v1`. No permission or build flag is required; reads
+  are snapshots, not subscriptions.
 - Clipboard writes and rich sharing require an admitted Go action. Sharing uses
   private, randomly named content URIs with temporary grants. Transfer storage is
   capped and old transfers expire after 24 hours. Closing the share sheet does not
   prove recipient delivery.
+- Calendar `edit` requests open the installed calendar editor without calendar
+  permission. Closing it does not confirm saving. Missing apps report
+  unsupported; `status`, `add` and `read` report unsupported.
+  See [calendar events](calendar-events.md) for bounds and acceptance limits.
 - Recording requires `--microphone-usage`, then Android permission at the user's
   explicit action. AAC/M4A recording is foreground-only, bounded by the request
   and the framework's 60 second / 1 MiB ceiling. Notes requests 512 KiB. Cancelled
   or backgrounded recordings do not become attachments.
+- [Speech services](#speech) speak text and transcribe one utterance using
+  installed Android providers. Recognition uses the same microphone opt-in
+  as recording and returns text, not audio.
 - Reminders use app-scoped notification channels and inexact alarms. Scheduling
   validates future local time and requests notification permission when needed.
   Status/cancel do not request permission. Stored alarms are restored after a
@@ -101,6 +115,107 @@ to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
 `connectedDevice`, joined with `|`. A library may ship only an Android adapter.
 The [capture library](capture.md) uses all of these for background video
 capture, location and camera direction, with live WHIP streaming.
+
+- Remote push is opt-in Firebase Cloud Messaging with a private message inbox;
+  see [push notifications](push.md) for licensing, flags and validation.
+
+## Speech
+
+Return a `nativeui.ServiceRequest` with a `device/speech.Request` from an
+explicit action. Register its ID in the route's `Services` map:
+
+```go
+return nativeui.Result{Service: &nativeui.ServiceRequest{
+    ID: "dictation",
+    Speech: &speech.Request{Operation: speech.Recognize, Language: "en-US"},
+}}, nil
+```
+
+Use `speech.Speak` with `Text` to speak without microphone access.
+`Language` is an optional BCP 47 language tag. Spoken text and final
+transcripts must be nonblank and at most 4,000 UTF-8 bytes. A completed
+recognition returns the best final result as `ServiceResult.Transcript`.
+Synthesis completes after the provider reports playback finished; it returns
+no audio or transcript. Neither operation saves anything to app storage.
+
+These adapters are native Android only. Screen requirements can use
+`CapabilityTextToSpeech` or `CapabilitySpeechRecognition` to require provider
+availability. Availability is not a permission grant or a guarantee that a
+language is installed. Recognition asks for microphone permission when invoked
+and only if built with `--microphone-usage`. Both operations are cancellable and
+stop when the app is backgrounded. Recognition ends after one utterance or
+times out within 30 seconds. Providers may use their own online services.
+
+```sh
+GOWORK=off go run ./cmd/gofastr-native run --platform android-emu --renderer native \
+  --pkg ./examples/speech/speechnative --device Pixel_5_API_34 \
+  --microphone-usage 'Transcribe speech when the user taps Dictate.' \
+  --out dist/mobile/speech
+python scripts/android_speech_smoke.py --serial emulator-5554
+```
+
+## Opening web URLs and receiving Android App Links
+
+A Go action can return a `nativeui.Result` with a `ServiceRequest` whose
+`OpenURL` is `&links.Open{URL: "https://example.org/help"}`
+(`device/links`). Give the request an ID and register the matching
+`ServiceRespond` on the route, as with the other device services. Native
+Android provides `nativeui.CapabilityOpenURL` (`open-url/v1`). The
+service accepts absolute HTTP(S) URLs of at most 2048 bytes without
+credentials (use punycode for internationalized hosts), the same rules as
+`device/browser`, and uses Android's browser or other selected handler.
+A completed result means Android accepted the handoff, not that a page loaded.
+No handler returns `unsupported`. Use Go navigation for destinations inside
+the same app. Native iOS does not advertise `open-url/v1`; there, the
+in-app `browser/v1` service ([UIKit service notes](../render/ios/docs/services.md#in-app-browser))
+shows web pages, and Android reports `browser/v1` unavailable.
+
+Inbound Android App Links are separate and opt-in:
+
+```sh
+go run ./cmd/gofastr-native build --platform android-emu --renderer native \
+  --pkg ./examples/devicefeatures/featuresnative --id dev.gofastr.linksdemo \
+  --app-link-hosts links.example.org,links.example.net --url-scheme gofastr-links-demo
+```
+
+Use lowercase DNS hosts you control (ASCII or punycode, no wildcards, paths
+or ports). Each gets an auto-verified HTTP/HTTPS intent filter. The activity
+checks the configured host and standard port, then sends the path and query
+to the matching Go screen. Fragments are ignored. Cold links open at that
+screen, falling back to the root if it cannot open; warm links use the same
+navigation guard as custom-scheme links. Unlisted hosts cannot supply routes.
+Use a dedicated host if only part of a website should open in the app.
+Treat incoming path and query values as untrusted. App Link verification
+controls Android's default routing; it does not authorize access to a screen.
+
+For verification, publish a Digital Asset Links statement at
+`https://<host>/.well-known/assetlinks.json` on **each** configured host.
+Serve it directly over HTTPS with `Content-Type: application/json`, without
+redirects. Set the statement's package name to the build's `--id` and its
+fingerprint to the **installed APK signer's SHA-256** (the app-signing
+certificate, not the upload certificate, for Play App Signing):
+
+```json
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "dev.gofastr.linksdemo",
+    "sha256_cert_fingerprints": ["<colon-separated SHA-256 fingerprint>"]
+  }
+}]
+```
+
+Get the APK fingerprint with `apksigner verify --print-certs <app.apk>`.
+On Android 12+, run `adb shell pm verify-app-links --re-verify <package>`,
+then look for `verified` per host in `adb shell pm get-app-links <package>`.
+Then open a link without an explicit component or package. On Android 11
+and below, verification requires all manifest hosts to verify.
+See the [Android App Links guide](https://developer.android.com/training/app-links).
+For local routing tests with the demo's placeholder hosts, install its APK on
+an isolated Android 12+ emulator and run
+`python3 scripts/android_links_smoke.py --serial <emulator-serial>`. This uses
+the user's supported-links selection, not live domain verification.
 
 ## Build compatibility
 
@@ -167,6 +282,9 @@ Android SDK and actual generated Go bindings when a full SDK/JDK is present.
 The smoke test requires an emulator, creates its own notes, and never clears app
 data. Results, screenshots, and UI XML go under `dist/android-acceptance/`.
 Only one UI automation process should drive that emulator at a time.
+For the devicefeatures app, use `scripts/android_smoke.py --deviceinfo` instead
+of `--services`; it compares device metadata with Android properties and restores
+battery simulation after checking a 42% AC-charging snapshot.
 
 November 6, 2026 validation used Windows, JDK 17, SDK/build-tools 36, NDK 27.1,
 and an isolated Android 14 x86-64 emulator. Both renderer options build as APKs.

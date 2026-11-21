@@ -43,6 +43,15 @@ func validateDeviceFeatures(a app, platform string) error {
 	if a.BackgroundRefresh && !strings.HasPrefix(platform, "ios") && !strings.HasPrefix(platform, "android") {
 		return errors.New("--background-refresh is available on iOS and Android only")
 	}
+	if (a.PushConfig == "") != (a.PushLibraries == "") {
+		return errors.New("--push-config and --push-libraries are used together")
+	}
+	if a.PushConfig != "" && a.Renderer != "native" {
+		return errors.New("push notifications require --renderer native")
+	}
+	if a.PushConfig != "" && strings.HasPrefix(platform, "ios") {
+		return errors.New("--push-config and --push-libraries enable Android FCM push; iOS uses --push")
+	}
 	if a.Widgets && a.URLScheme == "" {
 		return errors.New("--widgets requires --url-scheme for widget navigation")
 	}

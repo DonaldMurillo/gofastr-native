@@ -10,14 +10,23 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 
 | Feature | Go request | Android adapter | iOS adapter |
 | --- | --- | --- | --- |
+| Device and battery snapshots | `ServiceRequest.DeviceInfo` | Build metadata, sticky battery intent, PowerManager | Unsupported |
 | In-app browser | `ServiceRequest.Browser` | Unavailable | SFSafariViewController (`browser/v1`) |
+| Open web URL in another app | `ServiceRequest.OpenURL` | `ACTION_VIEW` handoff (`open-url/v1`); see [Android](android.md#opening-web-urls-and-receiving-android-app-links) | Not implemented |
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
 | Foreground location | `ServiceRequest.Location` | LocationManager, coarse/fine runtime permission, bounded updates | CoreLocation, when-in-use authorization, bounded updates |
-| Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
+| Barcode scanner | `ServiceRequest.Scan` | Camera photo or selected image, decoded offline; opt-in `extension/barcode` | One-shot AVFoundation sheet; see [scanner](scanner.md) |
 | Network status | `ServiceRequest.Network` | One-shot ConnectivityManager snapshot (`network/v1`); see [network status](network-status.md) | Not implemented |
+| Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
+| Remote push | `ServiceRequest.Push` | Firebase Cloud Messaging and a private inbox (`--push-config`, `--push-libraries`) | APNs registration and tap routing (`--push`); no inbox |
+| Speech | `ServiceRequest.Speech` | TextToSpeech and one-utterance SpeechRecognizer (`text-to-speech/v1`, `speech-recognition/v1`); see [speech](android.md#speech) | Not implemented; the runtime refuses the request |
 | Background refresh | `ServiceRequest.Refresh` | Periodic JobScheduler job; see [background refresh](background-refresh.md) | BGAppRefreshTask |
+
+[Device and battery snapshots](deviceinfo.md) require no opt-in or permission on
+Android. The demo offers Device info and Battery actions; iOS and WebView return
+unsupported without advertising `deviceinfo/v1`.
 
 [Location](location.md) is an additional opt-in service on iOS and Android.
 Build the demo with `--location --location-usage "Show nearby places in the foreground."`
@@ -30,6 +39,9 @@ The browser is a separate, user-initiated service in `device/browser`. It accept
 only bounded absolute HTTP/HTTPS URLs without credentials. Reader mode and
 Done/Close/Cancel labels are optional; dismissal reports completed, not page-load
 success. Android and WebView do not fall back to opening an external browser.
+`ServiceRequest.OpenURL` (`device/links`) is the separate external handoff:
+it accepts only URLs the browser service would accept, plus stricter host and
+port checks, and is implemented on native Android only.
 Try **About → Open docs** in the native Starter example. See the
 [UIKit service notes](../render/ios/docs/services.md#in-app-browser).
 
@@ -61,6 +73,13 @@ Widgets display only explicitly published public snapshots. Add the widget
 through the system launcher/gallery after publishing. Updating the stored
 snapshot requests a system reload; the completion does not prove that the OS
 has displayed it. Clear the snapshot when signing out or removing its content.
+
+Push uses one `device/push` contract on both platforms. `State.Provider` says
+whether APNs or FCM issued the token. Android push needs a Firebase project and
+libraries the owner downloads under Google's terms, and keeps received messages
+in an inbox the demo's Push notifications screen reads and acknowledges. iOS
+has no inbox and reports `next` and `acknowledge` unsupported. See
+[push notifications](push.md).
 
 See [share-in](share-in.md), [secure storage](secure-storage.md), and
 [widgets](widgets.md) for bounds, platform behavior, and validation gates.
@@ -103,8 +122,18 @@ location has SDK compilation checks only; emulator and device runs are NOT RUN.
 
 ## Contact picker
 
-The iOS [contact picker](contacts-services.md) supports explicit single or multiple
-selection with requested fields only, through `contacts/v1`. The native and
-WebView hosts reuse the service runner. No Contacts authorization or
-`NSContactsUsageDescription` is needed for the system picker. Android does
-not advertise this capability. Native picker GUI acceptance: NOT RUN.
+The [contact picker](contacts-services.md) works through `contacts/v1` on iOS and the
+native Android renderer. iOS supports explicit single or multiple selection
+with requested fields only; its native and WebView hosts reuse the service
+runner. No Contacts authorization or `NSContactsUsageDescription` is needed
+for the system picker. iOS native picker GUI acceptance: NOT RUN.
+
+Android uses the system phone or email row picker without `READ_CONTACTS` and
+serves single selection of one `phone` or `email` field; other requests,
+including Notes' **Pick contacts**, settle as `unsupported`. The display name
+arrives in `GivenName`. Gallery's Device tab has a **Choose contact** demo.
+An Android 15 arm64 emulator run passed phone selection and display, Back
+cancellation and reopening, using a local Gallery build with the iOS-only map
+screen stubbed out. Email selection, denied access, physical devices and
+accessibility: NOT RUN. The Android WebView renderer does not advertise
+`contacts/v1`.

@@ -28,6 +28,8 @@ const (
 	CapabilitySharing         Capability = "sharing/v1"
 	CapabilityBrowser         Capability = "browser/v1"
 	CapabilityClipboard       Capability = "clipboard/v1"
+	CapabilityDeviceInfo      Capability = "deviceinfo/v1"
+	CapabilityOpenURL         Capability = "open-url/v1"
 	CapabilityAudio           Capability = "audio/v1"
 	CapabilityLive            Capability = "live/v1"
 	CapabilityIncomingShares  Capability = "incoming-shares/v1"
@@ -44,6 +46,11 @@ const (
 	// CapabilityBackgroundRefresh schedules periodic work while the app is closed.
 	CapabilityBackgroundRefresh Capability = "background-refresh/v1"
 	CapabilityPush              Capability = "push/v1"
+)
+
+const (
+	CapabilityTextToSpeech      Capability = "text-to-speech/v1"
+	CapabilitySpeechRecognition Capability = "speech-recognition/v1"
 )
 
 // Support distinguishes a service from an explicitly disclosed fallback.
@@ -117,7 +124,9 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityNetwork, CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
+	case CapabilityTextToSpeech, CapabilitySpeechRecognition:
+		return true
+	case CapabilityNetwork, CapabilityDeviceInfo, CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityOpenURL, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false

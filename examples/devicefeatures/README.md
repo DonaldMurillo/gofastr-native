@@ -3,7 +3,9 @@
 `featuresnative` demonstrates incoming shares, secure storage, widgets, and
 calendar events using shared Go service contracts. Enable each service with
 its build flag; disabled services return unsupported rather than requesting
-permission. Calendar events are currently iOS-only.
+permission. Calendar status, add and read are iOS-only. On Android, **Open
+calendar editor** opens the system calendar editor; closing it does not
+confirm a save, and the other calendar actions return unsupported.
 
 ## Calendar simulator build
 

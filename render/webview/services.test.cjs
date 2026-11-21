@@ -3,6 +3,22 @@ const { test } = require('node:test');
 const { harness, connected, flush, plain } = require('./test-dom.cjs');
 
 const request = (kind, value) => ({ id: 'declared-go-continuation', [kind]: value });
+
+test('calendar requests return unsupported without invoking a host', async () => {
+  const fixture = harness({ setup({ window }) {
+    window.__gofastrDeviceServices = {
+      async capabilities() { return { 'calendar/v1': 'available' }; },
+      async perform() { assert.fail('Calendar host must not run'); }
+    };
+  } });
+  assert.equal((await fixture.adapter.capabilities())['calendar/v1'], 'unavailable');
+  let observed;
+  const dialog = fixture.open(request('calendar', { operation: 'edit', event: { title: 'Event', start: '2028-01-01T09:00:00Z', end: '2028-01-01T10:00:00Z', allDay: false } }), async result => { observed = plain(result); });
+  dialog.querySelector('[data-gfw-service-perform]').click();
+  await flush();
+  assert.equal(observed.status, 'unsupported');
+});
+
 test('contacts require a native host and preserve completed selections only', async () => {
   const browser = harness();
   assert.equal((await browser.adapter.capabilities())['contacts/v1'], 'unavailable');
@@ -65,6 +81,7 @@ test('capability discovery is truthful and never requests permission or writes o
   let mic;
   const fixture = harness({ setup(value) { mic = microphone(value); value.context.navigator.clipboard = { writeText: () => assert.fail('Not explicit') }; } });
   const facts = plain(await fixture.adapter.capabilities());
+  assert.equal(facts['calendar/v1'], 'unavailable');
   assert.equal(facts['notifications/v1'], 'unavailable');
   assert.equal(facts['sharing/v1'], 'fallback');
   assert.equal(facts['clipboard/v1'], 'fallback');
@@ -416,4 +433,25 @@ test('saved bounded audio has local native controls and releases playback on int
   fixture.document.hidden = false; fixture.document.dispatchEvent({ type: 'visibilitychange' });
   assert.equal(fixture.objects.size, 1);
   fixture.root.remove(); fixture.mutate(); assert.equal(fixture.objects.size, 0);
+});
+
+test('device snapshots round-trip as unsupported without advertising or invoking a host', async () => {
+  const fixture = harness({ setup({ window }) {
+    window.webkit = { messageHandlers: { gofastrServices: { async postMessage(message) {
+      assert.equal(message.kind, 'capabilities');
+      return { 'deviceinfo/v1': 'available' };
+    } } } };
+  } });
+  assert.equal((await fixture.adapter.capabilities())['deviceinfo/v1'], undefined);
+  for (const operation of ['info', 'battery']) {
+    const outcomes = [];
+    const dialog = fixture.open(request('deviceInfo', { operation }), async result => outcomes.push(plain(result)), 'device-' + operation);
+    dialog.querySelector('[data-gfw-service-perform]').click();
+    await flush();
+    assert.deepEqual(outcomes, [{ status: 'unsupported', message: 'Device snapshots are unavailable on this renderer.' }]);
+  }
+  for (const value of [{}, { operation: 'subscribe' }, { operation: 'info', extra: true }]) {
+    assert.throws(() => fixture.open(request('deviceInfo', value)), /Invalid device snapshot/);
+  }
+  assert.throws(() => fixture.open({ id: 'bad', deviceInfo: { operation: 'info' }, clipboard: { text: 'x' } }), /no new issued identity/);
 });
