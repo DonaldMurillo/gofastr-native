@@ -1,0 +1,57 @@
+{
+  "identifier": "F3997DA4-D926-4AE4-B622-F775849CB884",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "1000001",
+      "localizations": [
+        {
+          "description": "Unlock the demo once.",
+          "displayName": "Demo Unlock",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "dev.gofastr.storefront.unlock",
+      "referenceName": "Demo Unlock",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "1000002",
+      "localizations": [],
+      "name": "Demo plans",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "2.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "1000003",
+          "localizations": [
+            {
+              "description": "A monthly demo subscription.",
+              "displayName": "Demo Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "dev.gofastr.storefront.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Demo Monthly",
+          "subscriptionGroupID": "1000002",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {"major": 3, "minor": 0}
+}

@@ -63,33 +63,16 @@ func TestNativeAndroidCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	}
 }
 
-func TestContactsExtensionCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
-	sdk, err := findAndroidSDK(false)
-	if err != nil {
-		t.Skipf("Android SDK/JDK unavailable: %v", err)
-	}
-	application, err := newApp("github.com/DonaldMurillo/gofastr-native/examples/gallery/gallerynative", "gallerynative", "dev.gofastr.gallerynative", "Gallery", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	application.Renderer = "native"
-	a := application.forAndroid(sdk.api)
-	directory, sources := androidHostSources(t, &a)
-	copied := false
-	for _, source := range sources {
-		copied = copied || filepath.Base(source) == "GofastrContactsExtension.java"
-	}
-	if !copied {
-		t.Fatal("contacts extension not discovered")
-	}
-	args := append([]string{"--release", "11", "-encoding", "UTF-8", "-classpath", sdk.androidJar, "-d", filepath.Join(directory, "classes")}, sources...)
-	if output, err := exec.Command(sdk.javac, args...).CombinedOutput(); err != nil {
-		t.Fatalf("contacts Android SDK compile: %v\n%s", err, output)
-	}
+// TestNativeAndroidContactsPickerManifest checks that contacts/v1 relies on
+// the system row picker: the picker intents are visible and broad address-book
+// access is never requested.
+func TestNativeAndroidContactsPickerManifest(t *testing.T) {
+	a := nativeApp(t).forAndroid(34)
 	manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
 	if err != nil {
 		t.Fatal(err)
 	}
+	wellFormed(t, "native Android manifest", manifest)
 	if bytes.Contains(manifest, []byte("READ_CONTACTS")) {
 		t.Fatal("picker must not request broad contacts access")
 	}

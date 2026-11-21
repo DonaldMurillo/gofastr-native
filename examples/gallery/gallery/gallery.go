@@ -18,10 +18,11 @@ import (
 	"sync"
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
+	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/extension"
-	"github.com/DonaldMurillo/gofastr-native/extension/contacts"
+	"github.com/DonaldMurillo/gofastr-native/extension/maps"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -62,6 +63,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 	routes := []nativeui.Route{
 		tabRoot(Root, "controls", "Controls", "Each row opens one demo. A demo that needs a capability says so and refuses to open where the renderer lacks it.", []nativeui.Row{
 			{ID: "fields", Title: "Form fields", Subtitle: "Six field kinds, required, disabled, validation", Destination: "/gallery/fields"},
+			{ID: "map", Title: "Map", Subtitle: "MapKit pins and optional location (iOS)", Destination: "/gallery/map"},
 			{ID: "document", Title: "Document form", Subtitle: "Document style with a details section", Icon: nativeui.IconFile, Destination: "/gallery/document"},
 			{ID: "draft", Title: "Drafts", Subtitle: "Local recovery and the leave prompt", Destination: "/gallery/draft"},
 			{ID: "unknown", Title: "Simulated unknown save", Subtitle: "What happens when a save's outcome is lost", Destination: "/gallery/unknown"},
@@ -148,11 +150,21 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		}},
 	}
 	routes = append(routes, navigationRoutes(called)...)
-	return nativeui.NewWithExtensions(Root, []extension.Definition{contacts.Definition()}, routes...)
+	routes = append(routes, nativeui.Route{Path: "/gallery/map", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+		block, err := maps.Block("places", maps.Content{Region: &maps.Region{Latitude: 37.78, Longitude: -122.42, LatitudeDelta: 0.08, LongitudeDelta: 0.08}, ShowsUserLocation: true, Pins: []maps.Pin{
+			{ID: "ferry", Title: "Ferry Building", Latitude: 37.7955, Longitude: -122.3937, Destination: "/gallery/places/ferry"},
+			{ID: "park", Title: "Yerba Buena Gardens", Latitude: 37.785, Longitude: -122.402, Destination: "/gallery/places/park"},
+			{ID: "hall", Title: "City Hall", Latitude: 37.7793, Longitude: -122.4193, Destination: "/gallery/places/hall"},
+		}})
+		return nativeui.Screen{Title: "Map", Text: "Select a pin, then its detail button to open the place.", Components: []extension.Component{block}}, err
+	}}, nativeui.Route{Path: "/gallery/places/{id}", Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+		return nativeui.Screen{Title: "Place", Text: "Selected place: " + request.Params["id"]}, nil
+	}})
+	return nativeui.NewWithExtensions(Root, []extension.Definition{maps.Definition()}, routes...)
 }
 
 func contactsRoute(demo *state) nativeui.Route {
-	request := contacts.Request{Title: "Choose contact", Kind: contacts.Phone}
+	request := contacts.Request{Fields: []contacts.Field{contacts.Phone}}
 	return nativeui.Route{Path: "/device/contacts", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		demo.mu.Lock()
 		text := demo.saved["contact"]
@@ -160,20 +172,21 @@ func contactsRoute(demo *state) nativeui.Route {
 		if text == "" {
 			text = "Choose one contact phone number. Only the selected name and number are read; nothing is saved to disk."
 		}
-		return nativeui.Screen{Title: "Contacts", Text: text, Requires: []nativeui.Requirement{{Capability: "contacts/v1"}}, Actions: []nativeui.Action{{ID: "choose", Label: "Choose contact", Primary: true}}}, nil
+		return nativeui.Screen{Title: "Contacts", Text: text, Requires: []nativeui.Requirement{{Capability: nativeui.CapabilityContacts}}, Actions: []nativeui.Action{{ID: "choose", Label: "Choose contact", Primary: true}}}, nil
 	}, Actions: map[string]nativeui.Handle{"choose": func(context.Context, nativeui.Request) (nativeui.Result, error) {
-		operation, err := contacts.Pick(request)
-		return nativeui.Result{Files: &nativeui.FileRequest{ID: "contact", Extension: operation}}, err
-	}}, Files: map[string]nativeui.FileRespond{"contact": func(_ context.Context, _ nativeui.Request, result nativeui.FileResult) (nativeui.Result, error) {
-		if result.Status != nativeui.EffectCompleted || result.File == nil {
+		copied := request
+		return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "contact", Contacts: &copied}}, nil
+	}}, Services: map[string]nativeui.ServiceRespond{"contact": func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+		if result.Status != nativeui.EffectCompleted || result.Contacts == nil || len(result.Contacts.Contacts) != 1 {
 			return nativeui.Result{}, nil
 		}
-		contact, err := request.Contact(*result.File)
-		if err != nil {
-			return nativeui.Result{}, err
+		contact := result.Contacts.Contacts[0]
+		text := strings.TrimSpace(contact.GivenName + " " + contact.FamilyName)
+		if len(contact.Phones) > 0 {
+			text += "\n" + contact.Phones[0].Value
 		}
 		demo.mu.Lock()
-		demo.saved["contact"] = contact.Name + "\n" + contact.Phone
+		demo.saved["contact"] = text
 		demo.mu.Unlock()
 		return nativeui.Result{Announcement: "Contact selected."}, nil
 	}}}
@@ -637,7 +650,7 @@ func Matrix(ctx context.Context) string {
 // KnownCapabilities is every built-in capability in protocol order.
 var KnownCapabilities = []nativeui.Capability{nativeui.CapabilityNavigation, nativeui.CapabilityEditor, nativeui.CapabilityDrafts, nativeui.CapabilityShare,
 	nativeui.CapabilityHaptics, nativeui.CapabilitySheets, nativeui.CapabilityAnnouncement, nativeui.CapabilityPresentation, nativeui.CapabilityFiles,
-	nativeui.CapabilityPhotos, nativeui.CapabilityCamera, nativeui.CapabilityNotifications, nativeui.CapabilitySharing, nativeui.CapabilityClipboard,
+	nativeui.CapabilityPhotos, nativeui.CapabilityCamera, nativeui.CapabilityNotifications, nativeui.CapabilitySharing, nativeui.CapabilityBrowser, nativeui.CapabilityClipboard,
 	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy}
 
 func demoImages() ([]nativeui.Image, error) {

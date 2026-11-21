@@ -212,7 +212,7 @@ func mobileScreensBrowser(t *testing.T, host *mobilehost.Host, android bool, opt
 			go serve(ctx, host, traffic, android, event)
 		case *cdpruntime.EventBindingCalled:
 			if event.Name == "__simNativePost" {
-				go relay(ctx, host, traffic, event.Payload)
+				go relay(ctx, host, traffic, event.Payload, event.ExecutionContextID)
 			}
 		case *page.EventLoadEventFired:
 			go func() {

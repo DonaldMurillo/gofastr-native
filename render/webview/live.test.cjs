@@ -250,6 +250,16 @@ test('renderer never watches or replaces an editor even if a live/list definitio
   fixture.depart();
 });
 
+test('screen-only watches use the rendered markup version, not a newer protocol snapshot', async () => {
+  const fixture = await connected(async () => ({}), {
+    config: { live: { version: 'epoch:stopping' } },
+    openScreen: { live: { version: 'epoch:stopped' } },
+  });
+  fixture.tick(50); await flush();
+  assert.equal(fixture.commands.find(command => command.kind === 'watch').dataVersion, 'epoch:stopping');
+  fixture.depart();
+});
+
 test('initial protocol snapshot replaces stale cached navigation rows before watching its version', async () => {
   const fresh = { ...list(), rows: [{ id: 'newest', title: 'Current repository version', destination: '/items' }] };
   const fixture = await connected(async () => ({}), { list: list(), openScreen: { list: fresh, live: { version: 'epoch:new' } } });

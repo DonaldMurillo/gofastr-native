@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -584,6 +585,80 @@ func TestFinishKeepsTheSessionActiveUntilFilesClose(t *testing.T) {
 	}
 	// Let it finish before the temporary directory goes.
 	<-reported
+}
+
+func TestFinishPublishesFinalManifestBeforeStopped(t *testing.T) {
+	for _, withSegment := range []bool{false, true} {
+		name := "empty"
+		if withSegment {
+			name = "recorded"
+		}
+		t.Run(name, func(t *testing.T) {
+			reset(t)
+			session, err := Start(Config{Record: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			started(t, session)
+			if withSegment {
+				writeSegment(t, session, 1, 100)
+			}
+			session.Stop()
+			session.writeManifest()
+			store.Lock()
+			var unlock sync.Once
+			release := func() { unlock.Do(store.Unlock) }
+			done := make(chan struct{})
+			go func() {
+				Event(session.ID(), "stopped", `{"reason":"requested"}`)
+				close(done)
+			}()
+			defer func() { release(); <-done }()
+			timer := time.NewTimer(100 * time.Millisecond)
+			defer timer.Stop()
+		waiting:
+			for {
+				if status := session.Status(); status.State != Stopping {
+					recordings, err := Recordings()
+					t.Fatalf("while the manifest writer is blocked: status = %+v, recordings = %+v, %v", status, recordings, err)
+				}
+				select {
+				case <-timer.C:
+					break waiting
+				default:
+					runtime.Gosched()
+				}
+			}
+			release()
+			<-done
+			status := session.Status()
+			recordings, err := Recordings()
+			if status.State != Stopped || err != nil || len(recordings) != 1 {
+				t.Fatalf("status = %+v, recordings = %+v, %v", status, recordings, err)
+			}
+			recording := recordings[0]
+			if recording.State != status.State || recording.Reason != "requested" || recording.Ended.IsZero() || recording.Complete() != withSegment {
+				t.Fatalf("stopped before the manifest was finalized: %+v", recording)
+			}
+		})
+	}
+}
+
+func TestFinishReportsFinalManifestFailure(t *testing.T) {
+	reset(t)
+	session, err := Start(Config{Record: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	started(t, session)
+	writeSegment(t, session, 1, 100)
+	if err := os.Mkdir(filepath.Join(session.directory(), manifestFile+".tmp"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	Event(session.ID(), "stopped", `{"reason":"requested"}`)
+	if status := session.Status(); status.State != Failed || status.Reason != "storage" || status.Message == "" {
+		t.Fatalf("manifest write failure was published as a successful stop: %+v", status)
+	}
 }
 
 func TestHeartbeatReportsRecordedVideoAndRefreshes(t *testing.T) {

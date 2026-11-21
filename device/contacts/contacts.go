@@ -1,91 +1,98 @@
-// Package contacts validates a single user-selected contact detail.
+// Package contacts describes explicit, bounded contact picker selections.
 package contacts
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
-	"github.com/DonaldMurillo/gofastr-native/device/files"
+	"github.com/DonaldMurillo/gofastr-native/internal/uitext"
 )
 
-type Kind string
+type Field string
 
 const (
-	Phone    Kind = "phone"
-	Email    Kind = "email"
-	MaxBytes      = 4096
+	Phone        Field = "phone"
+	Email        Field = "email"
+	Postal       Field = "postal"
+	Organization Field = "organization"
+	MaxContacts        = 50
+	MaxValues          = 20
+	MaxText            = 512
+	MaxPostal          = 2048
 )
 
 type Request struct {
-	Title string `json:"title"`
-	Kind  Kind   `json:"kind"`
+	Multiple bool    `json:"multiple"`
+	Fields   []Field `json:"fields,omitempty"`
 }
-
+type Labeled struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
 type Contact struct {
-	Name  string `json:"name"`
-	Phone string `json:"phone"`
-	Email string `json:"email"`
+	ID           string    `json:"id"`
+	GivenName    string    `json:"givenName"`
+	FamilyName   string    `json:"familyName"`
+	Organization string    `json:"organization,omitempty"`
+	Phones       []Labeled `json:"phones,omitempty"`
+	Emails       []Labeled `json:"emails,omitempty"`
+	Postal       []string  `json:"postal,omitempty"`
+}
+type Selection struct {
+	Contacts []Contact `json:"contacts"`
 }
 
-func (request Request) Validate() error {
-	if len(request.Title) < 1 || len(request.Title) > 200 || (request.Kind != Phone && request.Kind != Email) {
-		return errors.New("contacts: invalid title or kind")
+func (r Request) Validate() error {
+	seen := map[Field]bool{}
+	for _, f := range r.Fields {
+		if seen[f] {
+			return errors.New("contacts: duplicate field")
+		}
+		switch f {
+		case Phone, Email, Postal, Organization:
+		default:
+			return errors.New("contacts: unknown field")
+		}
+		seen[f] = true
 	}
 	return nil
 }
 
-func (request Request) Accept(document files.Document) error {
-	_, err := request.Contact(document)
-	return err
-}
-
-func (request Request) Contact(document files.Document) (Contact, error) {
-	if err := request.Validate(); err != nil {
-		return Contact{}, err
+func (r Request) Accept(s *Selection) error {
+	if err := r.Validate(); err != nil {
+		return err
 	}
-	contact, err := Parse(document)
-	if err != nil {
-		return Contact{}, err
+	if s == nil || len(s.Contacts) == 0 || len(s.Contacts) > MaxContacts || !r.Multiple && len(s.Contacts) != 1 {
+		return errors.New("contacts: invalid selection count")
 	}
-	if (request.Kind == Phone && (strings.TrimSpace(contact.Phone) == "" || contact.Email != "")) ||
-		(request.Kind == Email && (strings.TrimSpace(contact.Email) == "" || contact.Phone != "")) {
-		return Contact{}, errors.New("contacts: selected detail does not match the request")
+	fields := map[Field]bool{}
+	for _, f := range r.Fields {
+		fields[f] = true
 	}
-	return contact, nil
-}
-
-// Parse reads a bounded contact document without granting access to other rows.
-func Parse(document files.Document) (Contact, error) {
-	var contact Contact
-	if err := document.Validate(); err != nil {
-		return contact, err
-	}
-	if document.Name != "Contact.json" || document.MediaType != "application/json" || len(document.Data) > MaxBytes || !utf8.Valid(document.Data) {
-		return contact, errors.New("contacts: a bounded Contact.json document is required")
-	}
-	decoder := json.NewDecoder(bytes.NewReader(document.Data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&contact); err != nil {
-		return Contact{}, err
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return Contact{}, errors.New("contacts: trailing JSON")
-	}
-	for _, field := range []struct {
-		value   string
-		maximum int
-	}{{contact.Name, 512}, {contact.Phone, 256}, {contact.Email, 320}} {
-		if len(field.value) > field.maximum || strings.ContainsFunc(field.value, unicode.IsControl) {
-			return Contact{}, errors.New("contacts: invalid contact text")
+	for _, c := range s.Contacts {
+		if c.ID == "" || !uitext.Plain(c.ID, MaxText) || !uitext.Plain(c.GivenName, MaxText) || !uitext.Plain(c.FamilyName, MaxText) || !uitext.Plain(c.Organization, MaxText) {
+			return errors.New("contacts: invalid contact text")
+		}
+		if !fields[Organization] && c.Organization != "" || !fields[Phone] && len(c.Phones) > 0 || !fields[Email] && len(c.Emails) > 0 || !fields[Postal] && len(c.Postal) > 0 {
+			return errors.New("contacts: unrequested field")
+		}
+		for _, list := range [][]Labeled{c.Phones, c.Emails} {
+			if len(list) > MaxValues {
+				return errors.New("contacts: too many values")
+			}
+			for _, v := range list {
+				if !uitext.Plain(v.Label, MaxText) || !uitext.Plain(v.Value, MaxText) {
+					return errors.New("contacts: invalid labeled value")
+				}
+			}
+		}
+		if len(c.Postal) > MaxValues {
+			return errors.New("contacts: too many addresses")
+		}
+		for _, v := range c.Postal {
+			if !uitext.Multiline(v, MaxPostal) {
+				return errors.New("contacts: invalid address")
+			}
 		}
 	}
-	if (strings.TrimSpace(contact.Phone) == "") == (strings.TrimSpace(contact.Email) == "") {
-		return Contact{}, errors.New("contacts: exactly one contact detail is required")
-	}
-	return contact, nil
+	return nil
 }

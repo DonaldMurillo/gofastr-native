@@ -123,6 +123,8 @@ public final class Services {
                 if(!host.widgetsEnabled()){finish(outcome("unsupported","Widgets are disabled."));return;}
                 HomeWidget.perform(host,request.getJSONObject("widget"),this::finish);
             }
+            else if(request.has("iap")) finish(outcome("unsupported","In-app purchases require the native iOS renderer."));
+            else if(request.has("contacts")) contacts(request.getJSONObject("contacts"));
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
     }
@@ -146,6 +148,13 @@ public final class Services {
                 });
             }catch(Exception e){host.main.post(()->failed(e));}
         });
+    }
+    private void contacts(JSONObject request) {
+        String field=Contacts.field(request);
+        if(field==null){finish(outcome("unsupported","Android picks one phone number or one email address."));return;}
+        Intent intent=Contacts.picker(field);
+        if(intent.resolveActivity(host.getPackageManager())==null){finish(outcome("unsupported","No contact picker is available."));return;}
+        choose(intent,uri->background(()->JSON.object("status","completed","contacts",Contacts.read(host,uri,field))));
     }
     private void notification(JSONObject request) throws Exception {
         String operation=request.optString("operation"),id=request.getString("identifier");
