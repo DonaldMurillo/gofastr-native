@@ -14,6 +14,7 @@
 {{if ne .Renderer "native"}}{{range .AndroidWebViewPermissions}}    <uses-permission android:name="{{xml .}}" />
 {{end}}{{end}}{{if eq .Renderer "native"}}
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+{{if .NetworkStatus}}    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />{{end}}
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 {{if .MicrophoneUsage}}    <uses-permission android:name="android.permission.RECORD_AUDIO" />{{end}}
 {{if .Location}}    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
