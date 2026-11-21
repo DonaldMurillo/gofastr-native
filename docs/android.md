@@ -48,6 +48,10 @@ under the selected output directory. Run installs only the selected app package.
 - The media library owns its compiled factory. Keyed images and attachment cards
   update without replacing editors. Local audio has play/pause/seek controls and
   releases playback on backgrounding, navigation, or component removal.
+- [Device and battery snapshots](deviceinfo.md) expose model, manufacturer, OS/API,
+  locale, app version, battery percentage, charging source/state and power-save
+  mode through `deviceinfo/v1`. No permission or build flag is required; reads
+  are snapshots, not subscriptions.
 - Clipboard writes and rich sharing require an admitted Go action. Sharing uses
   private, randomly named content URIs with temporary grants. Transfer storage is
   capped and old transfers expire after 24 hours. Closing the share sheet does not
@@ -207,6 +211,9 @@ Android SDK and actual generated Go bindings when a full SDK/JDK is present.
 The smoke test requires an emulator, creates its own notes, and never clears app
 data. Results, screenshots, and UI XML go under `dist/android-acceptance/`.
 Only one UI automation process should drive that emulator at a time.
+For the devicefeatures app, use `scripts/android_smoke.py --deviceinfo` instead
+of `--services`; it compares device metadata with Android properties and restores
+battery simulation after checking a 42% AC-charging snapshot.
 
 November 6, 2026 validation used Windows, JDK 17, SDK/build-tools 36, NDK 27.1,
 and an isolated Android 14 x86-64 emulator. Both renderer options build as APKs.

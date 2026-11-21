@@ -10,6 +10,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 
 | Feature | Go request | Android adapter | iOS adapter |
 | --- | --- | --- | --- |
+| Device and battery snapshots | `ServiceRequest.DeviceInfo` | Build metadata, sticky battery intent, PowerManager | Unsupported |
 | In-app browser | `ServiceRequest.Browser` | Unavailable | SFSafariViewController (`browser/v1`) |
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
@@ -20,6 +21,10 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
 | Remote push | `ServiceRequest.Push` | Firebase Cloud Messaging and a private inbox (`--push-config`, `--push-libraries`) | APNs registration and tap routing (`--push`); no inbox |
 | Speech | `ServiceRequest.Speech` | TextToSpeech and one-utterance SpeechRecognizer (`text-to-speech/v1`, `speech-recognition/v1`); see [speech](android.md#speech) | Not implemented; the runtime refuses the request |
+
+[Device and battery snapshots](deviceinfo.md) require no opt-in or permission on
+Android. The demo offers Device info and Battery actions; iOS and WebView return
+unsupported without advertising `deviceinfo/v1`.
 
 [Location](location.md) is an additional opt-in service on iOS and Android.
 Build the demo with `--location --location-usage "Show nearby places in the foreground."`

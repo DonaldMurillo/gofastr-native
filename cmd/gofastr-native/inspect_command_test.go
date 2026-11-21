@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -745,5 +746,16 @@ func TestInspectGalleryUnderSyntheticProfiles(t *testing.T) {
 	}
 	if _, ok := refused["/feedback/sheet"]; ok {
 		t.Error("sheet screen allows the fallback but was refused")
+	}
+}
+
+func TestInspectDeviceInfoCapability(t *testing.T) {
+	for _, profile := range inspectProfiles() {
+		if got := profile.Caps["deviceinfo/v1"]; (got == "available") != (profile.Name == "android") {
+			t.Errorf("%s deviceinfo support = %q", profile.Name, got)
+		}
+	}
+	if !slices.Contains(inspectCapabilities, "deviceinfo/v1") {
+		t.Fatal("deviceinfo missing from report capabilities")
 	}
 }

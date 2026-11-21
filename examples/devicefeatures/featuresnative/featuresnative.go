@@ -18,6 +18,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
@@ -152,6 +153,8 @@ func newApp() (*nativeui.App, error) {
 			switch {
 			case result.Network != nil:
 				message = fmt.Sprintf("Connected: %t; transport: %s; metered: %t; validated: %t.", result.Network.Connected, result.Network.Transport, result.Network.Metered, result.Network.Validated)
+			case result.DeviceInfo != nil:
+				message = snapshotText(*result.DeviceInfo)
 			case result.Scan != nil:
 				message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
 			case result.Calendar != nil:
@@ -235,6 +238,7 @@ func newApp() (*nativeui.App, error) {
 	}
 	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
+			{ID: "device", Title: "Device and battery", Destination: "/features/device"},
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "network", Title: "Network status", Destination: "/features/network"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
@@ -252,6 +256,12 @@ func newApp() (*nativeui.App, error) {
 			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
 		}},
 		deviceRoute("/features/network", "Network status", "Query the active Android network. Re-query after changing connectivity or resuming the app.", []nativeui.Action{{ID: "status", Label: "Check network status", Primary: true}}, map[string]nativeui.Handle{"status": service(nativeui.ServiceRequest{Network: &network.Request{Operation: network.Status}})}),
+		deviceRoute("/features/device", "Device and battery", "Read a device or battery snapshot. No permission or subscription is required on Android. Other renderers report unsupported.", []nativeui.Action{
+			{ID: "info", Label: "Device info", Primary: true}, {ID: "battery", Label: "Battery"},
+		}, map[string]nativeui.Handle{
+			"info":    service(nativeui.ServiceRequest{DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}}),
+			"battery": service(nativeui.ServiceRequest{DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}}),
+		}),
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
@@ -347,6 +357,28 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+func snapshotText(result deviceinfo.Result) string {
+	if info := result.Info; info != nil {
+		version := info.AppVersion
+		if version == "" {
+			version = "unknown"
+		}
+		return fmt.Sprintf("Device: %s %s; %s %s (API %d); locale %s; app %s.", info.Manufacturer, info.Model, info.Platform, info.OSVersion, info.APILevel, info.Locale, version)
+	}
+	if battery := result.Battery; battery != nil {
+		level := "unknown"
+		if battery.LevelKnown {
+			level = fmt.Sprintf("%d%%", battery.Level)
+		}
+		save := "off"
+		if battery.PowerSave {
+			save = "on"
+		}
+		return fmt.Sprintf("Battery: %s %s (%s), power save %s.", level, battery.State, battery.PowerSource, save)
+	}
+	return "Device snapshot unavailable."
 }
 
 // calendarEditorRespond reports the Android editor outcome. The editor does

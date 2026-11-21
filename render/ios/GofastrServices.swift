@@ -1,5 +1,13 @@
 import Foundation
 
+struct MobileDeviceInfoRequest: Codable {
+    let operation: String
+
+    func validate() throws {
+        guard operation == "info" || operation == "battery" else { throw MobileServiceFailure.invalid }
+    }
+}
+
 struct MobilePushRequest: Codable {
     let operation: String
     var identifier: String? = nil
@@ -73,6 +81,7 @@ struct MobileServiceRequest: Codable {
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
+    var deviceInfo: MobileDeviceInfoRequest? = nil
     let location: MobileLocationRequest?
     var calendar: MobileCalendarRequest? = nil
     let widget: MobileWidgetRequest?
@@ -86,7 +95,7 @@ struct MobileServiceRequest: Codable {
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil, iap != nil].filter({ $0 }).count == 1 else {
+              [deviceInfo != nil, push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil, iap != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
@@ -99,6 +108,7 @@ struct MobileServiceRequest: Codable {
         try secureStorage?.validate()
         try location?.validate()
         try widget?.validate()
+        try deviceInfo?.validate()
         try scan?.validate()
         try authentication?.validate()
         try calendar?.validate()

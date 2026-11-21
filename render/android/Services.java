@@ -165,7 +165,8 @@ public final class Services {
             else if(request.has("clipboard")) {
                 ClipboardManager clipboard=(ClipboardManager)host.getSystemService(Context.CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(ClipData.newPlainText("",request.getJSONObject("clipboard").optString("text")));finish(outcome("completed","Copied to clipboard."));
-            }else if(request.has("share")) share(request.getJSONObject("share"));
+            }else if(request.has("deviceInfo")) finish(DeviceInfo.snapshot(host,request.getJSONObject("deviceInfo")));
+            else if(request.has("share")) share(request.getJSONObject("share"));
             else if(request.has("notification")) notification(request.getJSONObject("notification"));
             else if(request.has("audio")) record(request.getJSONObject("audio"));
             else if(request.has("speech")) speech(request.getJSONObject("speech"));

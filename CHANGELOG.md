@@ -50,6 +50,11 @@ This repository holds two Go modules, tagged separately:
   requests from UIKit and WebView renderers. `examples/speech/speechnative`
   demonstrates both. Audible playback and live transcription on a device are
   NOT RUN.
+- Snapshot-only device and battery reads in `device/deviceinfo`
+  (`deviceinfo/v1`). Native Android implements them with no permission or
+  build flag; iOS and WebView return unsupported and do not advertise the
+  capability. The device-features demo has a Device and battery screen.
+  Physical-device acceptance is NOT RUN.
 
 ### Internal
 

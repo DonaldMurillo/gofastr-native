@@ -98,6 +98,10 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
     }
 
     private func execute(_ request: MobileServiceRequest, token: UUID) {
+        if request.deviceInfo != nil {
+            finish(token, MobileServiceResult(status: "unsupported", message: "Device snapshots are unavailable on this renderer."))
+            return
+        }
         if let locationRequest = request.location {
             locationActive = true
             location.perform(locationRequest) { [weak self] result in

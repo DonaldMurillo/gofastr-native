@@ -119,6 +119,13 @@ real providers and physical-device acceptance for Android location are NOT RUN.
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
 
+[Device and battery snapshots](../deviceinfo.md) use typed `deviceinfo/v1`
+requests on native Android without permissions or opt-in flags. The devicefeatures
+demo displays both snapshots. iOS and WebView return unsupported and do not
+advertise support. Android 14 emulator acceptance compared model/API with system
+properties and displayed an injected 42% AC-charging battery snapshot.
+Physical-device acceptance is NOT RUN.
+
 [Location](../location.md) (`device/location`) defines typed permission, current-position and bounded
 foreground tracking requests, with `location/v1` protocol negotiation. Native
 CoreLocation support is opt-in through `--location --location-usage`, with

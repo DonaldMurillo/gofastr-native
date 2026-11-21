@@ -434,3 +434,24 @@ test('saved bounded audio has local native controls and releases playback on int
   assert.equal(fixture.objects.size, 1);
   fixture.root.remove(); fixture.mutate(); assert.equal(fixture.objects.size, 0);
 });
+
+test('device snapshots round-trip as unsupported without advertising or invoking a host', async () => {
+  const fixture = harness({ setup({ window }) {
+    window.webkit = { messageHandlers: { gofastrServices: { async postMessage(message) {
+      assert.equal(message.kind, 'capabilities');
+      return { 'deviceinfo/v1': 'available' };
+    } } } };
+  } });
+  assert.equal((await fixture.adapter.capabilities())['deviceinfo/v1'], undefined);
+  for (const operation of ['info', 'battery']) {
+    const outcomes = [];
+    const dialog = fixture.open(request('deviceInfo', { operation }), async result => outcomes.push(plain(result)), 'device-' + operation);
+    dialog.querySelector('[data-gfw-service-perform]').click();
+    await flush();
+    assert.deepEqual(outcomes, [{ status: 'unsupported', message: 'Device snapshots are unavailable on this renderer.' }]);
+  }
+  for (const value of [{}, { operation: 'subscribe' }, { operation: 'info', extra: true }]) {
+    assert.throws(() => fixture.open(request('deviceInfo', value)), /Invalid device snapshot/);
+  }
+  assert.throws(() => fixture.open({ id: 'bad', deviceInfo: { operation: 'info' }, clipboard: { text: 'x' } }), /no new issued identity/);
+});

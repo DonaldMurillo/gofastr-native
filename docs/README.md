@@ -32,7 +32,8 @@ own guide in [`tui/README.md`](../tui/README.md).
 
 - [Calendar events](calendar-events.md)
 
-- [Device features](device-features.md): share-in, secure storage, widgets.
+- [Device features](device-features.md): share-in, secure storage, widgets, Android device snapshots.
+- [Device and battery snapshots](deviceinfo.md)
 - [Background refresh](background-refresh.md): periodic work while the iOS app is closed.
 - [Files](files-services.md)
 - [Photos](photos-services.md)
