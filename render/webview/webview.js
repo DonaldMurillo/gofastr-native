@@ -303,6 +303,7 @@
     showComponents(root, state, reply.screen?.components || []);
     state.hasEditor = !!reply.screen?.form;
     state.dataVersion = reply.screen?.live?.version || reply.dataVersion || state.config.live?.version || '';
+    if (!reply.screen?.list && state.config.live) state.dataVersion = state.config.live.version || '';
     if (live && reply.screen?.list && !state.hasEditor) {
       const collection = root.querySelector('[data-gfw-collection-content]');
       if (collection) {
