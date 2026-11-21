@@ -32,11 +32,11 @@ func TestServicesSwiftWireBoundsAndOneShotLifecycle(t *testing.T) {
 			{ID: "share", Share: &sharing.Request{Title: "Files", Text: "Share these", Files: []files.Document{file}}},
 			{ID: "reminder", Notification: &notifications.Request{Operation: notifications.Schedule, Identifier: "notes:1", Title: "Reminder", Route: "/notes/1", Date: "2027-03-14", Time: "03:30"}},
 			{ID: "record", Audio: &audio.Request{Title: "Voice note"}, Commit: true},
-			{ID: "info", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}},
-			{ID: "battery", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}},
 			{ID: "browser", Browser: &browser.Request{URL: "https://example.com", ReaderMode: true, DismissLabel: "close"}},
 			{ID: "oauth", Authentication: &authentication.Request{Operation: authentication.OAuth, AuthorizationURL: "https://example.com/authorize", RedirectURI: "dev.example.app:/oauth", State: "state"}},
 			{ID: "push", Push: &push.Request{Operation: push.Register}},
+			{ID: "info", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}},
+			{ID: "battery", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}},
 		},
 		"contacts": contacts.Selection{Contacts: []contacts.Contact{{ID: "opaque", GivenName: "Ada", FamilyName: "Lovelace", Phones: []contacts.Labeled{{Label: "mobile", Value: "+123"}}}}},
 		"audio":    audio.Document{File: file, DurationMillis: 1},
@@ -273,8 +273,8 @@ enum ServiceChecks {
         }
         let device = try decoder.decode(MobileServiceRequest.self, from: Data(#"{"id":"device","deviceInfo":{"operation":"battery"}}"#.utf8))
         try device.validate()
-        let roundTrip = try decoder.decode(MobileServiceRequest.self, from: JSONEncoder().encode(device))
-        precondition(roundTrip.deviceInfo?.operation == "battery")
+        let deviceRoundTrip = try decoder.decode(MobileServiceRequest.self, from: JSONEncoder().encode(device))
+        precondition(deviceRoundTrip.deviceInfo?.operation == "battery")
         let emptyClipboard = try decoder.decode(MobileServiceRequest.self, from: Data(#"{"id":"clear","clipboard":{"text":""}}"#.utf8))
         try emptyClipboard.validate()
         let hugeClipboard = try decoder.decode(MobileServiceRequest.self, from: JSONSerialization.data(withJSONObject: ["id":"copy", "clipboard":["text":String(repeating:"é", count:32769)]]))
