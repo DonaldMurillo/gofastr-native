@@ -58,6 +58,7 @@ Flags (build, run):
   --camera-usage  camera purpose text (default: user-initiated photo capture;
                 empty disables native camera access)
   --microphone-usage  optional microphone purpose text; empty disables recording
+                and Android speech recognition
   --url-scheme  optional application-specific deep-link scheme (native renderer)
   --receive-shares  accept shared text and files into the app's private inbox
   --calendar        enable iOS calendar events (--calendar-usage sets purpose text)

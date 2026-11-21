@@ -16,6 +16,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/device/speech"
 	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
 )
 
@@ -75,7 +76,12 @@ func TestCalendarEditOutcomes(t *testing.T) {
 
 func serviceConnection(t *testing.T, runtime *Runtime) string {
 	t.Helper()
-	reply := serviceCommand(t, context.Background(), runtime, Command{Kind: "hello", Hello: &Hello{Minimum: 1, Maximum: 1, Renderer: "webview", Capabilities: map[Capability]Support{
+	return serviceConnectionForRenderer(t, runtime, "webview")
+}
+
+func serviceConnectionForRenderer(t *testing.T, runtime *Runtime, renderer string) string {
+	t.Helper()
+	reply := serviceCommand(t, context.Background(), runtime, Command{Kind: "hello", Hello: &Hello{Minimum: 1, Maximum: 1, Renderer: renderer, Capabilities: map[Capability]Support{
 		CapabilityNavigation: SupportAvailable, CapabilityEditor: SupportAvailable, CapabilityNotifications: SupportUnavailable,
 		CapabilityCalendar: SupportAvailable, CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
 		CapabilityContacts: SupportAvailable, CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback, CapabilityNetwork: SupportAvailable,
@@ -87,6 +93,11 @@ func serviceConnection(t *testing.T, runtime *Runtime) string {
 }
 
 func serviceFixture(t *testing.T, definition *ServiceRequest, handler ServiceRespond, disabled *atomic.Bool) (*Runtime, Command) {
+	t.Helper()
+	return serviceFixtureForRenderer(t, definition, handler, disabled, "webview")
+}
+
+func serviceFixtureForRenderer(t *testing.T, definition *ServiceRequest, handler ServiceRespond, disabled *atomic.Bool, renderer string) (*Runtime, Command) {
 	t.Helper()
 	app, err := New("/device", Route{Path: "/device", Screen: func(context.Context, Request) (Screen, error) {
 		actions := []Action{{ID: "start", Label: "Start"}}
@@ -102,7 +113,7 @@ func serviceFixture(t *testing.T, definition *ServiceRequest, handler ServiceRes
 	if err != nil {
 		t.Fatal(err)
 	}
-	connection := serviceConnection(t, runtime)
+	connection := serviceConnectionForRenderer(t, runtime, renderer)
 	opened := serviceCommand(t, context.Background(), runtime, Command{Kind: "open", Connection: connection, Route: "/device"})
 	if opened.Error != nil {
 		t.Fatal(opened.Error)
@@ -134,18 +145,27 @@ func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 		"share":     {ID: "device", Share: &sharing.Request{Text: "Private text"}},
 		"clipboard": {ID: "device", Clipboard: &sharing.Clipboard{Text: "Copy"}},
 		"audio":     {ID: "device", Audio: &audio.Request{Title: "Record"}, Commit: true},
+		"speak":     {ID: "device", Speech: &speech.Request{Operation: speech.Speak, Text: "Hello", Language: "en-US"}},
+		"recognize": {ID: "device", Speech: &speech.Request{Operation: speech.Recognize}},
 	}
 	for name, definition := range definitions {
+		renderer := "webview"
+		if definition.Speech != nil {
+			renderer = "android"
+		}
 		for _, status := range []EffectStatus{EffectCompleted, EffectCancelled, EffectDenied, EffectUnsupported, EffectFailed} {
 			t.Run(name+"/"+string(status), func(t *testing.T) {
 				var calls atomic.Int32
-				runtime, command := serviceFixture(t, &definition, func(_ context.Context, request Request, outcome ServiceResult) (Result, error) {
+				runtime, command := serviceFixtureForRenderer(t, &definition, func(_ context.Context, request Request, outcome ServiceResult) (Result, error) {
 					calls.Add(1)
 					if request.Values["body"] != "newer draft" || outcome.Status != status {
 						t.Error("continuation lost current draft or observed outcome")
 					}
+					if name == "recognize" && status == EffectCompleted && outcome.Transcript != "Recognized speech" {
+						t.Error("continuation lost the transcript")
+					}
 					return Result{Announcement: string(outcome.Status)}, nil
-				}, nil)
+				}, nil, renderer)
 				shown := admitService(t, runtime, command)
 				command.Kind, command.Action, command.RequestID = "complete", "start", "start"
 				if replay := serviceCommand(t, context.Background(), runtime, command); replay.ServiceID != shown.ServiceID {
@@ -160,6 +180,9 @@ func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 				if name == "audio" && status == EffectCompleted {
 					file := serviceWAV()
 					command.ServiceResult.File, command.ServiceResult.DurationMillis = &file, 1000
+				}
+				if name == "recognize" && status == EffectCompleted {
+					command.ServiceResult.Transcript = "Recognized speech"
 				}
 				for attempt := 0; attempt < 2; attempt++ {
 					if reply := serviceCommand(t, context.Background(), runtime, command); reply.Error != nil || reply.Response.Announcement != string(status) {
@@ -181,6 +204,55 @@ func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSpeechServiceRejectsUnexpectedContent(t *testing.T) {
+	speak := ServiceRequest{ID: "speak", Speech: &speech.Request{Operation: speech.Speak, Text: "Hello"}}
+	recognize := ServiceRequest{ID: "dictate", Speech: &speech.Request{Operation: speech.Recognize}}
+	clipboard := ServiceRequest{ID: "copy", Clipboard: &sharing.Clipboard{Text: "Copy"}}
+	multiple := speak
+	multiple.Clipboard = clipboard.Clipboard
+	if multiple.Validate() == nil {
+		t.Fatal("speech cannot be combined with another operation")
+	}
+	for _, test := range []struct {
+		request ServiceRequest
+		outcome ServiceResult
+	}{
+		{recognize, ServiceResult{Status: EffectCompleted}},
+		{recognize, ServiceResult{Status: EffectCompleted, Transcript: " \n "}},
+		{recognize, ServiceResult{Status: EffectCompleted, Transcript: strings.Repeat("é", 2001)}},
+		{recognize, ServiceResult{Status: EffectCompleted, Transcript: "Hello", File: &files.Document{}}},
+		{recognize, ServiceResult{Status: EffectCancelled, Transcript: "Hello"}},
+		{recognize, ServiceResult{Status: EffectFailed, Transcript: "Hello"}},
+		{speak, ServiceResult{Status: EffectCompleted, Transcript: "Hello"}},
+		{clipboard, ServiceResult{Status: EffectCompleted, Transcript: "Hello"}},
+	} {
+		if err := test.request.accept(test.outcome); err == nil {
+			t.Errorf("accepted invalid speech result for %s/%s", test.request.ID, test.outcome.Status)
+		}
+	}
+}
+
+func TestSpeechServiceIsNotAdmittedOutsideAndroid(t *testing.T) {
+	for _, renderer := range []string{"uikit", "webview"} {
+		t.Run(renderer, func(t *testing.T) {
+			definition := &ServiceRequest{ID: "device", Speech: &speech.Request{Operation: speech.Recognize}}
+			runtime, command := serviceFixtureForRenderer(t, definition, func(context.Context, Request, ServiceResult) (Result, error) {
+				t.Error("unsupported renderer invoked speech continuation")
+				return Result{}, nil
+			}, nil, renderer)
+			command.Kind, command.RequestID, command.Action = "action", "start", "start"
+			if reply := serviceCommand(t, context.Background(), runtime, command); reply.Error != nil {
+				t.Fatal(reply.Error)
+			}
+			command.Kind = "complete"
+			reply := serviceCommand(t, context.Background(), runtime, command)
+			if reply.Error == nil || reply.Error.Code != "unsupported" || reply.ServiceID != "" {
+				t.Fatalf("speech task was not refused: %+v", reply)
+			}
+		})
 	}
 }
 

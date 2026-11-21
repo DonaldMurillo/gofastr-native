@@ -94,6 +94,8 @@ public abstract class GofastrActivity extends Activity {
                 for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "calendar", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
                 caps.put("browser/v1", "unavailable");
+                caps.put("text-to-speech/v1", Speech.canSpeak(this) ? "available" : "unavailable");
+                caps.put("speech-recognition/v1", microphoneEnabled() && android.speech.SpeechRecognizer.isRecognitionAvailable(this) ? "available" : "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
                 caps.put("location/v1", locationEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
@@ -112,7 +114,7 @@ public abstract class GofastrActivity extends Activity {
         });
     }
 
-    @Override protected void onResume() { super.onResume(); foreground=true; reopenLocked();if(current!=null){Frame frame=current;frame.recovered=false;if(frame.deferredResponse!=null){JSONObject response=frame.deferredResponse,reply=frame.deferredReply;frame.deferredResponse=null;frame.deferredReply=null;apply(frame,response,reply);}if(!frame.busy)watch(frame);} }
+    @Override protected void onResume() { super.onResume(); foreground=true; services.resume(); reopenLocked();if(current!=null){Frame frame=current;frame.recovered=false;if(frame.deferredResponse!=null){JSONObject response=frame.deferredResponse,reply=frame.deferredReply;frame.deferredResponse=null;frame.deferredReply=null;apply(frame,response,reply);}if(!frame.busy)watch(frame);} }
     @Override public void onConfigurationChanged(Configuration configuration){super.onConfigurationChanged(configuration);setTheme(dark()?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);shell.setBackgroundColor(background());appearance.refresh();systemBars();for(ArrayList<Frame> stack:stacks.values())for(Frame frame:stack)frame.update();toolbar();}
     private void systemBars() {
         getWindow().setStatusBarColor(background());
