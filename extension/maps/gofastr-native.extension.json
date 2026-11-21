@@ -1,0 +1,1 @@
+{"name":"gofastr.maps/v1","kind":"component","capabilities":["gofastr.maps/v1"],"ios":{"factory":"GofastrMapComponent","sources":["GofastrMaps.swift"]}}

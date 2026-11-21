@@ -1,11 +1,158 @@
 # UIKit device services and live collections
 
+## Barcode scanner
+
+`GofastrScanner.swift` implements the typed `scanner/v1` sheet using
+AVFoundation metadata capture. It stops capture before returning the first
+accepted value, cancellation, background or interruption outcome. Permission
+is requested only on sheet appearance. Camera hardware and nonblank camera
+purpose text gate capability discovery. Simulator-only QR generation and
+Vision decoding, bounds, and the standalone XCUITest command are documented in
+[scanner](../../../docs/scanner.md). Hardware camera acceptance: **NOT RUN**.
+
+## Calendar events
+
+The opt-in native build flag `--calendar` enables `calendar/v1`.
+`--calendar-usage` overrides the default purpose text used for
+`NSCalendarsFullAccessUsageDescription`,
+`NSCalendarsWriteOnlyAccessUsageDescription`, and legacy
+`NSCalendarsUsageDescription`. Disabled builds advertise unavailable;
+Android advertises unavailable and returns unsupported.
+
+`device/calendar.Request` supports status (no prompt), add, and read.
+On iOS 17+, add requests write-only access and read requests full access;
+older systems use legacy event access. Denied access returns a denied outcome.
+Adds save once to the default calendar for new events. EventKit work runs on
+a private serial queue. Cancellation before execution prevents a save; once
+execution starts the observed save outcome is returned, never replayed.
+
+Titles are required plain text, at most 200 UTF-8 bytes; locations are at most
+200 bytes and notes at most 2000 bytes without control characters. Dates use
+RFC3339 timestamps; end may equal start. Reads require an increasing range of
+at most 366 days and return at most 100 events (default 20). Invalid or oversized
+external records are omitted. Results carry event identifiers, never OS paths.
+Trace records contain capability/status metadata, not event content.
+
+Foundation executable wire checks and UIKit compilation cover the adapter.
+The opt-in `scripts/ios_calendar_smoke.py` XCUITest installs the device-features
+example, grants calendar access with simctl, adds a sample event, verifies full
+authorization, and reads the event title/start back on screen. This passed on
+an iPhone 17 simulator with iOS 26.5. The read-result screenshot showed
+`GoFastr sample event` followed by its RFC3339 start timestamp.
+Permission-prompt, hardware, lifecycle, and accessibility acceptance: NOT RUN.
+
+## Push notifications (iOS)
+
+Build a native app with `--push` to opt into `push/v1`. Without the
+Info.plist opt-in the capability is unavailable. Simulator entitlements include
+`aps-environment=development`; device signing requires an explicit App ID and a
+profile granting APNs, and preserves that profile's development/production value.
+The simulator embeds APNs entitlements in the executable's
+`__TEXT,__entitlements` section rather than its macOS code signature.
+
+`device/push.Request` supports `register`, `unregister`, and `status` on iOS.
+The Android-only inbox operations `next` and `acknowledge` complete as
+unsupported, because iOS opens a tapped notification's route directly.
+Register asks for alert, sound and badge permission, then registers with APNs.
+It settles once on the app-delegate token/failure callback or a 45-second timeout;
+denial returns denied without a token. Status never prompts or registers.
+Unregister stops remote registration and clears the in-memory token. It does
+not revoke notification permission. Generated native delegates forward callbacks
+to `GofastrPush.didRegister(deviceToken:)` and `didFailToRegister(error:)`;
+custom hosts must forward those callbacks and call `GofastrPush.prepare()`
+at launch before creating the window.
+
+Completed state includes permission, OS registration, `provider: "apns"`, and
+an optional lowercase hex token (1–256 bytes). A registered app may have no observed token after a
+process restart; explicitly register to obtain the current token. Never treat
+tokens as identity, log them, or assume they are permanent. Send updated tokens
+to an authenticated application server. Environment is optional, read from the
+embedded provisioning profile's APNs entitlement when readable; simulators may
+omit it.
+
+A default remote-notification tap with a validated local route in the top-level
+`gofastr.route` key uses the same pending/cold-tap navigation as local reminders.
+Foreground pushes with routes show banner and sound without navigating.
+Missing/invalid routes and non-default actions forward to the previous delegate.
+Routes remain subject to normal Go routing and authorization.
+Pending taps retry after the renderer resumes, once navigation is active again;
+this applies to both remote pushes and local reminders.
+
+For the Notes example, open Settings → Push notifications. Register for push
+and Push status display permission/token results in rows with accessibility IDs
+`native.row.push-permission`, `native.row.push-token`, and
+`native.row.push-environment`. A separate `native.row.push-result` row shows
+the operation status and any failure message, without treating it as permission.
+The permission row labels `registered` as the OS remote-registration flag, and
+the token row says when no token was received in this process, so a timed-out
+Register followed by Status does not read as a successful registration.
+Action IDs are `native.action.push-register`
+and `native.action.push-status`. Build with:
+
+```sh
+GOWORK=off go run ./cmd/gofastr-native build --platform ios-sim --renderer native --pkg ./examples/notes/notesnative --push --out dist/mobile/ios-push
+```
+
+Save this APNs payload as `payload.json`:
+
+```json
+{
+  "aps": {"alert": {"title": "Notes", "body": "Open push settings"}, "sound": "default"},
+  "gofastr.route": "/settings/push"
+}
+```
+
+Install and launch the built app on a booted simulator, background it, then send:
+
+```sh
+xcrun simctl push <udid> <bundle-id> payload.json
+```
+
+Tap the notification to open push settings. This exercises simulated payload
+delivery, not APNs token issuance or provider authentication.
+Real APNs delivery on hardware: **NOT RUN**.
+
+Simulator verification on iOS 26.5: Notes installed and launched; permission
+authorization and no-prompt status displayed authorized/registered state with
+no observed token. A simulated remote payload displayed a banner. A foreground
+payload displayed a banner without navigating. A warm default tap from the
+background opened push settings in the same process after renderer resume.
+On an iOS 27.0 simulator, a cold-launch default tap opened the routed note.
+Token issuance and hardware delivery remain **NOT RUN**.
+
+## Device service overview
+
 Implementation notes, November 5, 2026. These are library/protocol verification
 notes, not real microphone, notification, or share-provider acceptance results.
 The frozen cross-worker contract is `../../../docs/mobile-services-plan.md`.
 Android native remains deferred. All imports are Apple system frameworks.
 
 ## Reusable public runner
+
+### In-app browser
+
+`device/browser.Request` is carried by `ServiceRequest.Browser` and negotiated
+as `browser/v1`. UIKit advertises it as available; Android and WebView report
+unavailable. URLs must be absolute HTTP/HTTPS, at most 2048 UTF-8 bytes, with a
+host, no credentials, whitespace or control characters. `ReaderMode` requests
+Reader when available. `DismissLabel` is `done` (the default), `close` or `cancel`.
+
+The runner presents `SFSafariViewController` on main with accessibility identifier
+`gofastr.browser`. Dismissing it completes the service without device content;
+an initial page-load failure leaves the browser open and does not settle it.
+Host cancellation remains cancellation. Settlement is one-shot, after dismissal.
+Starter's About screen exposes **Open docs** and shows the returned status.
+
+`TestBrowserUI` uses XCTest UI automation against an installed native Starter
+app, with `GOFASTR_BROWSER_UI_DEVICE` selecting a simulator. It opens About,
+taps Open docs, checks the Safari controller, taps Done, and checks the
+Go continuation's Browser completed screen. Three consecutive runs passed on
+iOS 26.5. Safari chrome requires a hittable-control wait and a center-coordinate
+tap; an ordinary element tap did not dismiss it in the simulator UI test.
+Set `GOFASTR_BROWSER_UI_RESULTS` to retain an XCTest result bundle including
+Safari-open and completed-screen screenshots. The default Go test run skips
+this opt-in simulator test.
+Physical-device and VoiceOver acceptance: NOT RUN.
 
 `GofastrServiceRunner` is ordinary Swift source, embedded unchanged by
 `sources.go`, with no gomobile binding imports or application-specific code:
@@ -151,6 +298,11 @@ late result is invalidated and closed, not falsely claimed to be interrupted.
   the tap remains cached. Native startup and appearance flush that cache.
 - Keep UIKit, AVFoundation, UserNotifications, and existing framework sources
   in the parent's Swift bind/link inputs. No production dependency is needed.
+- Background refresh needs `GofastrBackgroundRefresh.register(ready:run:cancel:)`
+  in `didFinishLaunching`, before launch returns, plus the Info.plist entries in
+  `docs/background-refresh.md` at the repository root. The runner reports the
+  `refresh` service `unsupported` until both are present. Keep BackgroundTasks in
+  the link inputs.
 
 ## Regression commands and limits
 
@@ -190,3 +342,11 @@ acceptance must verify those, plus cold launch, VoiceOver, IME and real playback
 - Scope: `ios/services`. Swift JSON encoding can escape base64 slashes and
   control text, expanding an admitted 1 MiB file plus 64 KiB text beyond 1.6 MiB.
   Next time, bound the wire envelope separately from decoded content limits.
+
+## Contact picker
+
+The iOS [contact picker](../../../docs/contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.

@@ -25,6 +25,7 @@ type fakeProfile struct {
 	allDevices        bool
 	getTaskAllow      bool
 	keychain, groups  []string
+	appleSignIn       []string
 	expiry            time.Time
 	cert              []byte
 }
@@ -80,6 +81,9 @@ func (f fakeProfile) xml() []byte {
 	}
 	if f.groups != nil {
 		fmt.Fprintf(&b, "<key>com.apple.security.application-groups</key>%s", arr(f.groups))
+	}
+	if f.appleSignIn != nil {
+		fmt.Fprintf(&b, "<key>com.apple.developer.applesignin</key>%s", arr(f.appleSignIn))
 	}
 	b.WriteString("</dict></dict></plist>")
 	return []byte(b.String())

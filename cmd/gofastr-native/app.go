@@ -73,8 +73,14 @@ type app struct {
 	URLScheme       string
 	ReceiveShares   bool
 	SecureStorage   bool
+	Calendar        bool
+	CalendarUsage   string
 	BiometricUsage  string
+	Location        bool
+	LocationUsage   string
 	Widgets         bool
+	SignInWithApple bool
+	Push            bool
 	// PushConfig is google-services.json and PushLibraries the directory
 	// push-libraries filled; both set enables FCM push on Android.
 	PushConfig      string
@@ -82,7 +88,11 @@ type app struct {
 	PushPermissions string // merged library manifest entries, generated XML
 	PushComponents  string
 	AppGroup        string
-	Extensions      []compiledExtension
+	// BackgroundRefresh registers a BGAppRefreshTask that calls the bound
+	// package's BackgroundRefresh(timeoutMillis int64) error, cancelled by
+	// CancelBackgroundRefresh().
+	BackgroundRefresh bool
+	Extensions        []compiledExtension
 	// WebViewFeatures are the browser features ("camera", "geolocation")
 	// that WebView adapters in the app declare. Android WebView builds only.
 	WebViewFeatures []string

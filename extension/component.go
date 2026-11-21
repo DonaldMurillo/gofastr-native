@@ -26,7 +26,7 @@ func DecodeComponent(payload string, target any) error {
 // Route existence and navigation guards remain the screen runtime's concern.
 func (registry *Registry) ValidateComponent(component Component) error {
 	definition, exists := registry.definitions[component.Name]
-	if !exists || definition.Manifest.Kind != ComponentKind || !behavior.SafeToken(component.ID) || len(component.Destinations) > 128 {
+	if !exists || definition.Manifest.Kind != ComponentKind || !behavior.SafeToken(component.ID) || len(component.Destinations) > 200 {
 		return errors.New("extension: unregistered component or invalid identity")
 	}
 	if len(component.Payload) == 0 || len(component.Payload) > MaxComponentPayload || !json.Valid([]byte(component.Payload)) {

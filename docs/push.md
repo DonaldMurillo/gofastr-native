@@ -1,8 +1,12 @@
-# Push notifications (Android FCM)
+# Push notifications
 
-Remote push uses Firebase Cloud Messaging on Android. It is opt-in and needs a
-Firebase project. Local reminders (`ServiceRequest.Notification`) are separate
-and need neither.
+Remote push uses one Go contract, `device/push`, on both platforms: APNs on
+iOS and Firebase Cloud Messaging on Android. Both are opt-in. Local reminders
+(`ServiceRequest.Notification`) are separate and need neither.
+
+This page covers Android. iOS builds use `--push`; see
+[iOS services](../render/ios/docs/services.md#push-notifications-ios) for
+entitlements, the app-delegate callbacks and simulator checks.
 
 ## Licensing
 
@@ -42,31 +46,39 @@ component registrars), turns the matching `google-services.json` client into
 the string resources the Firebase Gradle plugin would generate, compiles the
 library resources, generates their R classes, and links all classes into the
 APK, splitting dex files when needed. Without both flags the APK has no
-Firebase code and `push/v1` reports unavailable. iOS push (APNs) is not
-implemented; the flags are rejected for iOS builds.
+Firebase code and `push/v1` reports unavailable. The flags are rejected for
+iOS builds, which use `--push` instead.
 
 ## Go contract
 
-`ServiceRequest.Push` carries a `push.Request`:
+`ServiceRequest.Push` carries a `push.Request`. A completed result carries a
+`push.State` in `ServiceResult.Push`: `Permission`, `Registered`, an optional
+`Token`, and `Provider`, which names the service that issued the token
+(`apns` or `fcm`). Go rejects a token without a provider, an APNs token that
+is not lowercase hex, and an APNs `Environment` on an FCM state.
 
-| Operation | Result |
-| --- | --- |
-| `register` | `ServiceResult.Push.Token`, the FCM token for your server. Asks for notification permission on Android 13+. |
-| `status` | The last token Android issued, when registered, and the notification permission. |
-| `unregister` | Deletes the FCM token. |
-| `next` | `ServiceResult.Push.Message`, the oldest unacknowledged message, or none. |
-| `acknowledge` | Removes the message with that inbox identifier and its notification. |
+| Operation | Android (FCM) | iOS (APNs) |
+| --- | --- | --- |
+| `register` | Asks for notification permission on Android 13+, then returns the FCM token. | Asks for permission, then returns the APNs token. |
+| `status` | The last token Android issued, when registered, and the notification permission. | Permission, OS registration, and the token observed in this process. |
+| `unregister` | Deletes the FCM token. | Stops remote registration. |
+| `next` | `State.Message`, the oldest unacknowledged message, or none. | Unsupported. |
+| `acknowledge` | Removes the message with that inbox identifier and its notification. | Unsupported. |
 
-Tokens rotate. Register when the app starts and send the server any token that
-changed. Go validates every token and message before a handler sees it.
+Android reports permission as `authorized` or `denied` from whether the app
+may post notifications; it has no `notDetermined` state before the Android 13
+prompt. Tokens rotate. Register when the app starts and send the server any
+token that changed. Go validates every token and message before a handler
+sees it.
 
 ## Messages
 
-Send data messages with `title`, `body` and an optional `route` key, plus up to
-32 other string keys within the 4 KiB FCM payload. The app stores each message
+Send data messages with `title`, `body` and an optional `gofastr.route` key,
+the same route key APNs payloads use on iOS, plus up to 32 other string keys
+within the 4 KiB FCM payload. The app stores each message
 in a private inbox of the newest 32 and shows a notification on the
 `gofastr.push` channel when it has text and notifications are allowed. Tapping
-it opens `route` through the same local-path guard as deep links. A repeated
+it opens `gofastr.route` through the same local-path guard as deep links. A repeated
 `next` returns the same message until it is acknowledged, so an app can save it
 under its stable identifier first.
 
@@ -78,8 +90,9 @@ message must reach the inbox.
 
 ## Validation
 
-Go tests cover the request, token and message bounds, manifest merging,
-`google-services.json` parsing and multi-dex packaging.
+Go tests cover the request, state, token and message bounds for both
+providers, manifest merging, `google-services.json` parsing and multi-dex
+packaging.
 
 On November 20, 2026 the device-features demo was built with push for x86-64
 and installed on an Android 14 Google APIs emulator with a placeholder Firebase
@@ -87,7 +100,10 @@ configuration. FirebaseApp initialized. A data message injected into the FCM
 receiver with `adb root` was stored, shown as a notification, opened the
 `/features/push` route when tapped, was returned by `next`, and was removed by
 `acknowledge`. Registration failed, as expected without a real Firebase project
-and with the emulator's out-of-date Google Play services.
+and with the emulator's out-of-date Google Play services. That run predates the
+shared iOS contract: it used the earlier `route` data key and result shape.
+The emulator check has not been repeated with `gofastr.route` and
+`push.State`: NOT RUN.
 
 NOT RUN: token issue and delivery through Firebase's servers, background and
 killed-app delivery, token rotation, and any physical device.

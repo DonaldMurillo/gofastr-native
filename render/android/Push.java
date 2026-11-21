@@ -20,6 +20,8 @@ public final class Push {
     public interface Provider { void token(Context context, Callback callback); void delete(Context context, Callback callback); }
 
     private static final String CHANNEL="gofastr.push", STORE="gofastr.push", TOKEN="token", INBOX="inbox";
+    /** The data key naming a tap's local route, the same key APNs payloads use on iOS. */
+    static final String ROUTE="gofastr.route";
     private static final int MAX_INBOX=32, MAX_DATA=4096;
     private static volatile Provider provider;
     private Push() {}
@@ -37,26 +39,25 @@ public final class Push {
             switch(request.optString("operation")) {
                 case "register":
                     current.token(context,(token,error)->main.post(()->{
-                        if(error!=null || token==null || token.isEmpty()){done.accept(JSON.object("status","failed","permission",permission,"message","Push registration failed. Check the network and Google Play services."));return;}
+                        if(error!=null || token==null || token.isEmpty()){done.accept(JSON.object("status","failed","message","Push registration failed. Check the network and Google Play services."));return;}
                         store(context).edit().putString(TOKEN,token).commit();
-                        done.accept(JSON.object("status","completed","permission",permission,"push",JSON.object("token",token),"message","Registered for push notifications."));
+                        done.accept(JSON.object("status","completed","push",state(permission,true,token),"message","Registered for push notifications."));
                     }));
                     return;
                 case "unregister":
                     current.delete(context,(token,error)->main.post(()->{
                         if(error!=null){done.accept(JSON.object("status","failed","message","Push unregistration failed."));return;}
                         store(context).edit().remove(TOKEN).commit();
-                        done.accept(JSON.object("status","completed","push",new JSONObject(),"message","Unregistered from push notifications."));
+                        done.accept(JSON.object("status","completed","push",state(permission,false,""),"message","Unregistered from push notifications."));
                     }));
                     return;
                 case "status": {
                     String token=store(context).getString(TOKEN,"");
-                    JSONObject result=new JSONObject();if(!token.isEmpty())result.put("token",token);
-                    done.accept(JSON.object("status","completed","permission",permission,"push",result,"message",token.isEmpty()?"Not registered for push notifications.":"Registered for push notifications."));
+                    done.accept(JSON.object("status","completed","push",state(permission,!token.isEmpty(),token),"message",token.isEmpty()?"Not registered for push notifications.":"Registered for push notifications."));
                     return;
                 }
                 case "next": {
-                    JSONObject result=new JSONObject();
+                    JSONObject result=state(permission,registered(context),"");
                     synchronized(Push.class){JSONArray inbox=inbox(context);if(inbox.length()>0)result.put("message",inbox.getJSONObject(0));}
                     done.accept(JSON.object("status","completed","push",result,"message",result.has("message")?"A push message is waiting.":"No push messages are waiting."));
                     return;
@@ -69,12 +70,21 @@ public final class Push {
                         if(!store(context).edit().putString(INBOX,kept.toString()).commit())throw new IllegalStateException("Cannot update the push inbox");
                     }
                     ((NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(id,1);
-                    done.accept(JSON.object("status","completed","push",new JSONObject(),"message","Push message acknowledged."));
+                    JSONObject result=state(permission,registered(context),"");
+                    done.accept(JSON.object("status","completed","push",result,"message","Push message acknowledged."));
                     return;
                 }
                 default: done.accept(JSON.object("status","failed","message","Unsupported push operation."));
             }
         } catch(Exception e) { done.accept(JSON.object("status","failed","message","The push inbox could not be read.")); }
+    }
+
+    private static boolean registered(Context context) { return !store(context).getString(TOKEN,"").isEmpty(); }
+
+    /** The shared push/v1 state; a token, when present, is always an FCM token. */
+    private static JSONObject state(String permission, boolean registered, String token) {
+        JSONObject state=JSON.object("permission",permission,"registered",registered,"provider","fcm");
+        return token.isEmpty()?state:JSON.object("permission",permission,"registered",registered,"provider","fcm","token",token);
     }
 
     private static JSONArray inbox(Context context) throws Exception { return new JSONArray(store(context).getString(INBOX,"[]")); }
@@ -94,7 +104,7 @@ public final class Push {
         return out.toString();
     }
 
-    private static boolean reserved(String key) { return key.startsWith("google.") || key.startsWith("gcm.") || key.equals("from") || key.equals("collapse_key") || key.equals("title") || key.equals("body") || key.equals("route"); }
+    private static boolean reserved(String key) { return key.startsWith("google.") || key.startsWith("gcm.") || key.equals("from") || key.equals("collapse_key") || key.equals("title") || key.equals("body") || key.equals(ROUTE); }
 
     /**
      * Stores a received message and, when it has text, shows it. A tap opens
@@ -107,7 +117,7 @@ public final class Push {
             title=plain(bounded(title,200));body=bounded(body,MAX_DATA);
             if(!title.isEmpty())message.put("title",title);
             if(!body.isEmpty())message.put("body",body);
-            String route=localRoute(data==null?null:data.get("route"));if(!route.isEmpty())message.put("route",route);
+            String route=localRoute(data==null?null:data.get(ROUTE));if(!route.isEmpty())message.put("route",route);
             JSONObject values=new JSONObject();int total=0;
             if(data!=null)for(Map.Entry<String,String> entry:new TreeMap<>(data).entrySet()){
                 String key=entry.getKey(),value=entry.getValue()==null?"":entry.getValue();

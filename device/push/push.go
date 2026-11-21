@@ -1,11 +1,13 @@
-// Package push describes remote push notifications delivered through the
-// platform push service (Firebase Cloud Messaging on Android).
+// Package push describes explicit remote-push registration and observed
+// device state. iOS registers with APNs and Android with Firebase Cloud
+// Messaging; State.Provider says which service issued the token.
 //
-// Register returns the device token the application's own server uses to
-// address this installation. Tokens rotate: register again when the app
-// starts and send the server any token that changed. Received messages stay
-// in a private inbox until the application acknowledges them, like the
-// incoming-share inbox, so an uncertain save can be repeated without loss.
+// Tokens are ephemeral, not stable device identifiers, and they rotate:
+// register when the app starts and send the application's own server any
+// token that changed. On Android received messages also stay in a private
+// inbox until the application acknowledges them, like the incoming-share
+// inbox, so an uncertain save can be repeated without loss. iOS has no inbox;
+// it opens a tapped notification's route directly.
 package push
 
 import (
@@ -17,23 +19,46 @@ import (
 )
 
 const (
-	Register    = "register"
-	Unregister  = "unregister"
-	Status      = "status"
+	Register   = "register"
+	Unregister = "unregister"
+	Status     = "status"
+	// Next and Acknowledge read and settle the Android inbox. iOS reports
+	// them unsupported.
 	Next        = "next"
 	Acknowledge = "acknowledge"
+
+	// ProviderAPNs and ProviderFCM name the service that issued a token.
+	ProviderAPNs = "apns"
+	ProviderFCM  = "fcm"
+
+	// MaxTokenLength bounds a hex APNs token.
+	MaxTokenLength = 512
+	// MaxFCMTokenLength bounds an FCM registration token.
+	MaxFCMTokenLength = 4096
 
 	// MaxDataBytes matches the FCM payload ceiling.
 	MaxDataBytes = 4096
 	MaxDataKeys  = 32
 	MaxInbox     = 32
-	MaxToken     = 4096
 )
 
 // Request is one explicit push operation. Only acknowledge names a message.
 type Request struct {
 	Operation  string `json:"operation"`
 	Identifier string `json:"identifier,omitempty"`
+}
+
+// State is the observed registration. Token is present only while
+// registered and names its Provider. Environment is the APNs environment
+// from the iOS provisioning profile. Message is the oldest unacknowledged
+// Android inbox entry, returned only by next.
+type State struct {
+	Permission  string   `json:"permission"`
+	Registered  bool     `json:"registered"`
+	Token       string   `json:"token,omitempty"`
+	Provider    string   `json:"provider,omitempty"`
+	Environment string   `json:"environment,omitempty"`
+	Message     *Message `json:"message,omitempty"`
 }
 
 // Message is a copied push payload. Route, when present, is the local route a
@@ -44,13 +69,6 @@ type Message struct {
 	Body       string            `json:"body,omitempty"`
 	Route      string            `json:"route,omitempty"`
 	Data       map[string]string `json:"data,omitempty"`
-}
-
-// Result carries the token for register and status, and the oldest
-// unacknowledged message for next. Both are empty when absent.
-type Result struct {
-	Token   string   `json:"token,omitempty"`
-	Message *Message `json:"message,omitempty"`
 }
 
 func validIdentifier(id string) bool {
@@ -113,22 +131,43 @@ func (message Message) Validate() error {
 	return nil
 }
 
+func validToken(provider, token string) bool {
+	switch provider {
+	case ProviderAPNs:
+		return len(token) >= 2 && len(token) <= MaxTokenLength && len(token)%2 == 0 && strings.Trim(token, "0123456789abcdef") == ""
+	case ProviderFCM:
+		return uitext.Token(token, MaxFCMTokenLength)
+	}
+	return false
+}
+
 // Accept checks a completed host result against the request that asked for it.
-func (request Request) Accept(result Result) error {
+func (request Request) Accept(state State) error {
 	if err := request.Validate(); err != nil {
 		return err
 	}
-	if result.Token != "" && (request.Operation != Register && request.Operation != Status || !uitext.Token(result.Token, MaxToken)) {
+	switch state.Permission {
+	case "notDetermined", "denied", "authorized", "provisional", "ephemeral":
+	default:
+		return errors.New("push: invalid permission")
+	}
+	if state.Provider != "" && state.Provider != ProviderAPNs && state.Provider != ProviderFCM {
+		return errors.New("push: invalid provider")
+	}
+	if state.Environment != "" && (state.Provider == ProviderFCM || state.Environment != "development" && state.Environment != "production") {
+		return errors.New("push: invalid environment")
+	}
+	if request.Operation == Unregister && state.Registered || !state.Registered && state.Token != "" {
+		return errors.New("push: unexpected registration or token")
+	}
+	if state.Token != "" && (request.Operation != Register && request.Operation != Status || !validToken(state.Provider, state.Token)) {
 		return errors.New("push: unexpected or invalid token")
 	}
-	if request.Operation == Register && result.Token == "" {
-		return errors.New("push: registration returned no token")
-	}
-	if result.Message != nil {
+	if state.Message != nil {
 		if request.Operation != Next {
 			return errors.New("push: only next returns a message")
 		}
-		return result.Message.Validate()
+		return state.Message.Validate()
 	}
 	return nil
 }
