@@ -270,5 +270,8 @@ Android uses the system phone or email row picker without `READ_CONTACTS` and
 serves single selection of one `phone` or `email` field; other requests,
 including Notes' **Pick contacts**, settle as `unsupported`. The display name
 arrives in `GivenName`. Gallery's Device tab has a **Choose contact** demo.
-ANDROID_EMULATOR_RESULT The Android WebView renderer does not advertise
+An Android 15 arm64 emulator run passed phone selection and display, Back
+cancellation and reopening, using a local Gallery build with the iOS-only map
+screen stubbed out. Email selection, denied access, physical devices and
+accessibility: NOT RUN. The Android WebView renderer does not advertise
 `contacts/v1`.

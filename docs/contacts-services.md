@@ -72,6 +72,11 @@ A successful build or launch does not establish picker acceptance.
 On Android, `TestAndroidContactsWire` checks the adapter's JSON against the Go
 validation, the Android SDK compile test builds the renderer, and
 `TestNativeAndroidContactsPickerManifest` checks the picker queries and the
-absent `READ_CONTACTS` permission. ANDROID_EMULATOR_RESULT
+absent `READ_CONTACTS` permission. An Android 15 arm64 emulator run of
+`--contacts` passed: a seeded contact's name and phone number were selected
+and displayed, Back cancellation kept the selection, and the picker reopened. The crash buffer was empty. That run used a
+local Gallery build with the map screen stubbed out, because Gallery's native
+Android build currently stops at the iOS-only `gofastr.maps/v1` extension,
+which has no Android adapter.
 Email selection, denied access, physical devices and providers, TalkBack and
 IME acceptance: NOT RUN.
