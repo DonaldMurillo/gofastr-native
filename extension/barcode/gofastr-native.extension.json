@@ -1,1 +1,1 @@
-{"name":"gofastr.barcode/v1","kind":"file","capabilities":["gofastr.barcode.camera/v1","gofastr.barcode.image/v1"],"android":{"factory":"GofastrBarcode","sources":["GofastrBarcode.java"],"bind":["barcodebind"]}}
+{"name":"gofastr.barcode/v1","capabilities":["scanner/v1"],"android":{"factory":"GofastrBarcode","sources":["GofastrBarcode.java"],"bind":["barcodebind"]}}

@@ -12,13 +12,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
-	"github.com/DonaldMurillo/gofastr-native/device/barcode"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
@@ -220,7 +218,6 @@ func newApp() (*nativeui.App, error) {
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "calendar", Title: "Calendar events", Destination: "/features/calendar"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
-			{ID: "barcode", Title: "Barcode and QR scanner", Destination: "/features/barcode"},
 			{ID: "location", Title: "Location", Destination: "/features/location"},
 			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
@@ -289,44 +286,8 @@ func newApp() (*nativeui.App, error) {
 			"status":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Status}}),
 			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
 		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
-		barcodeRoute(),
 	}
 	return nativeui.NewWithExtensions(Root(), []extension.Definition{barcodeext.Definition()}, append(routes, newLocationRoutes()...)...)
-}
-
-func barcodeRoute() nativeui.Route {
-	scan := func(source barcode.Source) nativeui.Handle {
-		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
-			operation, err := barcodeext.Scan(barcode.Request{Source: source})
-			if err != nil {
-				return nativeui.Result{}, err
-			}
-			return nativeui.Result{Files: &nativeui.FileRequest{ID: "scan", Extension: operation}}, nil
-		}
-	}
-	return nativeui.Route{
-		Path: "/features/barcode",
-		Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-			return nativeui.Screen{
-				Title: "Barcode and QR scanner", Text: "On Android, take a clear photo of one code or select an image. The scanner displays text without opening links.",
-				Actions: []nativeui.Action{
-					{ID: "scan-camera", Label: "Scan with camera", Primary: true},
-					{ID: "scan-image", Label: "Scan from image"},
-				},
-			}, nil
-		},
-		Actions: map[string]nativeui.Handle{"scan-camera": scan(barcode.Camera), "scan-image": scan(barcode.Image)},
-		Files: map[string]nativeui.FileRespond{"scan": func(_ context.Context, _ nativeui.Request, outcome nativeui.FileResult) (nativeui.Result, error) {
-			result, err := barcodeext.ReadResult(*outcome.File)
-			if err != nil {
-				return nativeui.Result{}, err
-			}
-			if result.NotFound {
-				return nativeui.Result{Announcement: "No barcode found."}, nil
-			}
-			return nativeui.Result{Announcement: string(result.Format) + ": " + strconv.QuoteToASCII(preview(result.Text))}, nil
-		}},
-	}
 }
 
 func demoToken() string {

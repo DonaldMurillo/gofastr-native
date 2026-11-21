@@ -34,7 +34,7 @@ own guide in [`tui/README.md`](../tui/README.md).
 - [Background refresh](background-refresh.md): periodic work while the iOS app is closed.
 - [Files](files-services.md)
 - [Photos](photos-services.md)
-- [Barcode and QR scanning](barcode-scanning.md): Android camera photos and selected images.
+- [Barcode scanner](scanner.md): `scanner/v1` on iOS (live camera) and Android (photo or image).
 - [Secure storage](secure-storage.md)
 - [Location](location.md): opt-in iOS permission, current position and bounded foreground updates.
 - [Share-in](share-in.md)

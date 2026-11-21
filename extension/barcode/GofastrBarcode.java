@@ -1,5 +1,6 @@
 package dev.gofastr.nativeui;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -9,40 +10,56 @@ import barcodebind.Barcodebind;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.json.JSONObject;
 
-public final class GofastrBarcode implements Extensions.FileFactory {
+/** Serves scanner/v1 on Android by decoding one still photo or selected image in Go. */
+public final class GofastrBarcode implements Extensions.ServiceFactory {
     private static final int MAX_IMAGE_BYTES = 16 << 20;
     private static final long MAX_SOURCE_PIXELS = 100_000_000L;
 
     @Override public Map<String,String> capabilities(GofastrActivity host) {
         Map<String,String> capabilities = new LinkedHashMap<>();
-        boolean camera = host.canUseCamera() && host.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY);
-        capabilities.put("gofastr.barcode.camera/v1", camera ? "available" : "unavailable");
-        capabilities.put("gofastr.barcode.image/v1", "available");
+        capabilities.put("scanner/v1", "available");
         return capabilities;
     }
 
-    @Override public void acquire(GofastrActivity host, JSONObject request, Consumer<JSONObject> result) throws Exception {
-        String source = request.getString("source");
-        boolean camera = source.equals("camera");
-        if (!camera && !source.equals("image")) throw new IOException("Unknown barcode source");
+    @Override public void perform(GofastrActivity host, JSONObject request, Consumer<JSONObject> result) throws Exception {
+        String scan = request.toString();
+        if (!Barcodebind.supports(scan)) {
+            result.accept(Services.outcome("unsupported", "Android cannot read the requested code formats."));
+            return;
+        }
+        boolean camera = host.canUseCamera() && host.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY);
+        String[] choices = camera ? new String[]{"Take photo", "Choose image"} : new String[]{"Choose image"};
+        boolean[] chosen = {false};
+        AlertDialog dialog = new AlertDialog.Builder(host).setTitle(request.optString("title"))
+            .setItems(choices, (d, which) -> {
+                chosen[0] = true;
+                start(host, scan, camera && which == 0, result);
+            })
+            .setNegativeButton("Cancel", null)
+            .create();
+        dialog.setOnDismissListener(d -> { if (!chosen[0]) result.accept(Services.outcome("cancelled", "Scan cancelled.")); });
+        dialog.show();
+    }
+
+    private static void start(GofastrActivity host, String scan, boolean camera, Consumer<JSONObject> result) {
         Services services = host.deviceServices();
         Consumer<Uri> selected = uri -> host.workers.execute(() -> {
             JSONObject outcome;
             try {
                 InputStream input = camera ? new FileInputStream(uri.getPath()) : host.getContentResolver().openInputStream(uri);
-                byte[] data = Services.read(input, MAX_IMAGE_BYTES);
-                byte[] decoded = decode(data).getBytes(StandardCharsets.UTF_8);
-                outcome = JSON.object("status", "completed", "file", Services.document("Barcode.json", "application/json", decoded));
+                String decoded = decode(scan, Services.read(input, MAX_IMAGE_BYTES));
+                outcome = decoded.isEmpty()
+                    ? Services.outcome("failed", "No supported code was found in the image.")
+                    : JSON.object("status", "completed", "scan", new JSONObject(decoded));
             } catch (SecurityException e) {
-                outcome = JSON.object("status", "denied");
+                outcome = Services.outcome("denied", "Access to the image was denied.");
             } catch (Exception e) {
-                outcome = JSON.object("status", "failed");
+                outcome = Services.outcome("failed", "The image could not be scanned.");
             }
             JSONObject settled = outcome;
             host.main.post(() -> {
@@ -54,7 +71,7 @@ public final class GofastrBarcode implements Extensions.FileFactory {
         else services.choose(new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), selected);
     }
 
-    private static String decode(byte[] data) throws Exception {
+    private static String decode(String scan, byte[] data) throws Exception {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(data, 0, data.length, options);
@@ -82,7 +99,7 @@ public final class GofastrBarcode implements Extensions.FileFactory {
                     pixels[y * width + x] = (byte) ((gray * opacity + 255 * (255 - opacity)) / 255);
                 }
             }
-            return Barcodebind.decode(pixels, width, height);
+            return Barcodebind.decode(scan, pixels, width, height);
         } finally {
             bitmap.recycle();
         }

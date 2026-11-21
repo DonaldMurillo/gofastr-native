@@ -40,9 +40,11 @@ func NewWithExtensions(root string, definitions []extension.Definition, routes .
 	if err != nil {
 		return nil, err
 	}
+	// Only compiled file adapters may implement the photos, camera and scanner
+	// core services; components and other core capabilities stay renderer-owned.
 	for _, definition := range extensions.Definitions() {
 		for _, capability := range definition.Manifest.Capabilities {
-			if knownCapability(Capability(capability)) && (definition.Manifest.Kind == extension.ComponentKind || capability != string(CapabilityPhotos) && capability != string(CapabilityCamera)) {
+			if knownCapability(Capability(capability)) && (definition.Manifest.Kind == extension.ComponentKind || capability != string(CapabilityPhotos) && capability != string(CapabilityCamera) && capability != string(CapabilityScanner)) {
 				return nil, fmt.Errorf("nativeui: extension cannot replace core capability %q", capability)
 			}
 		}

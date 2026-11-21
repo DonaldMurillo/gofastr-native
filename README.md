@@ -151,6 +151,6 @@ describes how versions are tagged and the checks that run first.
 MIT; see [LICENSE](LICENSE). The tables and test data in `tui/uni` come from
 the Unicode Character Database and are used under the
 [Unicode License v3](https://www.unicode.org/license.txt).
-The Android barcode scanner uses gozxing and its original ZXing implementation
+The Android barcode scanner adapter uses gozxing and its original ZXing implementation
 under [MIT and Apache-2.0 terms](extension/barcode/LICENSE-gozxing), and
 xerrors under a [BSD license](extension/barcode/LICENSE-xerrors).

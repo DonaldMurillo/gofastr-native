@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
-	"github.com/DonaldMurillo/gofastr-native/device/files"
-	"github.com/DonaldMurillo/gofastr-native/extension/barcode/barcodebind"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -70,21 +68,19 @@ func TestBackgroundRefreshRecordsTheLastRun(t *testing.T) {
 	CancelBackgroundRefresh()
 }
 
-func TestBarcodeNoMatchAnnouncesWithoutTreatingInvalidInputAsNoMatch(t *testing.T) {
-	blank := make([]byte, 640*480)
-	for i := range blank {
-		blank[i] = 255
-	}
-	payload, err := barcodebind.Decode(blank, 640, 480)
+// Android serves the root screen's Scan code action through the compiled
+// barcode adapter; iOS serves the same scanner/v1 request natively.
+func TestScannerAdapterIsRegisteredForAndroid(t *testing.T) {
+	app, err := newApp()
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := &files.Document{Name: "Barcode.json", MediaType: "application/json", Data: []byte(payload)}
-	result, err := barcodeRoute().Files["scan"](context.Background(), nativeui.Request{}, nativeui.FileResult{Status: nativeui.EffectCompleted, File: file})
-	if err != nil || result.Announcement != "No barcode found." {
-		t.Fatalf("blank image: announcement %q, error %v", result.Announcement, err)
+	for _, definition := range app.Extensions() {
+		for _, capability := range definition.Manifest.Capabilities {
+			if capability == string(nativeui.CapabilityScanner) && definition.Manifest.Android != nil {
+				return
+			}
+		}
 	}
-	if _, err := barcodebind.Decode(blank[:len(blank)-1], 640, 480); err == nil {
-		t.Fatal("malformed image became a no-code result")
-	}
+	t.Fatal("no Android scanner/v1 adapter is registered")
 }

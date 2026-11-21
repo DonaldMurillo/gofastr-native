@@ -46,6 +46,11 @@ The [typed barcode scanner](../scanner.md) adds `scanner/v1` to native iOS and a
 the QR image/Vision fixture and cancellation through the real service wire.
 Hardware camera acceptance: **NOT RUN**; simulator checks do not establish
 physical barcode, permission, interruption or accessibility acceptance.
+Native Android serves the same `scanner/v1` request through the opt-in
+`extension/barcode` adapter, which decodes one camera photo or selected image
+offline in Go. Go decoder tests and the Android SDK compile check pass;
+emulator and hardware runs are **NOT RUN**. Android cannot read PDF417 or
+Aztec. WebView has no scanner adapter.
 
 The mobile Notes bindings now consume one Go screen/action package,
 `notesscreens`, through either UIKit or the generic WebView renderer. The latter
@@ -158,10 +163,6 @@ policy, durable draft storage, capabilities and observed effect receipts live in
 See [the architecture, public APIs, validation, and limitations](presentation-prototype.md)
 and [the native host contract](../native-presentation.md), plus
 [implementation notes](agent-notes.md).
-
-Native Android also includes optional [barcode and QR scanning](../barcode-scanning.md)
-from a camera photo or selected image. UIKit and WebView do not have scanner
-adapters.
 
 The [shared-screen implementation](../shared-mobile-screens.md) documents the
 working APIs and limits. The [mobile presentation roadmap](mobile-roadmap.md)
