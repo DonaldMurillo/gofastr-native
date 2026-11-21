@@ -92,10 +92,22 @@ public final class Push {
     /** Records a newly issued token so status reports it before the next register. */
     public static void tokenChanged(Context context, String token) { if(token!=null && !token.isEmpty())store(context).edit().putString(TOKEN,token).apply(); }
 
+    /**
+     * A local route Go's push.ValidRoute also accepts. Go rejects a whole
+     * inbox entry it cannot parse, and an entry nobody can read is never
+     * acknowledged, so control characters and broken escapes drop the route.
+     */
     static String localRoute(String route) {
-        if(route==null || !route.startsWith("/") || route.startsWith("//") || route.contains("\\") || route.contains("#") || route.length()>4096) return "";
+        if(route==null || !route.startsWith("/") || route.startsWith("//") || route.contains("\\") || route.contains("#") || utf8(route)>4096 || !wellFormed(route).equals(route)) return "";
+        for(int i=0;i<route.length();i++){
+            char c=route.charAt(i);
+            if(c<0x20 || c==0x7f) return "";
+            if(c=='%' && (i+2>=route.length() || !hex(route.charAt(i+1)) || !hex(route.charAt(i+2)))) return "";
+        }
         return route;
     }
+
+    private static boolean hex(char c) { return c>='0' && c<='9' || c>='a' && c<='f' || c>='A' && c<='F'; }
 
     private static String identifier(String messageId) throws Exception {
         if(messageId==null || messageId.isEmpty())messageId=UUID.randomUUID().toString();
@@ -122,7 +134,7 @@ public final class Push {
             if(data!=null)for(Map.Entry<String,String> entry:new TreeMap<>(data).entrySet()){
                 String key=entry.getKey(),value=entry.getValue()==null?"":entry.getValue();
                 int size=key==null?0:utf8(key)+utf8(value);
-                if(key==null || key.isEmpty() || utf8(key)>128 || reserved(key) || values.length()>=32 || !plain(key).equals(key) || value.indexOf('\0')>=0)continue;
+                if(key==null || key.isEmpty() || utf8(key)>128 || reserved(key) || values.length()>=32 || !plain(key).equals(key) || value.indexOf('\0')>=0 || !wellFormed(key).equals(key) || !wellFormed(value).equals(value))continue;
                 if(total+size>MAX_DATA)break;
                 total+=size;values.put(key,value);
             }
@@ -147,11 +159,33 @@ public final class Push {
         return out.toString();
     }
 
+    /**
+     * At most maximum UTF-8 bytes, cut at a code point. Lone surrogates
+     * become U+FFFD first: Go receives them as three-byte U+FFFD, so a Java
+     * count of them, or a cut through a surrogate pair, could exceed Go's bound.
+     */
     private static String bounded(String value, int maximum) {
         if(value==null)return "";
-        value=value.replace("\0","");
-        while(value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>maximum)value=value.substring(0,value.length()-1);
-        return value;
+        value=wellFormed(value.replace("\0",""));
+        int bytes=0,end=0;
+        while(end<value.length()){
+            int point=value.codePointAt(end),size=point<0x80?1:point<0x800?2:point<0x10000?3:4;
+            if(bytes+size>maximum)break;
+            bytes+=size;end+=Character.charCount(point);
+        }
+        return value.substring(0,end);
+    }
+
+    private static String wellFormed(String value) {
+        StringBuilder out=null;
+        for(int i=0;i<value.length();i++){
+            char c=value.charAt(i);
+            boolean pair=Character.isHighSurrogate(c) && i+1<value.length() && Character.isLowSurrogate(value.charAt(i+1));
+            if(pair){if(out!=null)out.append(c).append(value.charAt(i+1));i++;continue;}
+            if(Character.isSurrogate(c)){if(out==null)out=new StringBuilder(value.substring(0,i));out.append('\uFFFD');}
+            else if(out!=null)out.append(c);
+        }
+        return out==null?value:out.toString();
     }
 
     private static void show(Context context, String id, String title, String body, String route) {
