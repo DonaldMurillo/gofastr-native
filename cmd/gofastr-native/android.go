@@ -239,17 +239,35 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 	if err != nil {
 		return "", err
 	}
+	var push pushBuild
+	if a.PushConfig != "" {
+		if push, err = preparePushLibraries(r, &a, filepath.Join(work, "android")); err != nil {
+			return "", err
+		}
+	}
 	manifest := filepath.Join(work, "android", "AndroidManifest.xml")
 	if err := r.do("generate AndroidManifest.xml", func() error {
 		return writeRendered("templates/android/AndroidManifest.xml.tmpl", manifest, a)
 	}); err != nil {
 		return "", err
 	}
+	resourceArgs, err := prepareAndroidFeatureResources(r, sdk, a, filepath.Join(work, "android"))
+	if err != nil {
+		return "", err
+	}
+	if a.PushConfig != "" {
+		if err := preparePushResources(r, sdk, a, filepath.Join(work, "android"), manifest, &push, resourceArgs); err != nil {
+			return "", err
+		}
+		resourceArgs = append(resourceArgs, push.resourceArgs...)
+		sources = append(sources, push.rSources...)
+	}
+	classpath := append([]string{sdk.androidJar, classesJar}, push.jars...)
 	classes := filepath.Join(work, "android", "classes")
 	if err := r.do("clear old classes", func() error { return os.RemoveAll(classes) }); err != nil {
 		return "", err
 	}
-	javaArgs := []string{"--release", "11", "-encoding", "UTF-8", "-nowarn", "-classpath", sdk.androidJar + string(os.PathListSeparator) + classesJar, "-d", classes}
+	javaArgs := []string{"--release", "11", "-encoding", "UTF-8", "-nowarn", "-classpath", strings.Join(classpath, string(os.PathListSeparator)), "-d", classes}
 	if err := r.run("compile the Java host", sdk.javac, append(javaArgs, sources...)...); err != nil {
 		return "", err
 	}
@@ -269,14 +287,10 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 		return "", err
 	}
 	d8Args := append([]string{"--release", "--min-api", strconv.Itoa(a.MinSDK), "--lib", sdk.androidJar, "--output", dex}, classFiles...)
-	if err := r.run("convert the Java classes to dex", sdk.tool("d8"), append(d8Args, classesJar)...); err != nil {
+	if err := r.run("convert the Java classes to dex", sdk.tool("d8"), append(append(d8Args, classesJar), push.jars...)...); err != nil {
 		return "", err
 	}
 	base := filepath.Join(work, "android", "base.apk")
-	resourceArgs, err := prepareAndroidFeatureResources(r, sdk, a, filepath.Join(work, "android"))
-	if err != nil {
-		return "", err
-	}
 	if o.release() {
 		return releaseAndroid(r, sdk, a, o, out, androidReleaseInputs{work: work, manifest: manifest,
 			dexFile: filepath.Join(dex, "classes.dex"), jniDir: filepath.Join(unpacked, "jni"), resourceArgs: resourceArgs}, cert)
@@ -587,9 +601,16 @@ func addToAPK(base, dst, dexFile, jniDir string) error {
 		_, err = w.Write(b)
 		return err
 	}
-	if err := add("classes.dex", dexFile); err != nil {
+	dexFiles, err := dexOutputs(dexFile)
+	if err != nil {
 		out.Close()
 		return err
+	}
+	for _, file := range dexFiles {
+		if err := add(filepath.Base(file), file); err != nil {
+			out.Close()
+			return err
+		}
 	}
 	libs, err := listFiles(jniDir, ".so")
 	if err != nil {
@@ -616,6 +637,21 @@ func addToAPK(base, dst, dexFile, jniDir string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// dexOutputs is classes.dex followed by the classes2.dex, classes3.dex ...
+// d8 writes beside it when the methods do not fit one dex file.
+func dexOutputs(dexFile string) ([]string, error) {
+	files := []string{dexFile}
+	for n := 2; ; n++ {
+		next := filepath.Join(filepath.Dir(dexFile), fmt.Sprintf("classes%d.dex", n))
+		if _, err := os.Stat(next); errors.Is(err, fs.ErrNotExist) {
+			return files, nil
+		} else if err != nil {
+			return nil, err
+		}
+		files = append(files, next)
+	}
 }
 
 func listFiles(dir, suffix string) ([]string, error) {

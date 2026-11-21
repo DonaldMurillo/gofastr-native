@@ -102,6 +102,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("sign-in-with-apple/v1", "unavailable");
                 caps.put("oauth-web-login/v1", "unavailable");
                 caps.put("iap/v1", "unavailable");
+                caps.put("push/v1", Push.available() ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));
@@ -184,7 +185,7 @@ public abstract class GofastrActivity extends Activity {
     }
     private String routeFrom(Intent intent) {
         if(intent==null) return "";
-        if(intent.getBooleanExtra("gofastr.reminder", false)) return localRoute(intent.getStringExtra("route"));
+        if(intent.getBooleanExtra("gofastr.reminder", false) || intent.getBooleanExtra("gofastr.push", false)) return localRoute(intent.getStringExtra("route"));
         if(!Intent.ACTION_VIEW.equals(intent.getAction()))return "";
         android.net.Uri uri=intent.getData();
         if(uri==null || urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";

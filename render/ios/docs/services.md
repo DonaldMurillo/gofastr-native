@@ -52,7 +52,9 @@ profile granting APNs, and preserves that profile's development/production value
 The simulator embeds APNs entitlements in the executable's
 `__TEXT,__entitlements` section rather than its macOS code signature.
 
-`device/push.Request` supports `register`, `unregister`, and `status`.
+`device/push.Request` supports `register`, `unregister`, and `status` on iOS.
+The Android-only inbox operations `next` and `acknowledge` complete as
+unsupported, because iOS opens a tapped notification's route directly.
 Register asks for alert, sound and badge permission, then registers with APNs.
 It settles once on the app-delegate token/failure callback or a 45-second timeout;
 denial returns denied without a token. Status never prompts or registers.
@@ -62,8 +64,8 @@ to `GofastrPush.didRegister(deviceToken:)` and `didFailToRegister(error:)`;
 custom hosts must forward those callbacks and call `GofastrPush.prepare()`
 at launch before creating the window.
 
-Completed state includes permission, OS registration, and an optional lowercase
-hex token (1–256 bytes). A registered app may have no observed token after a
+Completed state includes permission, OS registration, `provider: "apns"`, and
+an optional lowercase hex token (1–256 bytes). A registered app may have no observed token after a
 process restart; explicitly register to obtain the current token. Never treat
 tokens as identity, log them, or assume they are permanent. Send updated tokens
 to an authenticated application server. Environment is optional, read from the

@@ -101,6 +101,9 @@ to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
 The [capture library](capture.md) uses all of these for background video
 capture, location and camera direction, with live WHIP streaming.
 
+- Remote push is opt-in Firebase Cloud Messaging with a private message inbox;
+  see [push notifications](push.md) for licensing, flags and validation.
+
 ## Build compatibility
 
 The pinned dependencies exposed two failures inside a real Android app sandbox:

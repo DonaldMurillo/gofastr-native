@@ -10,6 +10,15 @@ This repository holds two Go modules, tagged separately:
 
 ### Added
 
+- Opt-in Android remote push through Firebase Cloud Messaging, built with
+  `--push-config` and `--push-libraries` (the owner downloads the pinned
+  Firebase libraries with `push-libraries` under Google's terms). It uses the
+  same `device/push` contract as iOS APNs: `push.State` gains `Provider`
+  (`apns` or `fcm`), and Go rejects a token without one. Android also keeps
+  received messages in a private inbox read with `next` and settled with
+  `acknowledge`; iOS reports those two operations unsupported. Taps on both
+  platforms open the `gofastr.route` payload key. Delivery through Firebase
+  servers is NOT RUN.
 - iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
   optional user location, a gallery screen and `--location --location-usage`
   opt-in purpose text.

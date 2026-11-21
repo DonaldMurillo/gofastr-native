@@ -81,6 +81,11 @@ accepted an earlier epoch-millisecond revision of this request (expected title
 and next-hour slot, offline-calendar save with matching provider values,
 completed outcome); the current RFC 3339 wire has NOT RUN on an emulator.
 Google Calendar editor/save and accessibility acceptance are NOT RUN.
+Android builds can opt into FCM [push notifications](../push.md) with
+`--push-config` and `--push-libraries`. They share the iOS `device/push`
+contract (`State.Provider` is `fcm`) and add a private message inbox read with
+`next` and settled with `acknowledge`. Token issue and delivery through
+Firebase servers are NOT RUN.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go

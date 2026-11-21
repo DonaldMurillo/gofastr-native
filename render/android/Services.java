@@ -170,6 +170,7 @@ public final class Services {
                 if(!host.networkStatusEnabled()){finish(outcome("unsupported","Network status is disabled."));return;}
                 finish(NetworkStatus.perform(host,request.getJSONObject("network")));
             }
+            else if(request.has("push")) push(request.getJSONObject("push"));
             else if(request.has("incomingShare")) {
                 if(!host.incomingSharesEnabled()){finish(outcome("unsupported","The share inbox is disabled."));return;}
                 IncomingShares.perform(host,request.getJSONObject("incomingShare"),this::finish);
@@ -233,6 +234,15 @@ public final class Services {
         long when=time.getTime();if(when<=System.currentTimeMillis())throw new IllegalArgumentException("Choose a future reminder time");
         ReminderReceiver.schedule(host,request,when);
         finish(JSON.object("status","completed","identifier",id,"permission","authorized","message","Reminder scheduled. Android may delay delivery to save battery."));
+    }
+    private void push(JSONObject request) {
+        if(!Push.available()){finish(outcome("unsupported","Push notifications are not enabled for this build."));return;}
+        if("register".equals(request.optString("operation")) && Build.VERSION.SDK_INT>=33 && host.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+            permissionGranted=()->push(request);
+            host.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATION);return;
+        }
+        NotificationManager manager=(NotificationManager)host.getSystemService(Context.NOTIFICATION_SERVICE);
+        Push.perform(host,request,manager.areNotificationsEnabled(),this::finish);
     }
     private void record(JSONObject request) {
         if(!host.canUseMicrophone()){finish(outcome("unsupported","Microphone access is not enabled for this build."));return;}
