@@ -15,42 +15,54 @@ import (
 type buildFlags struct {
 	fs            *flag.FlagSet
 	networkStatus *bool
+	location      *bool
+	locationUsage *string
+	calendar      *bool
+	calendarUsage *string
 
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
+	signInWithApple, backgroundRefresh, push                        *bool
 	wait                                                            *time.Duration
 }
 
 func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 	return &buildFlags{
-		fs:              fs,
-		networkStatus:   fs.Bool("network-status", false, "enable Android network status queries"),
-		platform:        fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
-		pkg:             fs.String("pkg", "", "bind package"),
-		id:              fs.String("id", "", "bundle / application id"),
-		name:            fs.String("name", "", "home-screen name"),
-		version:         fs.String("version", "", "app version"),
-		out:             fs.String("out", "", "output directory"),
-		hostTemplate:    fs.String("host-template", "", "caller-owned native host template"),
-		renderer:        fs.String("renderer", "webview", "webview or native (iOS/Android)"),
-		cameraUsage:     fs.String("camera-usage", defaultCameraUsage, "iOS camera purpose string; empty disables native camera"),
-		microphoneUsage: fs.String("microphone-usage", "", "iOS microphone purpose string; empty disables recording"),
-		urlScheme:       fs.String("url-scheme", "", "application-specific deep-link scheme (native renderer)"),
-		receiveShares:   fs.Bool("receive-shares", false, "enable the private incoming-share inbox"),
-		secureStorage:   fs.Bool("secure-storage", false, "enable secure storage and authentication"),
-		biometricUsage:  fs.String("biometric-usage", "", "Face ID purpose text"),
-		widgets:         fs.Bool("widgets", false, "package a home-screen widget"),
-		appGroup:        fs.String("app-group", "", "iOS app-group identifier"),
-		dry:             fs.Bool("dry-run", false, "print the steps only"),
-		debugTrace:      fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
-		device:          fs.String("device", "", "simulator / device / AVD"),
-		shot:            fs.String("screenshot", "", "screenshot path"),
-		existingApp:     fs.String("app", "", "existing signed iOS device app (doctor only)"),
-		require:         fs.String("require", "", "required iOS device features (doctor only)"),
-		devices:         fs.Bool("devices", false, "list attached devices (doctor only; starts the adb server)"),
-		wait:            fs.Duration("wait", 8*time.Second, "wait before the screenshot"),
+		fs:                fs,
+		networkStatus:     fs.Bool("network-status", false, "enable Android network status queries"),
+		location:          fs.Bool("location", false, "enable foreground iOS location services"),
+		locationUsage:     fs.String("location-usage", "", "iOS when-in-use location purpose text"),
+		calendar:          fs.Bool("calendar", false, "enable iOS calendar events"),
+		calendarUsage:     fs.String("calendar-usage", "Add and read calendar events you choose.", "calendar permission purpose text"),
+		platform:          fs.String("platform", "", "ios-sim, android-emu (or android), ios-device; dev also accepts go"),
+		pkg:               fs.String("pkg", "", "bind package"),
+		id:                fs.String("id", "", "bundle / application id"),
+		name:              fs.String("name", "", "home-screen name"),
+		version:           fs.String("version", "", "app version"),
+		out:               fs.String("out", "", "output directory"),
+		hostTemplate:      fs.String("host-template", "", "caller-owned native host template"),
+		renderer:          fs.String("renderer", "webview", "webview or native (iOS/Android)"),
+		cameraUsage:       fs.String("camera-usage", defaultCameraUsage, "iOS camera purpose string; empty disables native camera"),
+		microphoneUsage:   fs.String("microphone-usage", "", "iOS microphone purpose string; empty disables recording"),
+		urlScheme:         fs.String("url-scheme", "", "application-specific deep-link scheme (native renderer)"),
+		receiveShares:     fs.Bool("receive-shares", false, "enable the private incoming-share inbox"),
+		secureStorage:     fs.Bool("secure-storage", false, "enable secure storage and authentication"),
+		biometricUsage:    fs.String("biometric-usage", "", "Face ID purpose text"),
+		widgets:           fs.Bool("widgets", false, "package a home-screen widget"),
+		signInWithApple:   fs.Bool("sign-in-with-apple", false, "enable Sign in with Apple (native iOS)"),
+		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS)"),
+		push:              fs.Bool("push", false, "enable iOS APNs registration"),
+		appGroup:          fs.String("app-group", "", "iOS app-group identifier"),
+		dry:               fs.Bool("dry-run", false, "print the steps only"),
+		debugTrace:        fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
+		device:            fs.String("device", "", "simulator / device / AVD"),
+		shot:              fs.String("screenshot", "", "screenshot path"),
+		existingApp:       fs.String("app", "", "existing signed iOS device app (doctor only)"),
+		require:           fs.String("require", "", "required iOS device features (doctor only)"),
+		devices:           fs.Bool("devices", false, "list attached devices (doctor only; starts the adb server)"),
+		wait:              fs.Duration("wait", 8*time.Second, "wait before the screenshot"),
 	}
 }
 
@@ -163,6 +175,10 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2
 	}
+	a.Calendar = *f.calendar
+	if a.Calendar {
+		a.CalendarUsage = strings.TrimSpace(*f.calendarUsage)
+	}
 	a.HostTemplate = *f.hostTemplate
 	a.Renderer = *f.renderer
 	a.DebugTrace = *f.debugTrace
@@ -171,7 +187,11 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.URLScheme = *f.urlScheme
 	a.ReceiveShares, a.SecureStorage, a.Widgets = *f.receiveShares, *f.secureStorage, *f.widgets
 	a.NetworkStatus = *f.networkStatus
+	a.SignInWithApple = *f.signInWithApple
+	a.BackgroundRefresh = *f.backgroundRefresh
+	a.Push = *f.push
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
+	a.Location, a.LocationUsage = *f.location, strings.TrimSpace(*f.locationUsage)
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)
 		return app{}, 2

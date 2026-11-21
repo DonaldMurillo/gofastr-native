@@ -199,7 +199,7 @@ const deliverPortJS = `(() => {
 // relay answers one bridge message, as the Android shell's port listener
 // does: Bridge, then the reply back through the port, or for a native
 // form submission, the answer shown as the next document.
-func relay(ctx context.Context, h *mobilehost.Host, st *stats, payload string) {
+func relay(ctx context.Context, h *mobilehost.Host, st *stats, payload string, contextID cdpruntime.ExecutionContextID) {
 	exec := cdp.WithExecutor(ctx, chromedp.FromContext(ctx).Target)
 	st.bridged.Add(1)
 	out := h.Bridge(payload)
@@ -220,9 +220,76 @@ func relay(ctx context.Context, h *mobilehost.Host, st *stats, payload string) {
 		}
 		out = string(mustJSON(mobilehost.BridgeReply{ID: r.ID, Navigate: true}))
 	}
-	q, _ := json.Marshal(out)
-	if _, _, err := cdpruntime.Evaluate("window.__simPort && window.__simPort.postMessage(" + string(q) + ")").Do(exec); err != nil {
+	if err := replyToBridge(exec, contextID, out); err != nil {
 		st.note("reply %s: %v", r.ID, err)
+	}
+}
+
+func replyToBridge(ctx context.Context, contextID cdpruntime.ExecutionContextID, out string) error {
+	q, _ := json.Marshal(out)
+	_, exception, err := cdpruntime.Evaluate("window.__simPort && window.__simPort.postMessage(" + string(q) + ")").WithContextID(contextID).Do(ctx)
+	if retiredBridgeContext(err) {
+		return nil
+	}
+	if err == nil && exception != nil {
+		return exception
+	}
+	return err
+}
+
+// A reply belongs to the document that sent the request, not its successor.
+// CDP cannot deliver to that execution context once navigation destroys it.
+func retiredBridgeContext(err error) bool {
+	var protocol *cdproto.Error
+	return errors.As(err, &protocol) && protocol.Code == -32000 &&
+		(protocol.Message == "Cannot find context with specified id" || protocol.Message == "Inspected target navigated or closed")
+}
+
+func TestBridgeReplyStaysInSendingDocument(t *testing.T) {
+	_, _, host := screensHost(t, mobileui.IOS)
+	ctx, _ := mobileScreensBrowser(t, host, false)
+	contexts := make(chan cdpruntime.ExecutionContextID, 1)
+	chromedp.ListenTarget(ctx, func(event any) {
+		if event, ok := event.(*cdpruntime.EventBindingCalled); ok && event.Name == "__simReplyContext" {
+			contexts <- event.ExecutionContextID
+		}
+	})
+	check := deviceBrowserCheck(t, ctx)
+	check(cdpruntime.AddBinding("__simReplyContext"), chromedp.Navigate(origin+"/notes"), waitForFileScreen("/notes"),
+		chromedp.Evaluate(`window.__simReplyContext('ready'); window.__simPort = { postMessage(value) { window.__reply = value; } }`, nil))
+	var sender cdpruntime.ExecutionContextID
+	select {
+	case sender = <-contexts:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	check(chromedp.ActionFunc(func(ctx context.Context) error {
+		return replyToBridge(cdp.WithExecutor(ctx, chromedp.FromContext(ctx).Target), sender, "current")
+	}), chromedp.Poll(`window.__reply === 'current'`, nil),
+		chromedp.Navigate(origin+"/notes"), waitForFileScreen("/notes"),
+		chromedp.Evaluate(`window.__simPort = { postMessage(value) { window.__reply = value; } }`, nil),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return replyToBridge(cdp.WithExecutor(ctx, chromedp.FromContext(ctx).Target), sender, "obsolete")
+		}))
+	var leaked bool
+	check(chromedp.Evaluate(`window.__reply !== undefined`, &leaked))
+	if leaked {
+		t.Fatal("reply for a destroyed document reached its successor")
+	}
+}
+
+func TestRetiredBridgeContextDoesNotHideOtherFailures(t *testing.T) {
+	for _, message := range []string{"Cannot find context with specified id", "Inspected target navigated or closed"} {
+		if !retiredBridgeContext(fmt.Errorf("reply: %w", &cdproto.Error{Code: -32000, Message: message})) {
+			t.Fatalf("destroyed context was treated as a bridge failure: %s", message)
+		}
+	}
+	for _, err := range []error{nil, errors.New("Inspected target navigated or closed"),
+		&cdproto.Error{Code: -32602, Message: "Cannot find context with specified id"},
+		&cdproto.Error{Code: -32000, Message: "Invalid remote object id"}} {
+		if retiredBridgeContext(err) {
+			t.Fatalf("genuine bridge failure was hidden: %v", err)
+		}
 	}
 }
 
@@ -328,7 +395,7 @@ func runPhone(t *testing.T, android bool) {
 			go serve(ctx, h, st, android, e)
 		case *cdpruntime.EventBindingCalled:
 			if e.Name == "__simNativePost" {
-				go relay(ctx, h, st, e.Payload)
+				go relay(ctx, h, st, e.Payload, e.ExecutionContextID)
 			}
 		case *page.EventLoadEventFired:
 			go func() {

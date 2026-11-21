@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
@@ -134,6 +135,8 @@ func TestTracePrivacyCanaryNeverReachesDiagnostics(t *testing.T) {
 	wire(t, runtime, nativeui.Command{Kind: "service-result", Connection: connection, Instance: editor.Instance, Revision: revision, RequestID: "service-" + canary, ServiceID: service.ServiceID,
 		ServiceResult: &nativeui.ServiceResult{Status: nativeui.EffectCompleted, Message: canary, SecureStorage: &securestore.Result{Found: true, Value: []byte(canary)}}})
 	complete("service-" + canary)
+	wire(t, runtime, nativeui.Command{Kind: "service-result", Connection: connection, Instance: editor.Instance, RequestID: "calendar-" + canary, ServiceID: service.ServiceID,
+		ServiceResult: &nativeui.ServiceResult{Status: nativeui.EffectCompleted, Calendar: &calendar.Result{Events: []calendar.Event{{Title: canary, Notes: canary, Location: canary, Identifier: canary}}}}})
 	act("definition-"+canary, "fake-definition")
 	if reply := act("save-"+canary, "save"); reply.Error == nil || reply.Error.Code != "unknown" {
 		t.Fatalf("save: %+v", reply)

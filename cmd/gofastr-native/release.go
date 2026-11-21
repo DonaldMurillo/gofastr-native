@@ -807,7 +807,8 @@ func newReleaseReport(a app, platform string) *releaseReport {
 		on   bool
 		name string
 	}{{a.CameraUsage != "", "camera"}, {a.MicrophoneUsage != "", "microphone"}, {a.URLScheme != "", "url-scheme"},
-		{a.NetworkStatus, "network-status"}, {a.ReceiveShares, "receive-shares"}, {a.SecureStorage, "secure-storage"}, {a.Widgets, "widgets"}, {a.AppGroup != "", "app-group"}} {
+		{a.NetworkStatus, "network-status"}, {a.Push, "push"}, {a.ReceiveShares, "receive-shares"}, {a.SecureStorage, "secure-storage"}, {a.Calendar, "calendar"}, {a.Location, "location"}, {a.Widgets, "widgets"}, {a.AppGroup != "", "app-group"},
+		{a.SignInWithApple, "sign-in-with-apple"}} {
 		if f.on {
 			rep.Features = append(rep.Features, f.name)
 		}
