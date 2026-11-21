@@ -22,6 +22,12 @@ This repository holds two Go modules, tagged separately:
 - iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
   optional user location, a gallery screen and `--location --location-usage`
   opt-in purpose text.
+- The native Android renderer serves `contacts/v1` through the system phone
+  or email row picker, without `READ_CONTACTS`: single selection of one
+  `phone` or `email` field, with the display name in `GivenName`. Other
+  contact requests settle as `unsupported`. Gallery's Device tab has a
+  Choose contact demo, and `scripts/android_smoke.py --contacts` drives it on
+  an emulator.
 - Typed foreground iOS location services in `device/location`: permission
   status, when-in-use authorization, current position and bounded tracking.
   Native builds opt in with `--location --location-usage`; no background

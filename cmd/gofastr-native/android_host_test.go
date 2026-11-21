@@ -67,6 +67,26 @@ func TestNativeAndroidCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	}
 }
 
+// TestNativeAndroidContactsPickerManifest checks that contacts/v1 relies on
+// the system row picker: the picker intents are visible and broad address-book
+// access is never requested.
+func TestNativeAndroidContactsPickerManifest(t *testing.T) {
+	a := nativeApp(t).forAndroid(34)
+	manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wellFormed(t, "native Android manifest", manifest)
+	if bytes.Contains(manifest, []byte("READ_CONTACTS")) {
+		t.Fatal("picker must not request broad contacts access")
+	}
+	for _, kind := range []string{"vnd.android.cursor.dir/phone_v2", "vnd.android.cursor.dir/email_v2"} {
+		if !bytes.Contains(manifest, []byte(kind)) {
+			t.Errorf("missing picker visibility query: %s", kind)
+		}
+	}
+}
+
 // androidHostSources discovers a's extensions, writes its Android host and
 // returns the Java sources javac needs: host, renderer, extensions, the
 // go.Seq stand-ins and gobind's output for every bound package.

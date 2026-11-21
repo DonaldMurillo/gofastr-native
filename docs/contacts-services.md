@@ -1,8 +1,9 @@
 # Contact picker
 
-iOS provides an explicitly initiated Contacts picker through `contacts/v1`.
-Android and plain browsers do not advertise support. The default native and
-WebView iOS hosts share the same service runner.
+iOS and the native Android renderer provide an explicitly initiated contact
+picker through `contacts/v1`. The Android WebView renderer and plain browsers
+do not advertise support. The default native and WebView iOS hosts share the
+same service runner.
 
 Return a `nativeui.ServiceRequest{ID: "contacts", Contacts: &contacts.Request{
 Fields: []contacts.Field{contacts.Phone}}}` from an action and register a
@@ -26,8 +27,56 @@ application; Notes only displays the selected names and first phone numbers
 in a transient announcement and does not save them or modify note text.
 Treat identifiers as opaque private data, not authorization to read contacts.
 
+## Android
+
+The native Android renderer advertises `contacts/v1` when the system phone or
+email row picker resolves; it checks this without prompting. It serves single
+selection of exactly one field, `phone` or `email`. Any other request
+(`Multiple: true`, no fields, more than one field, `postal` or
+`organization`) settles as `unsupported` without opening a picker.
+
+The adapter opens `ACTION_PICK` on the phone or email data rows and reads only
+the row URI the picker grants, on a worker. It does not request
+`READ_CONTACTS`; generated native manifests declare the two picker intents as
+package-visibility queries. Cancelling the picker settles `cancelled`, a
+`SecurityException` settles `denied`, and other provider errors settle
+`failed`.
+
+The result has one contact. Android exposes only the row's display name, so
+`GivenName` carries the whole display name and `FamilyName` is empty. `ID` is
+the contact's lookup key, or the data row ID when the lookup key is missing or
+over the limit. `Phones` or `Emails` holds the one selected value with its
+localized type label. Text over 512 bytes or containing control characters
+fails the request instead of being truncated.
+
+The Gallery Device tab has a Contacts demo with a **Choose contact** button
+that requests one phone number and displays the selected name and number. The
+selection stays in memory only. Run its emulator flow with:
+
+```sh
+python scripts/android_smoke.py --contacts --serial emulator-5554 --package dev.gofastr.gallerynative --out dist/contacts-acceptance
+```
+
+The script adds a uniquely named synthetic contact and leaves existing app data
+and contacts intact. Screenshots and UI XML cover before, picker, after-select
+and after-cancel states.
+
+## Checks
+
 In Notes, open or create a note and choose **Pick contact** or **Pick contacts**
 from its actions. Go runtime tests, executable Swift wire checks, and the
 browser test `TestNotesContactsPickerWebView` cover the contract and injected
-completed/cancelled/multiple outcomes. Native picker GUI acceptance: NOT RUN.
+completed/cancelled/multiple outcomes. iOS native picker GUI acceptance: NOT RUN.
 A successful build or launch does not establish picker acceptance.
+
+On Android, `TestAndroidContactsWire` checks the adapter's JSON against the Go
+validation, the Android SDK compile test builds the renderer, and
+`TestNativeAndroidContactsPickerManifest` checks the picker queries and the
+absent `READ_CONTACTS` permission. An Android 15 arm64 emulator run of
+`--contacts` passed: a seeded contact's name and phone number were selected
+and displayed, Back cancellation kept the selection, and the picker reopened. The crash buffer was empty. That run used a
+local Gallery build with the map screen stubbed out, because Gallery's native
+Android build currently stops at the iOS-only `gofastr.maps/v1` extension,
+which has no Android adapter.
+Email selection, denied access, physical devices and providers, TalkBack and
+IME acceptance: NOT RUN.

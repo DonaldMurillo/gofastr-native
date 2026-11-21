@@ -1,4 +1,4 @@
-"""Exercise a built Notes or device-features APK in an emulator.
+"""Exercise a built Notes or device-features APK, or Gallery with --contacts, in an emulator.
 
 No app data is cleared. Each run creates its own note. ADB selects nodes by
 accessibility ID or text. Screenshots, XML and results stay in --out.
@@ -260,6 +260,48 @@ def service_smoke(a: Android):
     a.check("Future local reminder schedules with permission and cancels by app-scoped ID")
 
 
+def contacts_smoke(a):
+    """Gallery-only contact selection; independent of the Notes service routes."""
+    def raw_ids():
+        rows = a.adb("shell", "content", "query", "--uri", "content://com.android.contacts/raw_contacts", "--projection", "_id").decode()
+        return set(re.findall(r"_id=(\d+)", rows))
+
+    before = raw_ids()
+    a.adb("shell", "content", "insert", "--uri", "content://com.android.contacts/raw_contacts", "--bind", "account_type:n:", "--bind", "account_name:n:")
+    created = raw_ids() - before
+    assert len(created) == 1, created
+    raw_id = created.pop()
+    name, phone = "Gallery Contact " + raw_id, "2025550147"
+    for mime, value in (("vnd.android.cursor.item/name", name), ("vnd.android.cursor.item/phone_v2", phone)):
+        a.adb("shell", "content", "insert", "--uri", "content://com.android.contacts/data", "--bind", "raw_contact_id:i:" + raw_id,
+              "--bind", "mimetype:s:" + mime, "--bind", "data1:s:" + shlex.quote(value))
+    a.adb("shell", "am", "start", "-W", "-n", a.package + "/.MainActivity")
+    a.tap("native.tab.device")
+    a.tap("native.row.contacts")
+    a.find("native.action.choose")
+    a.shot("before")
+    a.tap("native.action.choose")
+    a.find(name)
+    a.shot("picker")
+    a.tap(name)
+    selected = name + "\n" + phone
+    a.find(selected)
+    a.shot("after-select")
+    a.check("System contact picker returns the selected name and phone to Gallery")
+    a.tap("native.action.choose")
+    a.find(name)
+    a.back()
+    a.find(selected)
+    a.find("native.action.choose")
+    a.shot("after-cancel")
+    # Reopening proves cancellation released foreground ownership.
+    a.tap("native.action.choose")
+    a.find(name)
+    a.back()
+    a.find(selected)
+    a.check("Contact picker Back cancellation retains selection and allows reopening")
+
+
 def deviceinfo_smoke(a: Android):
     a.adb("shell", "am", "start", "-W", "-n", a.package + "/.MainActivity")
     a.tap("native.row.device")
@@ -294,13 +336,18 @@ if __name__ == "__main__":
     parser.add_argument("--out", default="dist/android-acceptance")
     parser.add_argument("--services", action="store_true", help="Also test SAF, photos, recording, sharing and reminder status.")
     parser.add_argument("--deviceinfo", action="store_true", help="Test device snapshots in the devicefeatures app instead of Notes.")
+    parser.add_argument("--contacts", action="store_true", help="Test Gallery contacts instead of Notes (use the Gallery package).")
     args = parser.parse_args()
     if args.deviceinfo and args.services:
         parser.error("--deviceinfo and --services target different apps")
+    if args.contacts and (args.deviceinfo or args.services):
+        parser.error("--contacts targets Gallery, a different app")
     android = Android(args.serial, args.package, args.out)
     try:
         if args.deviceinfo:
             deviceinfo_smoke(android)
+        elif args.contacts:
+            contacts_smoke(android)
         else:
             smoke(android)
             if args.services:

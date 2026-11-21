@@ -299,8 +299,18 @@ and complete device/accessibility acceptance remain roadmap work.
 
 ## Contact picker
 
-The iOS [contact picker](../contacts-services.md) supports explicit single or multiple
-selection with requested fields only, through `contacts/v1`. The native and
-WebView hosts reuse the service runner. No Contacts authorization or
-`NSContactsUsageDescription` is needed for the system picker. Android does
-not advertise this capability. Native picker GUI acceptance: NOT RUN.
+The [contact picker](../contacts-services.md) works through `contacts/v1` on iOS and the
+native Android renderer. iOS supports explicit single or multiple selection
+with requested fields only; its native and WebView hosts reuse the service
+runner. No Contacts authorization or `NSContactsUsageDescription` is needed
+for the system picker. iOS native picker GUI acceptance: NOT RUN.
+
+Android uses the system phone or email row picker without `READ_CONTACTS` and
+serves single selection of one `phone` or `email` field; other requests,
+including Notes' **Pick contacts**, settle as `unsupported`. The display name
+arrives in `GivenName`. Gallery's Device tab has a **Choose contact** demo.
+An Android 15 arm64 emulator run passed phone selection and display, Back
+cancellation and reopening, using a local Gallery build with the iOS-only map
+screen stubbed out. Email selection, denied access, physical devices and
+accessibility: NOT RUN. The Android WebView renderer does not advertise
+`contacts/v1`.

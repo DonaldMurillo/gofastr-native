@@ -106,6 +106,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("oauth-web-login/v1", "unavailable");
                 caps.put("iap/v1", "unavailable");
                 caps.put("push/v1", Push.available() ? "available" : "unavailable");
+                caps.put("contacts/v1", Contacts.available(this) ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));
