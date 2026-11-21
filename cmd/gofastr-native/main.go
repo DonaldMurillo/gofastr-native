@@ -60,9 +60,17 @@ Flags (build, run):
                 and Android speech recognition
   --url-scheme  optional application-specific deep-link scheme (native renderer)
   --receive-shares  accept shared text and files into the app's private inbox
+  --calendar        enable iOS calendar events (--calendar-usage sets purpose text)
   --secure-storage  enable Keychain/Keystore storage and authentication
+  --network-status  enable Android one-shot network status
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
+  --location         Enable foreground location services (native iOS and Android)
+  --location-usage   When-in-use purpose text; required with --location on iOS
   --widgets     package a home-screen widget; requires --url-scheme
+  --background-refresh  let Go schedule periodic work while the app is closed (iOS);
+                the --pkg package must export BackgroundRefresh(int64) error
+                and CancelBackgroundRefresh()
+  --push        enable APNs registration (iOS native only)
   --app-group   iOS app-group identifier for share and widget extensions
   --dry-run     print every step without running it
   --debug-trace enable redacted Go runtime traces in instrumented native apps

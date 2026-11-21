@@ -20,6 +20,8 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/behavior"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
+	"github.com/DonaldMurillo/gofastr-native/extension"
+	"github.com/DonaldMurillo/gofastr-native/extension/maps"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -60,6 +62,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 	routes := []nativeui.Route{
 		tabRoot(Root, "controls", "Controls", "Each row opens one demo. A demo that needs a capability says so and refuses to open where the renderer lacks it.", []nativeui.Row{
 			{ID: "fields", Title: "Form fields", Subtitle: "Six field kinds, required, disabled, validation", Destination: "/gallery/fields"},
+			{ID: "map", Title: "Map", Subtitle: "MapKit pins and optional location (iOS)", Destination: "/gallery/map"},
 			{ID: "document", Title: "Document form", Subtitle: "Document style with a details section", Icon: nativeui.IconFile, Destination: "/gallery/document"},
 			{ID: "draft", Title: "Drafts", Subtitle: "Local recovery and the leave prompt", Destination: "/gallery/draft"},
 			{ID: "unknown", Title: "Simulated unknown save", Subtitle: "What happens when a save's outcome is lost", Destination: "/gallery/unknown"},
@@ -144,7 +147,17 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		}},
 	}
 	routes = append(routes, navigationRoutes(called)...)
-	return nativeui.New(Root, routes...)
+	routes = append(routes, nativeui.Route{Path: "/gallery/map", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+		block, err := maps.Block("places", maps.Content{Region: &maps.Region{Latitude: 37.78, Longitude: -122.42, LatitudeDelta: 0.08, LongitudeDelta: 0.08}, ShowsUserLocation: true, Pins: []maps.Pin{
+			{ID: "ferry", Title: "Ferry Building", Latitude: 37.7955, Longitude: -122.3937, Destination: "/gallery/places/ferry"},
+			{ID: "park", Title: "Yerba Buena Gardens", Latitude: 37.785, Longitude: -122.402, Destination: "/gallery/places/park"},
+			{ID: "hall", Title: "City Hall", Latitude: 37.7793, Longitude: -122.4193, Destination: "/gallery/places/hall"},
+		}})
+		return nativeui.Screen{Title: "Map", Text: "Select a pin, then its detail button to open the place.", Components: []extension.Component{block}}, err
+	}}, nativeui.Route{Path: "/gallery/places/{id}", Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+		return nativeui.Screen{Title: "Place", Text: "Selected place: " + request.Params["id"]}, nil
+	}})
+	return nativeui.NewWithExtensions(Root, []extension.Definition{maps.Definition()}, routes...)
 }
 
 var tabs = []nativeui.Tab{
@@ -605,8 +618,8 @@ func Matrix(ctx context.Context) string {
 // KnownCapabilities is every built-in capability in protocol order.
 var KnownCapabilities = []nativeui.Capability{nativeui.CapabilityNavigation, nativeui.CapabilityEditor, nativeui.CapabilityDrafts, nativeui.CapabilityShare,
 	nativeui.CapabilityHaptics, nativeui.CapabilitySheets, nativeui.CapabilityAnnouncement, nativeui.CapabilityPresentation, nativeui.CapabilityFiles,
-	nativeui.CapabilityPhotos, nativeui.CapabilityCamera, nativeui.CapabilityNotifications, nativeui.CapabilitySharing, nativeui.CapabilityClipboard,
-	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy}
+	nativeui.CapabilityPhotos, nativeui.CapabilityCamera, nativeui.CapabilityNotifications, nativeui.CapabilitySharing, nativeui.CapabilityBrowser, nativeui.CapabilityClipboard,
+	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityLocation, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy}
 
 func demoImages() ([]nativeui.Image, error) {
 	draw := func(pixel func(x, y int) color.Color) ([]byte, error) {
