@@ -61,9 +61,10 @@ Flags (build, run):
   --receive-shares  accept shared text and files into the app's private inbox
   --calendar        enable iOS calendar events (--calendar-usage sets purpose text)
   --secure-storage  enable Keychain/Keystore storage and authentication
+  --network-status  enable Android one-shot network status
   --biometric-usage  Face ID purpose text; required for secure storage on iOS
-  --location         Enable foreground iOS location services (native renderer)
-  --location-usage   When-in-use purpose text; required with --location
+  --location         Enable foreground location services (native iOS and Android)
+  --location-usage   When-in-use purpose text; required with --location on iOS
   --widgets     package a home-screen widget; requires --url-scheme
   --background-refresh  let Go schedule periodic work while the app is closed
                 (iOS BGTaskScheduler, Android JobScheduler);

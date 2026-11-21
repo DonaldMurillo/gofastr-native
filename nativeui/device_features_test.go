@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
+	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
@@ -19,6 +20,7 @@ func TestDeviceFeatureOutcomesSettleOnce(t *testing.T) {
 		request ServiceRequest
 		outcome ServiceResult
 	}{
+		{"network", ServiceRequest{ID: "device", Network: &network.Request{Operation: network.Status}}, ServiceResult{Status: EffectCompleted, Network: &network.Result{Connected: true, Transport: "wifi", Validated: true}}},
 		{"inbox", ServiceRequest{ID: "device", IncomingShare: &sharein.Request{Operation: sharein.Next}}, ServiceResult{Status: EffectCompleted, IncomingShare: &sharein.Item{Identifier: "0123456789abcdef0123456789abcdef", Text: "Shared text"}}},
 		{"secure", ServiceRequest{ID: "device", SecureStorage: &securestore.Request{Operation: securestore.Get, Key: "demo", Protection: securestore.Device}}, ServiceResult{Status: EffectCompleted, SecureStorage: &securestore.Result{Found: true, Value: []byte("secret")}}},
 		{"widget", ServiceRequest{ID: "device", Widget: &widgets.Request{Operation: widgets.Status}}, ServiceResult{Status: EffectCompleted, Widget: &widgets.State{Published: true}}},

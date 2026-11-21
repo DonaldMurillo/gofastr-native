@@ -53,6 +53,9 @@ func newLocationRoutes() []nativeui.Route {
 		} else if result.Permission != "" {
 			text += "; permission: " + result.Permission
 		}
+		if result.Location == nil && result.Message != "" {
+			text += "; " + result.Message
+		}
 		mu.Lock()
 		results[string(request.Service.Location.Operation)] = text
 		mu.Unlock()

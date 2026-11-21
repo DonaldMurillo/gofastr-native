@@ -38,6 +38,27 @@ func TestSignInWithAppleRequiresNativeIOSAndProvisionedEntitlement(t *testing.T)
 
 func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 	a := nativeApp(t)
+	a.NetworkStatus = true
+	if err := validateDeviceFeatures(a, "android-emu"); err != nil {
+		t.Fatal(err)
+	}
+	if validateDeviceFeatures(a, "ios-sim") == nil {
+		t.Fatal("network accepted on iOS")
+	}
+	networkManifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+	if err != nil || !bytes.Contains(networkManifest, []byte("ACCESS_NETWORK_STATE")) {
+		t.Fatalf("network permission missing: %v", err)
+	}
+	bootstrap, err := render("templates/android/NativeActivity.java.tmpl", a)
+	if err != nil || !bytes.Contains(bootstrap, []byte("networkStatusEnabled() { return true; }")) {
+		t.Fatalf("network bootstrap missing: %v", err)
+	}
+	a.Renderer = "webview"
+	if validateDeviceFeatures(a, "android-emu") == nil {
+		t.Fatal("network accepted on WebView")
+	}
+	a.Renderer = "native"
+	a.NetworkStatus = false
 	if err := validateDeviceFeatures(a, "android-emu"); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +94,7 @@ func TestDeviceFeaturesAreOptInAndValidatePlatformConfiguration(t *testing.T) {
 	}
 	plain := nativeApp(t)
 	manifest, _ = render("templates/android/AndroidManifest.xml.tmpl", plain)
-	for _, absent := range []string{"android.intent.action.SEND", "USE_BIOMETRIC", "HomeWidget"} {
+	for _, absent := range []string{"ACCESS_NETWORK_STATE", "android.intent.action.SEND", "USE_BIOMETRIC", "HomeWidget"} {
 		if bytes.Contains(manifest, []byte(absent)) {
 			t.Error("unsolicited feature", absent)
 		}
