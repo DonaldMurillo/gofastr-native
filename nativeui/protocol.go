@@ -12,6 +12,7 @@ const ProtocolVersion = 1
 type Capability string
 
 const (
+	CapabilityNetwork         Capability = "network/v1"
 	CapabilityNavigation      Capability = "navigation/v1"
 	CapabilityEditor          Capability = "editor/v1"
 	CapabilityDrafts          Capability = "drafts/v1"
@@ -116,7 +117,7 @@ func (contract Contract) Check(requirements []Requirement) error {
 
 func knownCapability(capability Capability) bool {
 	switch capability {
-	case CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
+	case CapabilityNetwork, CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false

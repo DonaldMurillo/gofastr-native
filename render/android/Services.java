@@ -165,6 +165,10 @@ public final class Services {
             }else if(request.has("share")) share(request.getJSONObject("share"));
             else if(request.has("notification")) notification(request.getJSONObject("notification"));
             else if(request.has("audio")) record(request.getJSONObject("audio"));
+            else if(request.has("network")) {
+                if(!host.networkStatusEnabled()){finish(outcome("unsupported","Network status is disabled."));return;}
+                finish(NetworkStatus.perform(host,request.getJSONObject("network")));
+            }
             else if(request.has("incomingShare")) {
                 if(!host.incomingSharesEnabled()){finish(outcome("unsupported","The share inbox is disabled."));return;}
                 IncomingShares.perform(host,request.getJSONObject("incomingShare"),this::finish);
