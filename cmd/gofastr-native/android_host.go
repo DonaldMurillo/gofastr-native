@@ -11,6 +11,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/extension"
 	renderandroid "github.com/DonaldMurillo/gofastr-native/render/android"
+	renderfcm "github.com/DonaldMurillo/gofastr-native/render/android/fcm"
 )
 
 func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
@@ -40,6 +41,26 @@ func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
 		sources = append(sources, dst)
 	}
 	var factories []string
+	if a.PushConfig != "" {
+		entries, err := renderfcm.Sources.ReadDir(".")
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			dst := filepath.Join(dir, "renderer", "fcm", entry.Name())
+			if err := r.do("copy Android push provider "+entry.Name(), func() error {
+				content, err := renderfcm.Sources.ReadFile(entry.Name())
+				if err != nil {
+					return err
+				}
+				return writeSource(dst, content)
+			}); err != nil {
+				return nil, err
+			}
+			sources = append(sources, dst)
+		}
+		factories = append(factories, "        dev.gofastr.nativeui.fcm.FcmPush.install();\n")
+	}
 	seen := map[string]bool{}
 	for index, definition := range a.Extensions {
 		adapter := definition.manifest.Android
@@ -92,9 +113,11 @@ func (a app) androidBindPackages() []string {
 // AndroidExtensionPermissions lists extension permissions the manifest
 // template does not already declare, in a stable order.
 func (a app) AndroidExtensionPermissions() []string {
-	seen := map[string]bool{"android.permission.INTERNET": true, "android.permission.POST_NOTIFICATIONS": true,
+	seen := map[string]bool{"android.permission.ACCESS_COARSE_LOCATION": a.Location,
+		"android.permission.ACCESS_FINE_LOCATION": a.Location,
+		"android.permission.INTERNET":             true, "android.permission.POST_NOTIFICATIONS": true,
 		"android.permission.RECEIVE_BOOT_COMPLETED": true, "android.permission.RECORD_AUDIO": a.MicrophoneUsage != "",
-		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != ""}
+		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != "", "android.permission.ACCESS_NETWORK_STATE": a.NetworkStatus}
 	var permissions []string
 	for _, definition := range a.Extensions {
 		if definition.manifest.Android == nil {

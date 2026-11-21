@@ -1,13 +1,27 @@
 import Foundation
 
+struct MobileDeviceInfoRequest: Codable {
+    let operation: String
+
+    func validate() throws {
+        guard operation == "info" || operation == "battery" else { throw MobileServiceFailure.invalid }
+    }
+}
+
 struct MobilePushRequest: Codable {
     let operation: String
+    var identifier: String? = nil
+    /// The shared push/v1 operations. next and acknowledge read Android's
+    /// inbox; iOS reports them unsupported and opens tapped routes directly.
+    static let inboxOperations = ["next", "acknowledge"]
     func validate() throws {
-        guard ["register", "unregister", "status"].contains(operation) else { throw MobileServiceFailure.invalid }
+        guard ["register", "unregister", "status"].contains(operation) || Self.inboxOperations.contains(operation) else { throw MobileServiceFailure.invalid }
     }
     func accept(_ state: MobilePushState) throws {
         try validate()
-        guard ["notDetermined", "denied", "authorized", "provisional", "ephemeral"].contains(state.permission),
+        guard !Self.inboxOperations.contains(operation),
+              state.provider == nil || state.provider == "apns",
+              ["notDetermined", "denied", "authorized", "provisional", "ephemeral"].contains(state.permission),
               state.environment == nil || ["development", "production", ""].contains(state.environment!),
               operation != "unregister" || !state.registered,
               state.registered || (state.token ?? "").isEmpty else { throw MobileServiceFailure.invalid }
@@ -21,6 +35,8 @@ struct MobilePushState: Codable {
     let registered: Bool
     var token: String?
     var environment: String?
+    /// The service that issued token; always APNs on iOS.
+    var provider: String? = "apns"
 
     static func environment(profile: Data) -> String? {
         guard profile.count <= 4_194_304,
@@ -65,6 +81,7 @@ struct MobileServiceRequest: Codable {
     let audio: MobileAudioRequest?
     let incomingShare: MobileIncomingShareRequest?
     let secureStorage: MobileSecureStorageRequest?
+    var deviceInfo: MobileDeviceInfoRequest? = nil
     let location: MobileLocationRequest?
     var calendar: MobileCalendarRequest? = nil
     let widget: MobileWidgetRequest?
@@ -78,7 +95,7 @@ struct MobileServiceRequest: Codable {
 
     func validate() throws {
         guard !id.isEmpty, id.utf8.count <= 256, !id.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              [push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil, iap != nil].filter({ $0 }).count == 1 else {
+              [deviceInfo != nil, push != nil, browser != nil, contacts != nil, notification != nil, share != nil, clipboard != nil, audio != nil, incomingShare != nil, secureStorage != nil, widget != nil, location != nil, scan != nil, authentication != nil, calendar != nil, refresh != nil, iap != nil].filter({ $0 }).count == 1 else {
             throw MobileServiceFailure.invalid
         }
         try contacts?.validate()
@@ -91,6 +108,7 @@ struct MobileServiceRequest: Codable {
         try secureStorage?.validate()
         try location?.validate()
         try widget?.validate()
+        try deviceInfo?.validate()
         try scan?.validate()
         try authentication?.validate()
         try calendar?.validate()

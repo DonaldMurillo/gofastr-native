@@ -39,6 +39,10 @@ func TestNativeAndroidCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	if output, err := exec.Command(sdk.javac, args...).CombinedOutput(); err != nil {
 		t.Fatalf("native Android SDK compile: %v\n%s", err, output)
 	}
+	if _, err := os.Stat(filepath.Join(directory, "classes", "dev", "gofastr", "nativeui", "DeviceLocation.class")); err != nil {
+		t.Fatalf("DeviceLocation.java was not compiled: %v", err)
+	}
+	t.Log("SDK javac compiled DeviceLocation.java against generated Go bindings")
 	entries, _ := renderandroid.Sources.ReadDir(".")
 	for _, entry := range entries {
 		want, _ := renderandroid.Sources.ReadFile(entry.Name())
@@ -287,6 +291,34 @@ func TestNativeAndroidDryRunAndPermissionPackaging(t *testing.T) {
 	manifest, _ = render("templates/android/AndroidManifest.xml.tmpl", a)
 	if bytes.Contains(manifest, []byte("RECORD_AUDIO")) || bytes.Contains(manifest, []byte("BROWSABLE")) {
 		t.Fatal("optional permission/link registration was not removed")
+	}
+}
+
+func TestAndroidSpeechServiceVisibility(t *testing.T) {
+	for _, tc := range []struct {
+		name, renderer, mic string
+		speak, recognize    bool
+	}{
+		{"native with microphone", "native", "Transcribe speech.", true, true},
+		{"native without microphone", "native", "", true, false},
+		{"WebView with microphone", "webview", "Record audio.", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := nativeApp(t).forAndroid(36)
+			a.Renderer, a.MicrophoneUsage = tc.renderer, tc.mic
+			manifest, err := render("templates/android/AndroidManifest.xml.tmpl", a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for action, wanted := range map[string]bool{
+				"android.intent.action.TTS_SERVICE": tc.speak,
+				"android.speech.RecognitionService": tc.recognize,
+			} {
+				if bytes.Contains(manifest, []byte(action)) != wanted {
+					t.Errorf("expected %s visibility: %t", action, wanted)
+				}
+			}
+		})
 	}
 }
 

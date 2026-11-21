@@ -6,6 +6,9 @@ application-owned native screens, JavaScript, or behavior templates are required
 GoFastr core remains unchanged. See [native Android](../android.md) for its adapters
 and acceptance limits. [Share-in, secure storage, and widgets](../device-features.md)
 add opt-in Go contracts for both native platforms.
+[Device and battery snapshots](../deviceinfo.md) add `deviceinfo/v1` on native
+Android without opt-in flags or permissions. These are explicit one-shot reads;
+iOS and WebView return unsupported and do not advertise the capability.
 
 ## Four additions in the same Notes application
 

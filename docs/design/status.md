@@ -74,6 +74,18 @@ renderers share the same Go [image preview definitions](../image-previews.md).
 
 Notes also exposes typed reminder scheduling/status/cancellation, rich note and
 attachment sharing, explicit clipboard writes, and private voice recordings.
+On Android, Notes also opens a user-controlled calendar event editor through
+the calendar/v1 `edit` operation; closing it does not confirm saving. iOS and
+WebView return unsupported for `edit`. Etar 1.0.57 on an Android API 34 emulator
+accepted an earlier epoch-millisecond revision of this request (expected title
+and next-hour slot, offline-calendar save with matching provider values,
+completed outcome); the current RFC 3339 wire has NOT RUN on an emulator.
+Google Calendar editor/save and accessibility acceptance are NOT RUN.
+Android builds can opt into FCM [push notifications](../push.md) with
+`--push-config` and `--push-libraries`. They share the iOS `device/push`
+contract (`State.Provider` is `fcm`) and add a private message inbox read with
+`next` and settled with `acknowledge`. Token issue and delivery through
+Firebase servers are NOT RUN.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go
@@ -95,9 +107,26 @@ The WebView renderer live-refreshes screens without a collection too: a data
 change reads the screen's markup again and swaps it into place, keeping
 mounted components, focus and scroll.
 
+Native Android implements the same [location](../location.md) contract with
+`LocationManager`, opted in with `--location`: status without a prompt,
+when-in-use authorization, one current fix with a deadline, and bounded
+tracking. It declares coarse and fine location only and cancels when the
+activity pauses, except during the permission dialog. SDK compilation against
+the generated bindings is automated. Emulator runs, permission dialogs,
+real providers and physical-device acceptance for Android location are NOT RUN.
+
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
+Its Android build also exercises [opening web URLs and receiving Android App
+Links](../android.md#opening-web-urls-and-receiving-android-app-links).
+
+[Device and battery snapshots](../deviceinfo.md) use typed `deviceinfo/v1`
+requests on native Android without permissions or opt-in flags. The devicefeatures
+demo displays both snapshots. iOS and WebView return unsupported and do not
+advertise support. Android 14 emulator acceptance compared model/API with system
+properties and displayed an injected 42% AC-charging battery snapshot.
+Physical-device acceptance is NOT RUN.
 
 [Location](../location.md) (`device/location`) defines typed permission, current-position and bounded
 foreground tracking requests, with `location/v1` protocol negotiation. Native
@@ -124,6 +153,14 @@ and contract tests pass; a physical-device run is NOT RUN.
 [In-app purchases and subscriptions](../iap.md) use StoreKit 2 in the native
 iOS renderer. Android and WebView explicitly report the service as unsupported.
 The storefront demo includes a local StoreKit catalog and simulator UI tests.
+
+[Network status](../network-status.md) has an opt-in Android native adapter and
+a device-features demo action. It reports one snapshot, with no subscriptions.
+iOS and WebView are not implemented.
+
+[Speech services](../android.md#speech) provide foreground text-to-speech and
+single-utterance dictation through the native Android renderer. UIKit and
+WebView do not have these adapters.
 
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
@@ -239,8 +276,10 @@ and recovers retired live reads without replaying writes or replacing inputs.
 
 ## Next steps
 
-Calendar events: bounded `device/calendar` add/read/status contract and opt-in
-iOS EventKit adapter; Android unavailable. The device-features example passed
+Calendar events: bounded `device/calendar` add/read/status/edit contract. The
+opt-in iOS EventKit adapter implements status/add/read; Android implements only
+`edit`, which opens the system calendar editor without confirming a save (see
+[calendar events](../calendar-events.md)). The device-features example passed
 an iPhone 17 / iOS 26.5 simulator UI test with pregranted calendar access:
 add a sample event, report full authorization, and show its title/start after
 reading the next seven days. Permission prompts/hardware acceptance: NOT RUN.

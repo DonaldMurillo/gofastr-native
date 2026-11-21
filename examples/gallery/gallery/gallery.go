@@ -16,8 +16,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -119,6 +121,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		tabRoot("/device", "device", "Device", "Device contracts. The capability matrix shows what this renderer advertised.", []nativeui.Row{
 			{ID: "capabilities", Title: "Capability matrix", Destination: "/device/capabilities"},
 			{ID: "files", Title: "Files", Subtitle: "Export and import", Icon: nativeui.IconFile, Destination: "/device/files"},
+			{ID: "calendar", Title: "Add to calendar", Destination: "/device/calendar"},
 			{ID: "contacts", Title: "Contacts", Subtitle: "Choose one phone number", Destination: "/device/contacts"},
 			{ID: "clipboard", Title: "Clipboard", Destination: "/device/clipboard"},
 			{ID: "share-text", Title: "System share", Destination: "/device/share-text"},
@@ -130,6 +133,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 			return nativeui.Screen{Title: "Capability matrix", Text: Matrix(ctx)}, nil
 		}},
 		filesRoute(called),
+		serviceRoute("/device/calendar", "Add to calendar", "Opens an editable one-hour event. Closing the editor does not confirm a save.", "calendar", "Add to calendar", nativeui.CapabilityCalendar, nativeui.ServiceRequest{ID: "calendar", Calendar: &calendar.Request{Operation: calendar.Edit}}, called),
 		contactsRoute(demo),
 		serviceRoute("/device/clipboard", "Clipboard", "Copies a fixed sentence to the clipboard. The result shows the status the OS reported.", "copy", "Copy text",
 			nativeui.CapabilityClipboard, nativeui.ServiceRequest{ID: "clipboard", Clipboard: &sharing.Clipboard{Text: "Copied from the GoFastr gallery."}}, called),
@@ -616,6 +620,10 @@ func serviceRoute(path, title, text, action, label string, capability nativeui.C
 	}, Actions: map[string]nativeui.Handle{action: func(context.Context, nativeui.Request) (nativeui.Result, error) {
 		called(path + " " + action)
 		copied := request
+		if copied.Calendar != nil {
+			start := time.Now().Truncate(time.Hour).Add(time.Hour)
+			copied.Calendar = &calendar.Request{Operation: calendar.Edit, Event: &calendar.Event{Title: "Gallery event", Start: start, End: start.Add(time.Hour)}}
+		}
 		return nativeui.Result{Service: &copied}, nil
 	}}, Services: map[string]nativeui.ServiceRespond{request.ID: func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
 		called(path + " " + request.ID + "-result")
@@ -651,7 +659,8 @@ func Matrix(ctx context.Context) string {
 var KnownCapabilities = []nativeui.Capability{nativeui.CapabilityNavigation, nativeui.CapabilityEditor, nativeui.CapabilityDrafts, nativeui.CapabilityShare,
 	nativeui.CapabilityHaptics, nativeui.CapabilitySheets, nativeui.CapabilityAnnouncement, nativeui.CapabilityPresentation, nativeui.CapabilityFiles,
 	nativeui.CapabilityPhotos, nativeui.CapabilityCamera, nativeui.CapabilityNotifications, nativeui.CapabilitySharing, nativeui.CapabilityBrowser, nativeui.CapabilityClipboard,
-	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy}
+	nativeui.CapabilityAudio, nativeui.CapabilityLive, nativeui.CapabilityIncomingShares, nativeui.CapabilitySecureStorage, nativeui.CapabilityLocation, nativeui.CapabilityWidgets, nativeui.CapabilityPrivacy,
+	nativeui.CapabilityCalendar}
 
 func demoImages() ([]nativeui.Image, error) {
 	draw := func(pixel func(x, y int) color.Color) ([]byte, error) {

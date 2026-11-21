@@ -12,12 +12,17 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
+	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
+	"github.com/DonaldMurillo/gofastr-native/device/links"
+	"github.com/DonaldMurillo/gofastr-native/device/network"
+	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -123,6 +128,7 @@ func Dispatch(route, action, values string) (string, error) {
 func newApp() (*nativeui.App, error) {
 	var inboxMu sync.Mutex
 	var next *sharein.Item
+	var pushed *push.Message
 	var scanMessage string
 	service := func(request nativeui.ServiceRequest) nativeui.Handle {
 		request.ID = "device"
@@ -147,6 +153,10 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Network != nil:
+				message = fmt.Sprintf("Connected: %t; transport: %s; metered: %t; validated: %t.", result.Network.Connected, result.Network.Transport, result.Network.Metered, result.Network.Validated)
+			case result.DeviceInfo != nil:
+				message = snapshotText(*result.DeviceInfo)
 			case result.Scan != nil:
 				message = fmt.Sprintf("Scanned %s: %s", result.Scan.Symbology, result.Scan.Value)
 			case result.Calendar != nil:
@@ -163,6 +173,20 @@ func newApp() (*nativeui.App, error) {
 				message = fmt.Sprintf("Widget snapshot published: %t.", result.Widget.Published)
 			case result.Refresh != nil:
 				message = fmt.Sprintf("Background refresh scheduled: %t.", result.Refresh.Scheduled)
+			case result.Push != nil:
+				inboxMu.Lock()
+				pushed = result.Push.Message
+				inboxMu.Unlock()
+				switch {
+				case result.Push.Token != "":
+					message = fmt.Sprintf("%s push token %s (%d bytes). Send it to your server; notifications permission: %s.", result.Push.Provider, preview(result.Push.Token[:min(12, len(result.Push.Token))]), len(result.Push.Token), result.Push.Permission)
+				case result.Push.Message != nil:
+					message = fmt.Sprintf("Push %s: %s %s (%d data keys, route %q).", result.Push.Message.Identifier, result.Push.Message.Title, preview(result.Push.Message.Body), len(result.Push.Message.Data), result.Push.Message.Route)
+				case result.Message != "":
+					message = result.Message
+				default:
+					message = fmt.Sprintf("No push token or message. Notifications permission: %s.", result.Push.Permission)
+				}
 			default:
 				item := result.IncomingShare
 				inboxMu.Lock()
@@ -183,6 +207,10 @@ func newApp() (*nativeui.App, error) {
 		return nativeui.Route{Path: path, Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
+	}
+	withService := func(route nativeui.Route, id string, respond nativeui.ServiceRespond) nativeui.Route {
+		route.Services[id] = respond
+		return route
 	}
 	signIn := func(operation authentication.Operation) nativeui.Handle {
 		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
@@ -211,21 +239,35 @@ func newApp() (*nativeui.App, error) {
 		return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/features/scanned"}}, nil
 	}
 	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
+		rows := []nativeui.Row{
+			{ID: "device", Title: "Device and battery", Destination: "/features/device"},
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
+			{ID: "network", Title: "Network status", Destination: "/features/network"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "calendar", Title: "Calendar events", Destination: "/features/calendar"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
 			{ID: "location", Title: "Location", Destination: "/features/location"},
 			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
-		}}}, nil
+			{ID: "push", Title: "Push notifications", Destination: "/features/push"},
+		}
+		if goruntime.GOOS == "android" {
+			rows = append(rows, nativeui.Row{ID: "links", Title: "Web links", Destination: "/features/links"})
+		}
+		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: rows}}, nil
 	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
 		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			inboxMu.Lock()
 			defer inboxMu.Unlock()
 			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
 		}},
+		deviceRoute("/features/network", "Network status", "Query the active Android network. Re-query after changing connectivity or resuming the app.", []nativeui.Action{{ID: "status", Label: "Check network status", Primary: true}}, map[string]nativeui.Handle{"status": service(nativeui.ServiceRequest{Network: &network.Request{Operation: network.Status}})}),
+		deviceRoute("/features/device", "Device and battery", "Read a device or battery snapshot. No permission or subscription is required on Android. Other renderers report unsupported.", []nativeui.Action{
+			{ID: "info", Label: "Device info", Primary: true}, {ID: "battery", Label: "Battery"},
+		}, map[string]nativeui.Handle{
+			"info":    service(nativeui.ServiceRequest{DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}}),
+			"battery": service(nativeui.ServiceRequest{DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}}),
+		}),
 		deviceRoute("/features/inbox", "Shared inbox", "Share text or files from another app, then choose Read next. Read does not consume it. Discard removes only the reviewed share.", []nativeui.Action{
 			{ID: "read", Label: "Read next", Primary: true}, {ID: "discard", Label: "Discard reviewed share"},
 		}, map[string]nativeui.Handle{
@@ -253,11 +295,16 @@ func newApp() (*nativeui.App, error) {
 			Services: map[string]nativeui.ServiceRespond{"sign-in": func(_ context.Context, _ nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
 				return nativeui.Result{Announcement: "Sign-in result: " + string(outcome.Status) + ". No app account was created."}, nil
 			}}},
-		deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar.", []nativeui.Action{
+		withService(deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar on iOS. On Android, Open calendar editor shows the system editor; closing it does not confirm a save.", []nativeui.Action{
 			{ID: "calendar-add", Label: "Add sample event", Primary: true},
 			{ID: "calendar-status", Label: "Calendar status"},
 			{ID: "calendar-read", Label: "Read next 7 days"},
+			{ID: "calendar-edit", Label: "Open calendar editor"},
 		}, map[string]nativeui.Handle{
+			"calendar-edit": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				start := time.Now().Truncate(time.Hour).Add(time.Hour)
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "calendar-editor", Calendar: &calendar.Request{Operation: calendar.Edit, Event: &calendar.Event{Title: "GoFastr sample event", Start: start, End: start.Add(time.Hour)}}}}, nil
+			},
 			"calendar-status": service(nativeui.ServiceRequest{Calendar: &calendar.Request{Operation: calendar.Status}}),
 			"calendar-add": func(context.Context, nativeui.Request) (nativeui.Result, error) {
 				start := time.Now().AddDate(0, 0, 1).Truncate(time.Minute)
@@ -267,13 +314,29 @@ func newApp() (*nativeui.App, error) {
 				now := time.Now()
 				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Read, From: now, To: now.AddDate(0, 0, 7), Limit: calendar.MaxLimit}}}, nil
 			},
-		}),
+		}), "calendar-editor", calendarEditorRespond),
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
 			"publish": service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Publish, Snapshot: &widgets.Snapshot{Title: "GoFastr device features", Text: "Published from shared Go code", Route: "/features/widgets", Items: []widgets.Item{{ID: "shared", Title: "Android and iOS", Subtitle: "One Go snapshot"}}}}}),
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
+		}),
+		deviceRoute("/features/push", "Push notifications", "Register to get this device's push token for your server. On Android received messages wait here until you acknowledge them; iOS opens a tapped notification's route directly and has no inbox.", []nativeui.Action{
+			{ID: "register", Label: "Register for push", Primary: true}, {ID: "status", Label: "Check registration"}, {ID: "next", Label: "Read next message"}, {ID: "acknowledge", Label: "Acknowledge message"}, {ID: "unregister", Label: "Unregister"},
+		}, map[string]nativeui.Handle{
+			"register":   service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Register}}),
+			"status":     service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Status}}),
+			"next":       service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Next}}),
+			"unregister": service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Unregister}}),
+			"acknowledge": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				inboxMu.Lock()
+				defer inboxMu.Unlock()
+				if pushed == nil {
+					return nativeui.Result{Announcement: "Read a push message before acknowledging it."}, nil
+				}
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Push: &push.Request{Operation: push.Acknowledge, Identifier: pushed.Identifier}}}, nil
+			},
 		}),
 		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
@@ -284,6 +347,23 @@ func newApp() (*nativeui.App, error) {
 			"status":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Status}}),
 			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
 		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
+		nativeui.Route{
+			Path: "/features/links",
+			Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+				return nativeui.Screen{
+					Title:    "Web links",
+					Text:     "Open a web URL with Android. Link source: " + preview(request.Values["source"]),
+					Actions:  []nativeui.Action{{ID: "open-web", Label: "Open Android App Links guide", Primary: true}},
+					Requires: []nativeui.Requirement{{Capability: nativeui.CapabilityOpenURL}},
+				}, nil
+			},
+			Actions: map[string]nativeui.Handle{
+				"open-web": service(nativeui.ServiceRequest{OpenURL: &links.Open{URL: "https://developer.android.com/training/app-links"}}),
+			},
+			Services: map[string]nativeui.ServiceRespond{"device": func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+				return nativeui.Result{Announcement: result.Message}, nil
+			}},
+		},
 	}
 	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 }
@@ -300,6 +380,37 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+func snapshotText(result deviceinfo.Result) string {
+	if info := result.Info; info != nil {
+		version := info.AppVersion
+		if version == "" {
+			version = "unknown"
+		}
+		return fmt.Sprintf("Device: %s %s; %s %s (API %d); locale %s; app %s.", info.Manufacturer, info.Model, info.Platform, info.OSVersion, info.APILevel, info.Locale, version)
+	}
+	if battery := result.Battery; battery != nil {
+		level := "unknown"
+		if battery.LevelKnown {
+			level = fmt.Sprintf("%d%%", battery.Level)
+		}
+		save := "off"
+		if battery.PowerSave {
+			save = "on"
+		}
+		return fmt.Sprintf("Battery: %s %s (%s), power save %s.", level, battery.State, battery.PowerSource, save)
+	}
+	return "Device snapshot unavailable."
+}
+
+// calendarEditorRespond reports the Android editor outcome. The editor does
+// not say whether the person saved the event.
+func calendarEditorRespond(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+	if result.Status == nativeui.EffectCompleted {
+		return nativeui.Result{Announcement: "Calendar editor closed. Saving is not confirmed."}, nil
+	}
+	return nativeui.Result{Announcement: "Calendar editor: " + string(result.Status)}, nil
 }
 
 func calendarMessage(result calendar.Result) string {
