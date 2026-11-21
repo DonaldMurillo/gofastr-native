@@ -39,6 +39,10 @@ func TestNativeAndroidCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	if output, err := exec.Command(sdk.javac, args...).CombinedOutput(); err != nil {
 		t.Fatalf("native Android SDK compile: %v\n%s", err, output)
 	}
+	if _, err := os.Stat(filepath.Join(directory, "classes", "dev", "gofastr", "nativeui", "DeviceLocation.class")); err != nil {
+		t.Fatalf("DeviceLocation.java was not compiled: %v", err)
+	}
+	t.Log("SDK javac compiled DeviceLocation.java against generated Go bindings")
 	entries, _ := renderandroid.Sources.ReadDir(".")
 	for _, entry := range entries {
 		want, _ := renderandroid.Sources.ReadFile(entry.Name())

@@ -92,3 +92,27 @@ func TestLocationInitiallyShowsNoCoordinates(t *testing.T) {
 		}
 	}
 }
+
+func TestLocationFailureMessageIsShown(t *testing.T) {
+	route, ctx := newLocationRoutes()[0], context.Background()
+	response, err := route.Actions["current"](ctx, nativeui.Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, outcome := range []struct {
+		result nativeui.ServiceResult
+		want   string
+	}{
+		{nativeui.ServiceResult{Status: nativeui.EffectUnsupported, Permission: "when_in_use", Message: "Location services are off."}, "unsupported; permission: when_in_use; Location services are off."},
+		{nativeui.ServiceResult{Status: nativeui.EffectFailed, Message: "No location fix arrived in time."}, "failed; No location fix arrived in time."},
+		{nativeui.ServiceResult{Status: nativeui.EffectDenied, Permission: "denied"}, "denied; permission: denied"},
+	} {
+		got, err := route.Services["location"](ctx, nativeui.Request{Service: response.Service}, outcome.result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Announcement != outcome.want {
+			t.Fatalf("announcement = %q, want %q", got.Announcement, outcome.want)
+		}
+	}
+}
