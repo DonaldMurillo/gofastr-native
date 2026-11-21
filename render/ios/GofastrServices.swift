@@ -10,12 +10,18 @@ struct MobileDeviceInfoRequest: Codable {
 
 struct MobilePushRequest: Codable {
     let operation: String
+    var identifier: String? = nil
+    /// The shared push/v1 operations. next and acknowledge read Android's
+    /// inbox; iOS reports them unsupported and opens tapped routes directly.
+    static let inboxOperations = ["next", "acknowledge"]
     func validate() throws {
-        guard ["register", "unregister", "status"].contains(operation) else { throw MobileServiceFailure.invalid }
+        guard ["register", "unregister", "status"].contains(operation) || Self.inboxOperations.contains(operation) else { throw MobileServiceFailure.invalid }
     }
     func accept(_ state: MobilePushState) throws {
         try validate()
-        guard ["notDetermined", "denied", "authorized", "provisional", "ephemeral"].contains(state.permission),
+        guard !Self.inboxOperations.contains(operation),
+              state.provider == nil || state.provider == "apns",
+              ["notDetermined", "denied", "authorized", "provisional", "ephemeral"].contains(state.permission),
               state.environment == nil || ["development", "production", ""].contains(state.environment!),
               operation != "unregister" || !state.registered,
               state.registered || (state.token ?? "").isEmpty else { throw MobileServiceFailure.invalid }
@@ -29,6 +35,8 @@ struct MobilePushState: Codable {
     let registered: Bool
     var token: String?
     var environment: String?
+    /// The service that issued token; always APNs on iOS.
+    var provider: String? = "apns"
 
     static func environment(profile: Data) -> String? {
         guard profile.count <= 4_194_304,

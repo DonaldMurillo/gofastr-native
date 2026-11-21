@@ -193,6 +193,11 @@ enum ServiceChecks {
         let pushJSON = try JSONSerialization.data(withJSONObject: pushResult.wire)
         let decodedPush = try decoder.decode(MobileServiceResult.self, from: pushJSON)
         precondition(decodedPush.push?.token == "aabb")
+        precondition(decodedPush.push?.provider == "apns" && (pushResult.wire["push"] as? [String: Any])?["provider"] as? String == "apns")
+        try MobilePushRequest(operation: "next").validate()
+        try MobilePushRequest(operation: "acknowledge", identifier: String(repeating: "a", count: 32)).validate()
+        rejected { try MobilePushRequest(operation: "next").accept(MobilePushState(permission: "authorized", registered: false)) }
+        rejected { try push.accept(MobilePushState(permission: "authorized", registered: true, token: "aabb", provider: "fcm")) }
         precondition(MobilePushState.environment(profile: Data()) == nil)
         let profile = Data(#"<?xml version="1.0"?><plist version="1.0"><dict><key>Entitlements</key><dict><key>aps-environment</key><string>production</string></dict></dict></plist>"#.utf8)
         precondition(MobilePushState.environment(profile: profile) == "production")

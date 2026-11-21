@@ -12,7 +12,7 @@ import (
 func pushScreen(permission, token, environment, result string) nativeui.Screen {
 	return nativeui.Screen{Title: "Push notifications", List: &nativeui.List{Rows: []nativeui.Row{
 		{ID: "push-permission", Title: "Permission", Subtitle: permission, Disabled: true},
-		{ID: "push-token", Title: "APNs token", Subtitle: token, Disabled: true},
+		{ID: "push-token", Title: "Push token", Subtitle: token, Disabled: true},
 		{ID: "push-environment", Title: "Environment", Subtitle: environment, Disabled: true},
 		{ID: "push-result", Title: "Result", Subtitle: result, Disabled: true},
 	}}, Actions: []nativeui.Action{

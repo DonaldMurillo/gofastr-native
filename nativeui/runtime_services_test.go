@@ -8,8 +8,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
+	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
@@ -35,11 +37,47 @@ func serviceCommand(t *testing.T, ctx context.Context, runtime *Runtime, command
 	return reply
 }
 
+func TestCalendarEditOutcomes(t *testing.T) {
+	begin := time.Date(2028, 1, 1, 9, 0, 0, 0, time.UTC)
+	event := calendar.Event{Title: "Event", Start: begin, End: begin.Add(time.Hour)}
+	request := ServiceRequest{ID: "calendar", Calendar: &calendar.Request{Operation: calendar.Edit, Event: &event}}
+	if err := request.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if request.capability() != CapabilityCalendar {
+		t.Fatal("wrong capability")
+	}
+	for _, result := range []ServiceResult{{Status: EffectCompleted}, {Status: EffectCompleted, Calendar: &calendar.Result{}}, {Status: EffectCancelled}, {Status: EffectUnsupported}, {Status: EffectFailed}} {
+		if err := request.accept(result); err != nil {
+			t.Fatal(result, err)
+		}
+	}
+	for _, result := range []ServiceResult{
+		{Status: EffectCompleted, Calendar: &calendar.Result{Identifier: "event"}},
+		{Status: EffectCompleted, Calendar: &calendar.Result{Authorization: "full"}},
+		{Status: EffectCompleted, Calendar: &calendar.Result{Events: []calendar.Event{}}},
+		{Status: EffectCompleted, Identifier: "event"}, {Status: EffectCompleted, File: &files.Document{}},
+		{Status: EffectCancelled, Calendar: &calendar.Result{}},
+	} {
+		if request.accept(result) == nil {
+			t.Fatal("calendar editor content accepted", result)
+		}
+	}
+	add := ServiceRequest{ID: "calendar", Calendar: &calendar.Request{Operation: calendar.Add, Event: &event}}
+	if add.accept(ServiceResult{Status: EffectCompleted}) == nil {
+		t.Fatal("add accepted a completion without an identifier")
+	}
+	request.Clipboard = &sharing.Clipboard{}
+	if request.Validate() == nil {
+		t.Fatal("competing operation accepted")
+	}
+}
+
 func serviceConnection(t *testing.T, runtime *Runtime) string {
 	t.Helper()
 	reply := serviceCommand(t, context.Background(), runtime, Command{Kind: "hello", Hello: &Hello{Minimum: 1, Maximum: 1, Renderer: "webview", Capabilities: map[Capability]Support{
 		CapabilityNavigation: SupportAvailable, CapabilityEditor: SupportAvailable, CapabilityNotifications: SupportUnavailable,
-		CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
+		CapabilityCalendar: SupportAvailable, CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
 		CapabilityContacts: SupportAvailable, CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback, CapabilityNetwork: SupportAvailable,
 	}}})
 	if reply.Error != nil {
@@ -89,6 +127,7 @@ func admitService(t *testing.T, runtime *Runtime, command Command) Reply {
 func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 	definitions := map[string]ServiceRequest{
 		"network":   {ID: "device", Network: &network.Request{Operation: network.Status}},
+		"calendar":  {ID: "device", Calendar: &calendar.Request{Operation: calendar.Edit, Event: &calendar.Event{Title: "Event", Start: time.Unix(1000, 0), End: time.Unix(2000, 0)}}},
 		"schedule":  {ID: "device", Notification: &notifications.Request{Operation: "schedule", Identifier: "notes:1", Title: "Remember", Route: "/device", Date: "2028-02-29", Time: "10:00"}},
 		"cancel":    {ID: "device", Notification: &notifications.Request{Operation: "cancel", Identifier: "notes:1"}},
 		"status":    {ID: "device", Notification: &notifications.Request{Operation: "status", Identifier: "notes:1"}},

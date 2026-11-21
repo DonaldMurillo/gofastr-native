@@ -41,7 +41,7 @@ struct MobileCalendarRequest: Codable {
     var effectiveLimit: Int { (limit ?? 0) == 0 ? 20 : limit! }
 
     func validate() throws {
-        if operation == "status" || operation == "add" {
+        if operation == "status" || operation == "add" || operation == "edit" {
             guard from == nil, to == nil, (limit ?? 0) == 0 else { throw MobileCalendarFailure.invalid }
             if operation == "status" { guard event == nil else { throw MobileCalendarFailure.invalid }; return }
             guard let event else { throw MobileCalendarFailure.invalid }
@@ -62,6 +62,8 @@ struct MobileCalendarRequest: Codable {
                   result.identifier == nil, result.events == nil else { throw MobileCalendarFailure.invalid }
         case "add":
             guard MobileCalendarEvent.validID(result.identifier ?? ""), result.authorization == nil, result.events == nil else { throw MobileCalendarFailure.invalid }
+        case "edit":
+            guard result.identifier == nil, result.authorization == nil, result.events == nil else { throw MobileCalendarFailure.invalid }
         default:
             guard result.authorization == nil, result.identifier == nil, (result.events?.count ?? 0) <= effectiveLimit,
                   let from = from.flatMap(MobileCalendarEvent.date), let to = to.flatMap(MobileCalendarEvent.date) else { throw MobileCalendarFailure.invalid }
@@ -118,6 +120,8 @@ final class GofastrCalendar {
         guard self.completion == nil else { completion(MobileServiceResult(status: "failed")); return }
         guard Self.enabled else { completion(MobileServiceResult(status: "unsupported")); return }
         do { try request.validate() } catch { completion(MobileServiceResult(status: "failed")); return }
+        // The system event editor is Android-only for now; EventKit adds directly.
+        if request.operation == "edit" { completion(MobileServiceResult(status: "unsupported", message: "The calendar editor is not available on iOS. Use add.")); return }
         self.completion = completion
         cancelled = false
         queue.async {

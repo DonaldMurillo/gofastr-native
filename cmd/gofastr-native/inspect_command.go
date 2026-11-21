@@ -87,9 +87,9 @@ func inspectProfiles() []inspectProfile {
 	uikit["browser/v1"] = "available"
 	// render/android/GofastrActivity.java, with microphone, incoming shares,
 	// secure storage and widgets off.
-	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy", "deviceinfo")
+	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy", "calendar", "deviceinfo")
 	uikit["location/v1"] = "unavailable"
-	for _, name := range []string{"browser", "audio", "incoming-shares", "secure-storage", "widgets", "location", "calendar"} {
+	for _, name := range []string{"browser", "audio", "incoming-shares", "secure-storage", "widgets", "location"} {
 		android[name+"/v1"] = "unavailable"
 	}
 	// render/webview/webview.js in a browser without the device services

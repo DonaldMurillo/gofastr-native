@@ -56,6 +56,10 @@ under the selected output directory. Run installs only the selected app package.
   private, randomly named content URIs with temporary grants. Transfer storage is
   capped and old transfers expire after 24 hours. Closing the share sheet does not
   prove recipient delivery.
+- Calendar `edit` requests open the installed calendar editor without calendar
+  permission. Closing it does not confirm saving. Missing apps report
+  unsupported; `status`, `add` and `read` report unsupported.
+  See [calendar events](calendar-events.md) for bounds and acceptance limits.
 - Recording requires `--microphone-usage`, then Android permission at the user's
   explicit action. AAC/M4A recording is foreground-only, bounded by the request
   and the framework's 60 second / 1 MiB ceiling. Notes requests 512 KiB. Cancelled
@@ -100,6 +104,9 @@ to `camera`, `location`, `microphone`, `dataSync`, `mediaPlayback` or
 `connectedDevice`, joined with `|`. A library may ship only an Android adapter.
 The [capture library](capture.md) uses all of these for background video
 capture, location and camera direction, with live WHIP streaming.
+
+- Remote push is opt-in Firebase Cloud Messaging with a private message inbox;
+  see [push notifications](push.md) for licensing, flags and validation.
 
 ## Build compatibility
 
