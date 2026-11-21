@@ -1,5 +1,8 @@
 # Shared native device features
 
+[Network status](network-status.md) is an Android-only, opt-in one-shot service.
+The device-features demo includes a network query; enable it with `--network-status`.
+
 Share-in, secure storage with biometric authentication, and home-screen widgets
 use the same Go contracts on Android and iOS. The app authors requests and
 handles typed outcomes in `nativeui.Route.Services`. The platform adapters own
@@ -14,6 +17,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
 | Foreground location | `ServiceRequest.Location` | Not implemented | CoreLocation, when-in-use authorization, bounded updates |
 | Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
+| Network status | `ServiceRequest.Network` | One-shot ConnectivityManager snapshot (`network/v1`); see [network status](network-status.md) | Not implemented |
 
 [Device and battery snapshots](deviceinfo.md) require no opt-in or permission on
 Android. The demo offers Device info and Battery actions; iOS and WebView return

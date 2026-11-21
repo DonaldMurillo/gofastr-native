@@ -19,6 +19,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
+	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -148,6 +149,8 @@ func newApp() (*nativeui.App, error) {
 		message := "Device result: " + string(result.Status)
 		if result.Status == nativeui.EffectCompleted {
 			switch {
+			case result.Network != nil:
+				message = fmt.Sprintf("Connected: %t; transport: %s; metered: %t; validated: %t.", result.Network.Connected, result.Network.Transport, result.Network.Metered, result.Network.Validated)
 			case result.DeviceInfo != nil:
 				message = snapshotText(*result.DeviceInfo)
 			case result.Scan != nil:
@@ -217,6 +220,7 @@ func newApp() (*nativeui.App, error) {
 		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
 			{ID: "device", Title: "Device and battery", Destination: "/features/device"},
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
+			{ID: "network", Title: "Network status", Destination: "/features/network"},
 			{ID: "secure", Title: "Secure storage", Destination: "/features/secure"},
 			{ID: "calendar", Title: "Calendar events", Destination: "/features/calendar"},
 			{ID: "widgets", Title: "Home-screen widget", Destination: "/features/widgets"},
@@ -230,6 +234,7 @@ func newApp() (*nativeui.App, error) {
 			defer inboxMu.Unlock()
 			return nativeui.Screen{Title: "Scan result", Text: scanMessage}, nil
 		}},
+		deviceRoute("/features/network", "Network status", "Query the active Android network. Re-query after changing connectivity or resuming the app.", []nativeui.Action{{ID: "status", Label: "Check network status", Primary: true}}, map[string]nativeui.Handle{"status": service(nativeui.ServiceRequest{Network: &network.Request{Operation: network.Status}})}),
 		deviceRoute("/features/device", "Device and battery", "Read a device or battery snapshot. No permission or subscription is required on Android. Other renderers report unsupported.", []nativeui.Action{
 			{ID: "info", Label: "Device info", Primary: true}, {ID: "battery", Label: "Battery"},
 		}, map[string]nativeui.Handle{

@@ -8,6 +8,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
+	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
@@ -20,6 +21,7 @@ func TestDeviceFeatureOutcomesSettleOnce(t *testing.T) {
 		request ServiceRequest
 		outcome ServiceResult
 	}{
+		{"network", ServiceRequest{ID: "device", Network: &network.Request{Operation: network.Status}}, ServiceResult{Status: EffectCompleted, Network: &network.Result{Connected: true, Transport: "wifi", Validated: true}}},
 		{"battery", ServiceRequest{ID: "device", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadBattery}}, ServiceResult{Status: EffectCompleted, DeviceInfo: &deviceinfo.Result{Battery: &deviceinfo.Battery{State: deviceinfo.UnknownState, PowerSource: deviceinfo.UnknownSource}}}},
 		{"info", ServiceRequest{ID: "device", DeviceInfo: &deviceinfo.Request{Operation: deviceinfo.ReadInfo}}, ServiceResult{Status: EffectCompleted, DeviceInfo: &deviceinfo.Result{Info: &deviceinfo.Info{Platform: "android", Locale: "en-US"}}}},
 		{"inbox", ServiceRequest{ID: "device", IncomingShare: &sharein.Request{Operation: sharein.Next}}, ServiceResult{Status: EffectCompleted, IncomingShare: &sharein.Item{Identifier: "0123456789abcdef0123456789abcdef", Text: "Shared text"}}},
