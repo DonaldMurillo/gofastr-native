@@ -91,13 +91,12 @@ public abstract class GofastrActivity extends Activity {
             try {
                 backend.start(getFilesDir().getAbsolutePath()+"/app");
                 Map<String,String> caps = new LinkedHashMap<>();
-                for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
+                for(String name: new String[]{"navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "calendar", "clipboard", "live", "notifications", "privacy"}) caps.put(name+"/v1", "available");
                 caps.put("audio/v1", microphoneEnabled() ? "available" : "unavailable");
                 caps.put("browser/v1", "unavailable");
                 caps.put("text-to-speech/v1", Speech.canSpeak(this) ? "available" : "unavailable");
                 caps.put("speech-recognition/v1", microphoneEnabled() && android.speech.SpeechRecognizer.isRecognitionAvailable(this) ? "available" : "unavailable");
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
-                caps.put("calendar/v1", "unavailable");
                 caps.put("location/v1", locationEnabled() ? "available" : "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
                 if(networkStatusEnabled())caps.put("network/v1", "available");
@@ -105,6 +104,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("sign-in-with-apple/v1", "unavailable");
                 caps.put("oauth-web-login/v1", "unavailable");
                 caps.put("iap/v1", "unavailable");
+                caps.put("push/v1", Push.available() ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));
                 if (reply.has("error")) throw new IllegalStateException(reply.optJSONObject("error").optString("message"));
@@ -187,7 +187,7 @@ public abstract class GofastrActivity extends Activity {
     }
     private String routeFrom(Intent intent) {
         if(intent==null) return "";
-        if(intent.getBooleanExtra("gofastr.reminder", false)) return localRoute(intent.getStringExtra("route"));
+        if(intent.getBooleanExtra("gofastr.reminder", false) || intent.getBooleanExtra("gofastr.push", false)) return localRoute(intent.getStringExtra("route"));
         if(!Intent.ACTION_VIEW.equals(intent.getAction()))return "";
         android.net.Uri uri=intent.getData();
         if(uri==null || urlScheme().isEmpty() || !urlScheme().equals(uri.getScheme()) || uri.getFragment()!=null) return "";

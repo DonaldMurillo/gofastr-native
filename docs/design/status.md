@@ -74,6 +74,18 @@ renderers share the same Go [image preview definitions](../image-previews.md).
 
 Notes also exposes typed reminder scheduling/status/cancellation, rich note and
 attachment sharing, explicit clipboard writes, and private voice recordings.
+On Android, Notes also opens a user-controlled calendar event editor through
+the calendar/v1 `edit` operation; closing it does not confirm saving. iOS and
+WebView return unsupported for `edit`. Etar 1.0.57 on an Android API 34 emulator
+accepted an earlier epoch-millisecond revision of this request (expected title
+and next-hour slot, offline-calendar save with matching provider values,
+completed outcome); the current RFC 3339 wire has NOT RUN on an emulator.
+Google Calendar editor/save and accessibility acceptance are NOT RUN.
+Android builds can opt into FCM [push notifications](../push.md) with
+`--push-config` and `--push-libraries`. They share the iOS `device/push`
+contract (`State.Provider` is `fcm`) and add a private message inbox read with
+`next` and settled with `acknowledge`. Token issue and delivery through
+Firebase servers are NOT RUN.
 Collections now page in the owner-scoped repository beyond 200 records and
 watch confirmed changes from the shared service. See [device services and
 acceptance limits](mobile-services.md). Native Android uses the same Go
@@ -255,8 +267,10 @@ and recovers retired live reads without replaying writes or replacing inputs.
 
 ## Next steps
 
-Calendar events: bounded `device/calendar` add/read/status contract and opt-in
-iOS EventKit adapter; Android unavailable. The device-features example passed
+Calendar events: bounded `device/calendar` add/read/status/edit contract. The
+opt-in iOS EventKit adapter implements status/add/read; Android implements only
+`edit`, which opens the system calendar editor without confirming a save (see
+[calendar events](../calendar-events.md)). The device-features example passed
 an iPhone 17 / iOS 26.5 simulator UI test with pregranted calendar access:
 add a sample event, report full authorization, and show its title/start after
 reading the next seven days. Permission prompts/hardware acceptance: NOT RUN.

@@ -23,6 +23,7 @@ type buildFlags struct {
 	platform, pkg, id, name, version, out, hostTemplate, renderer   *string
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
+	pushConfig, pushLibraries                                       *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
 	signInWithApple, backgroundRefresh, push                        *bool
 	wait                                                            *time.Duration
@@ -55,6 +56,8 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		backgroundRefresh: fs.Bool("background-refresh", false, "enable periodic background refresh (iOS)"),
 		push:              fs.Bool("push", false, "enable iOS APNs registration"),
 		appGroup:          fs.String("app-group", "", "iOS app-group identifier"),
+		pushConfig:        fs.String("push-config", "", "Firebase google-services.json enabling Android push notifications"),
+		pushLibraries:     fs.String("push-libraries", "", "directory filled by gofastr-native push-libraries"),
 		dry:               fs.Bool("dry-run", false, "print the steps only"),
 		debugTrace:        fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
 		device:            fs.String("device", "", "simulator / device / AVD"),
@@ -191,6 +194,16 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.BackgroundRefresh = *f.backgroundRefresh
 	a.Push = *f.push
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
+	for _, value := range []struct{ flag, dst *string }{{f.pushConfig, &a.PushConfig}, {f.pushLibraries, &a.PushLibraries}} {
+		if *value.flag != "" {
+			absolute, err := filepath.Abs(*value.flag)
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return app{}, 2
+			}
+			*value.dst = absolute
+		}
+	}
 	a.Location, a.LocationUsage = *f.location, strings.TrimSpace(*f.locationUsage)
 	if err := validateDeviceFeatures(a, *f.platform); err != nil {
 		fmt.Fprintln(stderr, err)

@@ -116,6 +116,10 @@ public final class GofastrServiceRunner: NSObject, CNContactPickerDelegate, SFSa
         }
         if let push = request.push {
             guard Self.capabilities()["push/v1"] == "available" else { finish(token, MobileServiceResult(status: "unsupported")); return }
+            guard !MobilePushRequest.inboxOperations.contains(push.operation) else {
+                finish(token, MobileServiceResult(status: "unsupported", message: "iOS has no push inbox; it opens a tapped notification's route directly."))
+                return
+            }
             durableServiceActive = true
             GofastrPush.perform(push) { [weak self] result in
                 self?.durableServiceActive = false

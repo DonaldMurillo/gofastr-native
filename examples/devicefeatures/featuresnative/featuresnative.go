@@ -19,6 +19,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
+	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
 	"github.com/DonaldMurillo/gofastr-native/device/scanner"
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
@@ -124,6 +125,7 @@ func Dispatch(route, action, values string) (string, error) {
 func newApp() (*nativeui.App, error) {
 	var inboxMu sync.Mutex
 	var next *sharein.Item
+	var pushed *push.Message
 	var scanMessage string
 	service := func(request nativeui.ServiceRequest) nativeui.Handle {
 		request.ID = "device"
@@ -166,6 +168,20 @@ func newApp() (*nativeui.App, error) {
 				message = fmt.Sprintf("Widget snapshot published: %t.", result.Widget.Published)
 			case result.Refresh != nil:
 				message = fmt.Sprintf("Background refresh scheduled: %t.", result.Refresh.Scheduled)
+			case result.Push != nil:
+				inboxMu.Lock()
+				pushed = result.Push.Message
+				inboxMu.Unlock()
+				switch {
+				case result.Push.Token != "":
+					message = fmt.Sprintf("%s push token %s (%d bytes). Send it to your server; notifications permission: %s.", result.Push.Provider, preview(result.Push.Token[:min(12, len(result.Push.Token))]), len(result.Push.Token), result.Push.Permission)
+				case result.Push.Message != nil:
+					message = fmt.Sprintf("Push %s: %s %s (%d data keys, route %q).", result.Push.Message.Identifier, result.Push.Message.Title, preview(result.Push.Message.Body), len(result.Push.Message.Data), result.Push.Message.Route)
+				case result.Message != "":
+					message = result.Message
+				default:
+					message = fmt.Sprintf("No push token or message. Notifications permission: %s.", result.Push.Permission)
+				}
 			default:
 				item := result.IncomingShare
 				inboxMu.Lock()
@@ -186,6 +202,10 @@ func newApp() (*nativeui.App, error) {
 		return nativeui.Route{Path: path, Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			return nativeui.Screen{Title: title, Text: text, Actions: actions}, nil
 		}, Actions: handlers, Services: map[string]nativeui.ServiceRespond{"device": respond}}
+	}
+	withService := func(route nativeui.Route, id string, respond nativeui.ServiceRespond) nativeui.Route {
+		route.Services[id] = respond
+		return route
 	}
 	signIn := func(operation authentication.Operation) nativeui.Handle {
 		return func(context.Context, nativeui.Request) (nativeui.Result, error) {
@@ -223,6 +243,7 @@ func newApp() (*nativeui.App, error) {
 			{ID: "location", Title: "Location", Destination: "/features/location"},
 			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
+			{ID: "push", Title: "Push notifications", Destination: "/features/push"},
 		}}}, nil
 	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
 		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
@@ -258,11 +279,16 @@ func newApp() (*nativeui.App, error) {
 			Services: map[string]nativeui.ServiceRespond{"sign-in": func(_ context.Context, _ nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
 				return nativeui.Result{Announcement: "Sign-in result: " + string(outcome.Status) + ". No app account was created."}, nil
 			}}},
-		deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar.", []nativeui.Action{
+		withService(deviceRoute("/features/calendar", "Calendar events", "Add a sample event to your default calendar, then read the next seven days. Calendar access is enabled with --calendar on iOS. On Android, Open calendar editor shows the system editor; closing it does not confirm a save.", []nativeui.Action{
 			{ID: "calendar-add", Label: "Add sample event", Primary: true},
 			{ID: "calendar-status", Label: "Calendar status"},
 			{ID: "calendar-read", Label: "Read next 7 days"},
+			{ID: "calendar-edit", Label: "Open calendar editor"},
 		}, map[string]nativeui.Handle{
+			"calendar-edit": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				start := time.Now().Truncate(time.Hour).Add(time.Hour)
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "calendar-editor", Calendar: &calendar.Request{Operation: calendar.Edit, Event: &calendar.Event{Title: "GoFastr sample event", Start: start, End: start.Add(time.Hour)}}}}, nil
+			},
 			"calendar-status": service(nativeui.ServiceRequest{Calendar: &calendar.Request{Operation: calendar.Status}}),
 			"calendar-add": func(context.Context, nativeui.Request) (nativeui.Result, error) {
 				start := time.Now().AddDate(0, 0, 1).Truncate(time.Minute)
@@ -272,13 +298,29 @@ func newApp() (*nativeui.App, error) {
 				now := time.Now()
 				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Calendar: &calendar.Request{Operation: calendar.Read, From: now, To: now.AddDate(0, 0, 7), Limit: calendar.MaxLimit}}}, nil
 			},
-		}),
+		}), "calendar-editor", calendarEditorRespond),
 		deviceRoute("/features/widgets", "Home-screen widget", "Publish a public summary, then add this app's widget from your home screen. Publishing does not pin it or confirm OS display.", []nativeui.Action{
 			{ID: "publish", Label: "Publish summary", Primary: true}, {ID: "status", Label: "Check snapshot"}, {ID: "clear", Label: "Clear summary"},
 		}, map[string]nativeui.Handle{
 			"publish": service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Publish, Snapshot: &widgets.Snapshot{Title: "GoFastr device features", Text: "Published from shared Go code", Route: "/features/widgets", Items: []widgets.Item{{ID: "shared", Title: "Android and iOS", Subtitle: "One Go snapshot"}}}}}),
 			"status":  service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Status}}),
 			"clear":   service(nativeui.ServiceRequest{Widget: &widgets.Request{Operation: widgets.Clear}}),
+		}),
+		deviceRoute("/features/push", "Push notifications", "Register to get this device's push token for your server. On Android received messages wait here until you acknowledge them; iOS opens a tapped notification's route directly and has no inbox.", []nativeui.Action{
+			{ID: "register", Label: "Register for push", Primary: true}, {ID: "status", Label: "Check registration"}, {ID: "next", Label: "Read next message"}, {ID: "acknowledge", Label: "Acknowledge message"}, {ID: "unregister", Label: "Unregister"},
+		}, map[string]nativeui.Handle{
+			"register":   service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Register}}),
+			"status":     service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Status}}),
+			"next":       service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Next}}),
+			"unregister": service(nativeui.ServiceRequest{Push: &push.Request{Operation: push.Unregister}}),
+			"acknowledge": func(context.Context, nativeui.Request) (nativeui.Result, error) {
+				inboxMu.Lock()
+				defer inboxMu.Unlock()
+				if pushed == nil {
+					return nativeui.Result{Announcement: "Read a push message before acknowledging it."}, nil
+				}
+				return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "device", Push: &push.Request{Operation: push.Acknowledge, Identifier: pushed.Identifier}}}, nil
+			},
 		}),
 		nativeui.Route{Path: "/features/refresh", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			return nativeui.Screen{Title: "Background refresh", LargeTitle: true, Text: "Schedule hourly background work, then leave the app. iOS decides when it runs, and may skip it. Last background refresh: " + lastRefresh() + ".", Actions: []nativeui.Action{
@@ -305,6 +347,15 @@ func preview(value string) string {
 		return string(runes[:160]) + "..."
 	}
 	return value
+}
+
+// calendarEditorRespond reports the Android editor outcome. The editor does
+// not say whether the person saved the event.
+func calendarEditorRespond(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+	if result.Status == nativeui.EffectCompleted {
+		return nativeui.Result{Announcement: "Calendar editor closed. Saving is not confirmed."}, nil
+	}
+	return nativeui.Result{Announcement: "Calendar editor: " + string(result.Status)}, nil
 }
 
 func calendarMessage(result calendar.Result) string {

@@ -1,4 +1,11 @@
 // Package calendar defines bounded calendar event operations.
+//
+// Status, Add and Read use the platform calendar store directly (EventKit on
+// iOS). Edit opens the platform's own event editor prefilled with Event (an
+// ACTION_INSERT intent on Android); the person may save or discard it there,
+// and the platform does not report which, so an Edit result carries no
+// identifier. Renderers report an operation they do not implement as
+// unsupported.
 package calendar
 
 import (
@@ -15,6 +22,7 @@ const (
 	Status       Operation = "status"
 	Add          Operation = "add"
 	Read         Operation = "read"
+	Edit         Operation = "edit"
 	DefaultLimit           = 20
 	MaxLimit               = 100
 )
@@ -52,6 +60,20 @@ func (event Event) validate(result bool) error {
 	return nil
 }
 
+// allDayBounds reports whether both times fall on midnight in their own
+// offsets and end is a later day: the editor receives whole calendar dates.
+func allDayBounds(start, end time.Time) bool {
+	midnight := func(t time.Time) bool {
+		return t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0
+	}
+	if !midnight(start) || !midnight(end) {
+		return false
+	}
+	sy, sm, sd := start.Date()
+	ey, em, ed := end.Date()
+	return time.Date(ey, em, ed, 0, 0, 0, 0, time.UTC).After(time.Date(sy, sm, sd, 0, 0, 0, 0, time.UTC))
+}
+
 func (request Request) EffectiveLimit() int {
 	if request.Limit == 0 {
 		return DefaultLimit
@@ -61,7 +83,7 @@ func (request Request) EffectiveLimit() int {
 
 func (request Request) Validate() error {
 	switch request.Operation {
-	case Status, Add:
+	case Status, Add, Edit:
 		if !request.From.IsZero() || !request.To.IsZero() || request.Limit != 0 {
 			return errors.New("calendar: unexpected range")
 		}
@@ -74,7 +96,13 @@ func (request Request) Validate() error {
 		if request.Event == nil {
 			return errors.New("calendar: event required")
 		}
-		return request.Event.validate(false)
+		if err := request.Event.validate(false); err != nil {
+			return err
+		}
+		if request.Operation == Edit && request.Event.AllDay && !allDayBounds(request.Event.Start, request.Event.End) {
+			return errors.New("calendar: all-day editor events need midnight boundaries and a positive span")
+		}
+		return nil
 	case Read:
 		if request.Event != nil || request.From.IsZero() || request.To.IsZero() || !request.To.After(request.From) || request.To.Sub(request.From) > 366*24*time.Hour || request.From.Year() < 1 || request.To.Year() > 9999 || request.Limit < 0 || request.Limit > MaxLimit {
 			return errors.New("calendar: invalid range or limit")
@@ -100,6 +128,10 @@ func (request Request) Accept(result Result) error {
 		}
 	case Add:
 		if result.Authorization == "" && result.Events == nil && validID(result.Identifier) {
+			return nil
+		}
+	case Edit:
+		if result.Authorization == "" && result.Identifier == "" && result.Events == nil {
 			return nil
 		}
 	case Read:
