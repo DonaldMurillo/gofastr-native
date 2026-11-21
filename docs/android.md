@@ -65,6 +65,11 @@ under the selected output directory. Run installs only the selected app package.
   device restart or app update; notification taps open a Go route through the
   navigation guard. Android can delay inexact alarms. Force-stop prevents OS
   delivery until the app runs again. No exact-alarm permission is requested.
+- Foreground location uses the shared `device/location` contract and
+  `location/v1` (see [location](location.md)). Enable it with `--location` on
+  the native Android renderer; `--location-usage` is optional and unused on
+  Android. The manifest gains `ACCESS_COARSE_LOCATION` and
+  `ACCESS_FINE_LOCATION`, never background location or Play Services.
 - Live reads run separately from commands. They watch only the authorized query
   while the collection is visible. Retired reads can reopen once without replaying
   a write. Editors are never replaced by live-read replies.
