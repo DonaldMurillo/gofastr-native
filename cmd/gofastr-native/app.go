@@ -74,6 +74,7 @@ type app struct {
 	AppLinkHosts    []string
 	ReceiveShares   bool
 	SecureStorage   bool
+	NetworkStatus   bool
 	Calendar        bool
 	CalendarUsage   string
 	BiometricUsage  string

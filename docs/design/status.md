@@ -127,6 +127,10 @@ and contract tests pass; a physical-device run is NOT RUN.
 iOS renderer. Android and WebView explicitly report the service as unsupported.
 The storefront demo includes a local StoreKit catalog and simulator UI tests.
 
+[Network status](../network-status.md) has an opt-in Android native adapter and
+a device-features demo action. It reports one snapshot, with no subscriptions.
+iOS and WebView are not implemented.
+
 The [Notes integrations](../../examples/notes/docs/device-features.md) add reviewed shared
 imports, explicitly selected note widgets, and biometric-protected text notes.
 

@@ -12,6 +12,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/links"
+	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/internal/fixtures"
@@ -41,7 +42,7 @@ func serviceConnection(t *testing.T, runtime *Runtime) string {
 		CapabilityNavigation: SupportAvailable, CapabilityEditor: SupportAvailable, CapabilityNotifications: SupportUnavailable,
 		CapabilitySharing: SupportFallback, CapabilityClipboard: SupportFallback, CapabilityAudio: SupportFallback, CapabilityLive: SupportAvailable,
 		CapabilityOpenURL:  SupportAvailable,
-		CapabilityContacts: SupportAvailable, CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback,
+		CapabilityContacts: SupportAvailable, CapabilityPresentation: SupportAvailable, CapabilityFiles: SupportFallback, CapabilityNetwork: SupportAvailable,
 	}}})
 	if reply.Error != nil {
 		t.Fatal(reply.Error)
@@ -89,6 +90,7 @@ func admitService(t *testing.T, runtime *Runtime, command Command) Reply {
 
 func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 	definitions := map[string]ServiceRequest{
+		"network":   {ID: "device", Network: &network.Request{Operation: network.Status}},
 		"schedule":  {ID: "device", Notification: &notifications.Request{Operation: "schedule", Identifier: "notes:1", Title: "Remember", Route: "/device", Date: "2028-02-29", Time: "10:00"}},
 		"cancel":    {ID: "device", Notification: &notifications.Request{Operation: "cancel", Identifier: "notes:1"}},
 		"status":    {ID: "device", Notification: &notifications.Request{Operation: "status", Identifier: "notes:1"}},
@@ -116,6 +118,9 @@ func TestServicesAllOutcomesUseOneShotPublicCommands(t *testing.T) {
 				command.Kind, command.RequestID, command.ServiceID, command.Revision = "service-result", "observed", shown.ServiceID, 2
 				command.Values = map[string]string{"body": "newer draft"}
 				command.ServiceResult = &ServiceResult{Status: status}
+				if definition.Network != nil && status == EffectCompleted {
+					command.ServiceResult.Network = &network.Result{Transport: "none"}
+				}
 				if name == "audio" && status == EffectCompleted {
 					file := serviceWAV()
 					command.ServiceResult.File, command.ServiceResult.DurationMillis = &file, 1000

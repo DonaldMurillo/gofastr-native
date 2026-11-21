@@ -15,6 +15,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/iap"
 	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
+	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
@@ -28,6 +29,7 @@ import (
 
 // ServiceRequest is one immutable, explicitly initiated device operation.
 type ServiceRequest struct {
+	Network        *network.Request        `json:"network,omitempty"`
 	Push           *push.Request           `json:"push,omitempty"`
 	Browser        *browser.Request        `json:"browser,omitempty"`
 	Contacts       *contacts.Request       `json:"contacts,omitempty"`
@@ -51,6 +53,7 @@ type ServiceRequest struct {
 
 // ServiceResult is an observed OS outcome, not permission to repeat an operation.
 type ServiceResult struct {
+	Network        *network.Result        `json:"network,omitempty"`
 	Push           *push.State            `json:"push,omitempty"`
 	Contacts       *contacts.Selection    `json:"contacts,omitempty"`
 	Status         EffectStatus           `json:"status"`
@@ -78,7 +81,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
+	for _, present := range []bool{request.Network != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
 		if present {
 			operations++
 		}
@@ -87,6 +90,8 @@ func (request ServiceRequest) Validate() error {
 		return errors.New("nativeui: exactly one named device service is required")
 	}
 	switch {
+	case request.Network != nil:
+		return request.Network.Validate()
 	case request.Browser != nil:
 		return request.Browser.Validate()
 	case request.Contacts != nil:
@@ -126,6 +131,8 @@ func (request ServiceRequest) Validate() error {
 
 func (request ServiceRequest) capability() Capability {
 	switch {
+	case request.Network != nil:
+		return CapabilityNetwork
 	case request.Browser != nil:
 		return CapabilityBrowser
 	case request.Contacts != nil:
@@ -167,6 +174,9 @@ func (request ServiceRequest) capability() Capability {
 }
 
 func (request ServiceRequest) accept(outcome ServiceResult) error {
+	if outcome.Network != nil && (request.Network == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unrelated or unsuccessful network content")
+	}
 	if outcome.Location != nil && (request.Location == nil || outcome.Status != EffectCompleted) {
 		return errors.New("nativeui: unexpected location content")
 	}
@@ -198,6 +208,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	}
 	switch outcome.Status {
 	case EffectCompleted:
+		if request.Network != nil {
+			if outcome.Network == nil {
+				return errors.New("nativeui: network result is required")
+			}
+			if err := request.Network.Accept(*outcome.Network); err != nil {
+				return err
+			}
+		}
 		if request.Contacts != nil {
 			if err := request.Contacts.Accept(outcome.Contacts); err != nil {
 				return err

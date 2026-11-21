@@ -45,6 +45,7 @@ public abstract class GofastrActivity extends Activity {
     protected boolean microphoneEnabled() { return false; }
     protected boolean incomingSharesEnabled() { return false; }
     protected boolean secureStorageEnabled() { return false; }
+    protected boolean networkStatusEnabled() { return false; }
     protected boolean biometricsEnabled() { return false; }
     protected boolean widgetsEnabled() { return false; }
     private static final ExecutorService lifecycle = Executors.newSingleThreadExecutor();
@@ -96,6 +97,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("incoming-shares/v1", incomingSharesEnabled() ? "available" : "unavailable");
                 caps.put("calendar/v1", "unavailable");
                 caps.put("secure-storage/v1", secureStorageEnabled() ? "available" : "unavailable");
+                if(networkStatusEnabled())caps.put("network/v1", "available");
                 caps.put("widgets/v1", widgetsEnabled() ? "available" : "unavailable");
                 caps.put("sign-in-with-apple/v1", "unavailable");
                 caps.put("oauth-web-login/v1", "unavailable");
