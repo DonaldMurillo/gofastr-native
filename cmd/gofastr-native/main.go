@@ -60,6 +60,7 @@ Flags (build, run):
   --microphone-usage  optional microphone purpose text; empty disables recording
                 and Android speech recognition
   --url-scheme  optional application-specific deep-link scheme (native renderer)
+  --app-link-hosts  comma-separated verified App Link hosts (native Android)
   --receive-shares  accept shared text and files into the app's private inbox
   --calendar        enable iOS calendar events (--calendar-usage sets purpose text)
   --secure-storage  enable Keychain/Keystore storage and authentication

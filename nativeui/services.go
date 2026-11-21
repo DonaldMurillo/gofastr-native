@@ -14,6 +14,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/iap"
+	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/location"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
@@ -39,6 +40,7 @@ type ServiceRequest struct {
 	Notification   *notifications.Request  `json:"notification,omitempty"`
 	Share          *sharing.Request        `json:"share,omitempty"`
 	Clipboard      *sharing.Clipboard      `json:"clipboard,omitempty"`
+	OpenURL        *links.Open             `json:"openURL,omitempty"`
 	Audio          *audio.Request          `json:"audio,omitempty"`
 	Speech         *speech.Request         `json:"speech,omitempty"`
 	IncomingShare  *sharein.Request        `json:"incomingShare,omitempty"`
@@ -85,7 +87,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Network != nil, request.DeviceInfo != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.Audio != nil, request.Speech != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
+	for _, present := range []bool{request.Network != nil, request.DeviceInfo != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.Speech != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
 		if present {
 			operations++
 		}
@@ -112,6 +114,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Share.Validate()
 	case request.Clipboard != nil:
 		return request.Clipboard.Validate()
+	case request.OpenURL != nil:
+		return request.OpenURL.Validate()
 	case request.IncomingShare != nil:
 		return request.IncomingShare.Validate()
 	case request.SecureStorage != nil:
@@ -155,6 +159,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilitySharing
 	case request.Clipboard != nil:
 		return CapabilityClipboard
+	case request.OpenURL != nil:
+		return CapabilityOpenURL
 	case request.IncomingShare != nil:
 		return CapabilityIncomingShares
 	case request.SecureStorage != nil:

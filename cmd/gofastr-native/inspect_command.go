@@ -92,6 +92,7 @@ func inspectProfiles() []inspectProfile {
 	for _, name := range []string{"browser", "audio", "incoming-shares", "secure-storage", "widgets", "location"} {
 		android[name+"/v1"] = "unavailable"
 	}
+	android["open-url/v1"] = "available"
 	// render/webview/webview.js in a browser without the device services
 	// host, navigator.share, navigator.vibrate or photo primitives.
 	webview := available("navigation", "editor", "drafts", "announcement", "presentation", "live")
@@ -113,7 +114,7 @@ func inspectProfiles() []inspectProfile {
 // "other" or is dropped.
 var (
 	inspectCapabilities = []string{"navigation/v1", "editor/v1", "drafts/v1", "share/v1", "haptics/v1", "sheets/v1", "announcement/v1", "presentation/v1",
-		"files/v1", "photos/v1", "camera/v1", "notifications/v1", "sharing/v1", "browser/v1", "clipboard/v1", "audio/v1", "live/v1", "incoming-shares/v1",
+		"files/v1", "photos/v1", "camera/v1", "notifications/v1", "sharing/v1", "browser/v1", "clipboard/v1", "open-url/v1", "audio/v1", "live/v1", "incoming-shares/v1",
 		"calendar/v1", "secure-storage/v1", "widgets/v1", "location/v1", "background-refresh/v1", "push/v1", "privacy/v1", "network/v1", "deviceinfo/v1"}
 	inspectCodes = []string{"protocol", "busy", "expired", "unsupported", "pending", "superseded", "stale", "invalid_request", "internal", "unknown",
 		"conflict", "validation", "not_found", "forbidden", "draft", "cancelled", "unsaved_changes", "save_pending", "save_unknown", "stale_completion", "invalid_outcome"}

@@ -118,6 +118,8 @@ real providers and physical-device acceptance for Android location are NOT RUN.
 [Incoming shares, secure storage with biometrics, and home-screen widgets](../device-features.md)
 also use shared Go requests with Android and iOS adapters. The Go-only
 `examples/devicefeatures/featuresnative` demo exercises their opt-in APIs.
+Its Android build also exercises [opening web URLs and receiving Android App
+Links](../android.md#opening-web-urls-and-receiving-android-app-links).
 
 [Device and battery snapshots](../deviceinfo.md) use typed `deviceinfo/v1`
 requests on native Android without permissions or opt-in flags. The devicefeatures

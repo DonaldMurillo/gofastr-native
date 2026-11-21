@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
+	"github.com/DonaldMurillo/gofastr-native/device/links"
 	"github.com/DonaldMurillo/gofastr-native/device/network"
 	"github.com/DonaldMurillo/gofastr-native/device/push"
 	"github.com/DonaldMurillo/gofastr-native/device/refresh"
@@ -237,7 +239,7 @@ func newApp() (*nativeui.App, error) {
 		return nativeui.Result{Navigation: &nativeui.Navigation{Kind: "push", Route: "/features/scanned"}}, nil
 	}
 	routes := []nativeui.Route{{Path: Root(), Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
-		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: []nativeui.Row{
+		rows := []nativeui.Row{
 			{ID: "device", Title: "Device and battery", Destination: "/features/device"},
 			{ID: "inbox", Title: "Shared inbox", Destination: "/features/inbox"},
 			{ID: "network", Title: "Network status", Destination: "/features/network"},
@@ -248,7 +250,11 @@ func newApp() (*nativeui.App, error) {
 			{ID: "sign-in", Title: "Native sign-in", Destination: "/features/sign-in"},
 			{ID: "refresh", Title: "Background refresh", Destination: "/features/refresh"},
 			{ID: "push", Title: "Push notifications", Destination: "/features/push"},
-		}}}, nil
+		}
+		if goruntime.GOOS == "android" {
+			rows = append(rows, nativeui.Row{ID: "links", Title: "Web links", Destination: "/features/links"})
+		}
+		return nativeui.Screen{Title: "Device features", Prompt: "The same Go screens run on Android and iOS.", Actions: []nativeui.Action{{ID: "scan", Label: "Scan code", Primary: true}}, List: &nativeui.List{Rows: rows}}, nil
 	}, Actions: map[string]nativeui.Handle{"scan": service(nativeui.ServiceRequest{Scan: &scanner.Request{Title: "Scan code"}})}, Services: map[string]nativeui.ServiceRespond{"device": scanRespond}},
 		nativeui.Route{Path: "/features/scanned", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
 			inboxMu.Lock()
@@ -341,6 +347,23 @@ func newApp() (*nativeui.App, error) {
 			"status":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Status}}),
 			"cancel":   service(nativeui.ServiceRequest{Refresh: &refresh.Request{Operation: refresh.Cancel}}),
 		}, Services: map[string]nativeui.ServiceRespond{"device": respond}},
+		nativeui.Route{
+			Path: "/features/links",
+			Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+				return nativeui.Screen{
+					Title:    "Web links",
+					Text:     "Open a web URL with Android. Link source: " + preview(request.Values["source"]),
+					Actions:  []nativeui.Action{{ID: "open-web", Label: "Open Android App Links guide", Primary: true}},
+					Requires: []nativeui.Requirement{{Capability: nativeui.CapabilityOpenURL}},
+				}, nil
+			},
+			Actions: map[string]nativeui.Handle{
+				"open-web": service(nativeui.ServiceRequest{OpenURL: &links.Open{URL: "https://developer.android.com/training/app-links"}}),
+			},
+			Services: map[string]nativeui.ServiceRespond{"device": func(_ context.Context, _ nativeui.Request, result nativeui.ServiceResult) (nativeui.Result, error) {
+				return nativeui.Result{Announcement: result.Message}, nil
+			}},
+		},
 	}
 	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
 }

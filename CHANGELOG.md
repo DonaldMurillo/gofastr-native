@@ -55,6 +55,12 @@ This repository holds two Go modules, tagged separately:
   build flag; iOS and WebView return unsupported and do not advertise the
   capability. The device-features demo has a Device and battery screen.
   Physical-device acceptance is NOT RUN.
+- Native Android `open-url/v1` service (`ServiceRequest.OpenURL`,
+  `device/links`) that hands an HTTP(S) URL to Android's handler, and
+  opt-in verified Android App Links through `--app-link-hosts`. Inbound
+  links for listed hosts open the matching Go screen. iOS does not
+  implement `open-url/v1`. `scripts/android_links_smoke.py` drives them on
+  an emulator; live Digital Asset Links verification is NOT RUN.
 
 ### Internal
 

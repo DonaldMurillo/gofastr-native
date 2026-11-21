@@ -17,7 +17,10 @@ public final class MainActivity extends GofastrActivity {
         };
     }
     @Override protected String urlScheme() { return "{{.URLScheme}}"; }
-    @Override protected boolean cameraEnabled() { return {{if .CameraUsage}}true{{else}}false{{end}}; }
+{{if .AppLinkHosts}}    @Override protected java.util.List<String> appLinkHosts() {
+        return java.util.Arrays.asList({{range $i, $host := .AppLinkHosts}}{{if $i}}, {{end}}"{{$host}}"{{end}});
+    }
+{{end}}    @Override protected boolean cameraEnabled() { return {{if .CameraUsage}}true{{else}}false{{end}}; }
     @Override protected boolean microphoneEnabled() { return {{if .MicrophoneUsage}}true{{else}}false{{end}}; }
     @Override protected boolean incomingSharesEnabled() { return {{.ReceiveShares}}; }
     @Override protected boolean locationEnabled() { return {{if .Location}}true{{else}}false{{end}}; }
