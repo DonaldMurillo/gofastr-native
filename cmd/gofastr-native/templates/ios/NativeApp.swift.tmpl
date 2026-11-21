@@ -39,8 +39,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ))
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        GofastrPush.prepare()
         GofastrCompiledExtensions.install()
-        window = renderer.makeWindow()
+{{if .BackgroundRefresh}}        GofastrBackgroundRefresh.register(ready: renderer.afterStart, run: { timeoutMillis in
+            var error: NSError?
+            guard {{.Prefix}}BackgroundRefresh(timeoutMillis, &error) else {
+                throw error ?? NSError(domain: "GoFastrMobile", code: 1, userInfo: [NSLocalizedDescriptionKey: "Background refresh failed."])
+            }
+        }, cancel: { {{.Prefix}}CancelBackgroundRefresh() })
+{{end}}        window = renderer.makeWindow()
 {{if .URLScheme}}        if let url = options?[.url] as? URL { _ = open(url) }
 {{end}}        return true
     }
@@ -58,7 +65,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         renderer.checkpoint()
     }
 
-    func applicationWillTerminate(_ application: UIApplication) {
+{{if .Push}}    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        GofastrPush.didRegister(deviceToken: deviceToken)
+    }
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        GofastrPush.didFailToRegister(error: error)
+    }
+{{end}}    func applicationWillTerminate(_ application: UIApplication) {
         renderer.stop()
     }
 }

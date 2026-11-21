@@ -1,0 +1,88 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		A10000000000000000000001 = {
+			isa = PBXProject;
+			buildConfigurationList = A10000000000000000000002;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			knownRegions = (en, Base);
+			mainGroup = A10000000000000000000003;
+			productRefGroup = A10000000000000000000004;
+			projectDirPath = "";
+			targets = (A10000000000000000000005);
+		};
+		A10000000000000000000002 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A10000000000000000000006);
+			defaultConfigurationName = Debug;
+		};
+		A10000000000000000000003 = {
+			isa = PBXGroup;
+			children = (A10000000000000000000007, A10000000000000000000008, A10000000000000000000004);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000004 = {
+			isa = PBXGroup;
+			children = (A10000000000000000000009);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000005 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000000A;
+			buildPhases = (A1000000000000000000000B, A1000000000000000000000C);
+			dependencies = ();
+			name = StorefrontTests;
+			productName = StorefrontTests;
+			productReference = A10000000000000000000009;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A10000000000000000000006 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A10000000000000000000007 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorefrontTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000008 = {isa = PBXFileReference; lastKnownFileType = text; path = Local.storekit; sourceTree = "<group>"; };
+		A10000000000000000000009 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = StorefrontTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000000A = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A1000000000000000000000D);
+			defaultConfigurationName = Debug;
+		};
+		A1000000000000000000000B = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A1000000000000000000000E);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000000C = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A1000000000000000000000F);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000000D = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.gofastr.storefront.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1000000000000000000000E = {isa = PBXBuildFile; fileRef = A10000000000000000000007; };
+		A1000000000000000000000F = {isa = PBXBuildFile; fileRef = A10000000000000000000008; };
+	};
+	rootObject = A10000000000000000000001;
+}

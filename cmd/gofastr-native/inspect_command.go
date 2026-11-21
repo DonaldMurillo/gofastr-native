@@ -84,15 +84,18 @@ func inspectProfiles() []inspectProfile {
 	}
 	// render/ios/GofastrNative.swift, without services or extensions.
 	uikit := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "live", "privacy")
+	uikit["browser/v1"] = "available"
 	// render/android/GofastrActivity.java, with microphone, incoming shares,
 	// secure storage and widgets off.
-	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "calendar", "clipboard", "live", "notifications", "privacy")
-	for _, name := range []string{"audio", "incoming-shares", "secure-storage", "widgets"} {
+	android := available("navigation", "editor", "drafts", "share", "haptics", "sheets", "announcement", "presentation", "files", "sharing", "clipboard", "live", "notifications", "privacy", "calendar")
+	uikit["location/v1"] = "unavailable"
+	for _, name := range []string{"browser", "audio", "incoming-shares", "secure-storage", "widgets", "location"} {
 		android[name+"/v1"] = "unavailable"
 	}
 	// render/webview/webview.js in a browser without the device services
 	// host, navigator.share, navigator.vibrate or photo primitives.
 	webview := available("navigation", "editor", "drafts", "announcement", "presentation", "live")
+	webview["browser/v1"] = "unavailable"
 	for name, support := range map[string]string{"sheets": "fallback", "share": "fallback", "files": "fallback", "haptics": "unavailable", "photos": "unavailable", "camera": "unavailable"} {
 		webview[name+"/v1"] = support
 	}
@@ -110,8 +113,8 @@ func inspectProfiles() []inspectProfile {
 // "other" or is dropped.
 var (
 	inspectCapabilities = []string{"navigation/v1", "editor/v1", "drafts/v1", "share/v1", "haptics/v1", "sheets/v1", "announcement/v1", "presentation/v1",
-		"calendar/v1", "files/v1", "photos/v1", "camera/v1", "notifications/v1", "sharing/v1", "clipboard/v1", "audio/v1", "live/v1", "incoming-shares/v1",
-		"secure-storage/v1", "widgets/v1", "privacy/v1"}
+		"files/v1", "photos/v1", "camera/v1", "notifications/v1", "sharing/v1", "browser/v1", "clipboard/v1", "audio/v1", "live/v1", "incoming-shares/v1",
+		"calendar/v1", "secure-storage/v1", "widgets/v1", "location/v1", "background-refresh/v1", "push/v1", "privacy/v1"}
 	inspectCodes = []string{"protocol", "busy", "expired", "unsupported", "pending", "superseded", "stale", "invalid_request", "internal", "unknown",
 		"conflict", "validation", "not_found", "forbidden", "draft", "cancelled", "unsaved_changes", "save_pending", "save_unknown", "stale_completion", "invalid_outcome"}
 	inspectFieldKinds = []string{"text", "multiline", "toggle", "date", "time", "select"}

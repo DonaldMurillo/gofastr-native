@@ -1,58 +1,107 @@
 package calendar
 
 import (
-	"encoding/json"
-	"math"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestEventBounds(t *testing.T) {
-	base := New("Event", time.Date(2028, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2028, 1, 2, 0, 0, 0, 0, time.UTC))
-	for name, change := range map[string]func(*Event){
-		"empty title": func(e *Event) { e.Title = "" }, "long title": func(e *Event) { e.Title = strings.Repeat("a", 201) },
-		"control title": func(e *Event) { e.Title = "a\n" }, "invalid title": func(e *Event) { e.Title = string([]byte{255}) },
-		"long location": func(e *Event) { e.Location = strings.Repeat("a", 201) }, "control location": func(e *Event) { e.Location = "\t" },
-		"invalid location": func(e *Event) { e.Location = string([]byte{255}) },
-		"long notes":       func(e *Event) { e.Notes = strings.Repeat("a", 4097) }, "nul notes": func(e *Event) { e.Notes = "\x00" },
-		"invalid notes": func(e *Event) { e.Notes = string([]byte{255}) },
-		"zero start":    func(e *Event) { e.Start = 0 }, "zero time": func(e *Event) { e.Start = (time.Time{}).UnixMilli() },
-		"equal": func(e *Event) { e.End = e.Start }, "reverse": func(e *Event) { e.End = e.Start - 1 },
-		"long span":     func(e *Event) { e.End = e.Start + MaxSpanMillis + 1 },
-		"overflow":      func(e *Event) { e.Start = math.MinInt64; e.End = math.MaxInt64 },
-		"all-day start": func(e *Event) { e.AllDay = true; e.Start++ },
-		"all-day end":   func(e *Event) { e.AllDay = true; e.End++ },
+func TestContract(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	event := Event{Title: "Lunch", Start: now, End: now.Add(time.Hour)}
+	add := Request{Operation: Add, Event: &event}
+	read := Request{Operation: Read, From: now, To: now.Add(24 * time.Hour)}
+	for _, request := range []Request{{Operation: Status}, add, read} {
+		if err := request.Validate(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	returned := event
+	returned.Identifier = "event-1"
+	for _, pair := range []struct {
+		request Request
+		result  Result
+	}{
+		{Request{Operation: Status}, Result{Authorization: "writeOnly"}},
+		{add, Result{Identifier: "event-1"}},
+		{read, Result{}},
+		{read, Result{Events: []Event{returned}}},
+		{read, Result{Events: []Event{returned, returned}}},
 	} {
-		t.Run(name, func(t *testing.T) {
-			e := base
-			change(&e)
-			if e.Validate() == nil {
-				t.Fatal("invalid event accepted")
-			}
-		})
+		if err := pair.request.Accept(pair.result); err != nil {
+			t.Fatal(err)
+		}
 	}
-	base.Title = strings.Repeat("a", 200)
-	base.Location = base.Title
-	base.Notes = strings.Repeat("\n", 4096)
-	base.AllDay = true
-	base.End = base.Start + MaxSpanMillis
-	if err := base.Validate(); err != nil {
+	invalid := []Request{{}, {Operation: Add}, {Operation: Status, Event: &event}, {Operation: Read, From: now, To: now}, {Operation: Read, From: now, To: now.Add(367 * 24 * time.Hour)}, {Operation: Read, From: now, To: now.Add(time.Hour), Limit: 101}, {Operation: Read, From: now, To: now.Add(time.Hour), Limit: -1}, {Operation: Add, Event: &event, Limit: 1}}
+	for _, request := range invalid {
+		if request.Validate() == nil {
+			t.Fatalf("accepted %#v", request)
+		}
+	}
+	for _, change := range []func(*Event){
+		func(e *Event) { e.Title = "" }, func(e *Event) { e.Title = strings.Repeat("x", 201) },
+		func(e *Event) { e.Title = "a\nb" }, func(e *Event) { e.Location = strings.Repeat("x", 201) },
+		func(e *Event) { e.Notes = strings.Repeat("x", 2001) }, func(e *Event) { e.End = now.Add(-time.Hour) },
+		func(e *Event) { e.Identifier = "unexpected" }, func(e *Event) { e.Start = time.Time{} },
+	} {
+		bad := event
+		change(&bad)
+		if (Request{Operation: Add, Event: &bad}).Validate() == nil {
+			t.Fatalf("accepted %#v", bad)
+		}
+	}
+	for _, pair := range []struct {
+		request Request
+		result  Result
+	}{
+		{Request{Operation: Status}, Result{}}, {Request{Operation: Status}, Result{Authorization: "full", Events: []Event{}}},
+		{add, Result{}}, {add, Result{Identifier: "id", Authorization: "full"}},
+		{read, Result{Authorization: "full"}}, {read, Result{Events: []Event{event}}},
+		{Request{Operation: Read, From: now, To: now.Add(time.Hour), Limit: 1}, Result{Events: []Event{returned, returned}}},
+		{Request{Operation: Read, From: now.Add(2 * time.Hour), To: now.Add(3 * time.Hour)}, Result{Events: []Event{returned}}},
+	} {
+		if pair.request.Accept(pair.result) == nil {
+			t.Fatalf("accepted %#v", pair.result)
+		}
+	}
+}
+
+func TestEditContract(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	edit := Request{Operation: Edit, Event: &Event{Title: "Lunch", Start: now, End: now.Add(time.Hour)}}
+	if err := edit.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	data, err := json.Marshal(base)
-	if err != nil {
+	if err := edit.Accept(Result{}); err != nil {
 		t.Fatal(err)
 	}
-	var wire map[string]any
-	if err = json.Unmarshal(data, &wire); err != nil {
-		t.Fatal(err)
+	for _, result := range []Result{{Identifier: "event-1"}, {Authorization: "full"}, {Events: []Event{}}} {
+		if edit.Accept(result) == nil {
+			t.Fatalf("accepted %#v", result)
+		}
 	}
-	if wire["startMillis"] != float64(base.Start) || wire["endMillis"] != float64(base.End) {
-		t.Fatal(string(data))
+	offset := time.FixedZone("UTC-5", -5*3600)
+	day := time.Date(2026, 3, 8, 0, 0, 0, 0, offset)
+	for _, event := range []Event{
+		{Title: "Day", AllDay: true, Start: day, End: day.AddDate(0, 0, 1)},
+		{Title: "Days", AllDay: true, Start: time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)},
+	} {
+		if err := (Request{Operation: Edit, Event: &event}).Validate(); err != nil {
+			t.Fatal(event, err)
+		}
 	}
-	var round Event
-	if err = json.Unmarshal(data, &round); err != nil || round != base {
-		t.Fatal(round, err)
+	for _, event := range []Event{
+		{Title: "Noon", AllDay: true, Start: day.Add(12 * time.Hour), End: day.AddDate(0, 0, 1)},
+		{Title: "Empty", AllDay: true, Start: day, End: day},
+		{Title: "Late end", AllDay: true, Start: day, End: day.Add(25 * time.Hour)},
+	} {
+		if (Request{Operation: Edit, Event: &event}).Validate() == nil {
+			t.Fatalf("accepted %#v", event)
+		}
+	}
+	for _, request := range []Request{{Operation: Edit}, {Operation: Edit, Event: edit.Event, Limit: 1}, {Operation: Edit, Event: &Event{Identifier: "x", Title: "a", Start: now, End: now}}} {
+		if request.Validate() == nil {
+			t.Fatalf("accepted %#v", request)
+		}
 	}
 }

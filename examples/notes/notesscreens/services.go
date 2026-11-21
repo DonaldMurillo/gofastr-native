@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
+	"github.com/DonaldMurillo/gofastr-native/device/contacts"
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/notifications"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
@@ -44,8 +46,8 @@ func requestCalendarEvent(service *notes.Service) nativeui.Handle {
 			return nativeui.Result{}, err
 		}
 		start := time.Now().Truncate(time.Hour).Add(time.Hour)
-		event := calendar.New("Notes event", start, start.Add(time.Hour))
-		return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "calendar", CalendarEvent: &event}}, nil
+		event := calendar.Event{Title: "Notes event", Start: start, End: start.Add(time.Hour)}
+		return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "calendar", Calendar: &calendar.Request{Operation: calendar.Edit, Event: &event}}}, nil
 	}
 }
 
@@ -154,6 +156,23 @@ func serviceOutcome(kind string, outcome nativeui.ServiceResult) nativeui.Result
 
 func editorServices(service *notes.Service, store *files.Store) map[string]nativeui.ServiceRespond {
 	responders := make(map[string]nativeui.ServiceRespond)
+	responders["contacts"] = func(ctx context.Context, request nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
+		if err := authorizeNote(ctx, service, request); err != nil {
+			return nativeui.Result{}, err
+		}
+		if outcome.Status != nativeui.EffectCompleted {
+			return serviceOutcome("contacts", outcome), nil
+		}
+		var names []string
+		for _, contact := range outcome.Contacts.Contacts {
+			text := strings.TrimSpace(contact.GivenName + " " + contact.FamilyName)
+			if len(contact.Phones) > 0 {
+				text += " " + contact.Phones[0].Value
+			}
+			names = append(names, text)
+		}
+		return nativeui.Result{Announcement: "Picked: " + strings.Join(names, ", ")}, nil
+	}
 	for _, identifier := range []string{"calendar", "share", "copy", "reminder-schedule", "reminder-cancel", "reminder-status"} {
 		responders[identifier] = func(ctx context.Context, request nativeui.Request, outcome nativeui.ServiceResult) (nativeui.Result, error) {
 			if err := authorizeNote(ctx, service, request); err != nil {
@@ -241,5 +260,14 @@ func requestAttachmentShare(load func(context.Context, nativeui.Request) (files.
 			return nativeui.Result{}, fileError(fmt.Sprintf("This attachment cannot be shared: %s", err))
 		}
 		return nativeui.Result{Service: operation}, nil
+	}
+}
+
+func requestContacts(service *notes.Service, multiple bool) nativeui.Handle {
+	return func(ctx context.Context, request nativeui.Request) (nativeui.Result, error) {
+		if err := authorizeNote(ctx, service, request); err != nil {
+			return nativeui.Result{}, err
+		}
+		return nativeui.Result{Service: &nativeui.ServiceRequest{ID: "contacts", Contacts: &contacts.Request{Multiple: multiple, Fields: []contacts.Field{contacts.Phone}}}}, nil
 	}
 }

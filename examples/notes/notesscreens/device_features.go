@@ -64,6 +64,7 @@ func withDeviceFeatures(routes []nativeui.Route, service *notes.Service, attachm
 					{ID: "inbox", Title: "Shared items", Subtitle: "Review text and files sent to Notes", Destination: "/inbox"},
 					{ID: "protected", Title: "Protected notes", Subtitle: "Encrypted text opened with biometrics", Destination: "/protected"},
 					{ID: "widget", Title: "Home screen widget", Subtitle: "Manage the note shown outside the app", Destination: "/settings/widget"},
+					{ID: "push", Title: "Push notifications", Subtitle: "Register with APNs or inspect permission", Destination: "/settings/push"},
 				}, screen.List.Rows...)
 				return screen, nil
 			}
@@ -144,7 +145,7 @@ func withDeviceFeatures(routes []nativeui.Route, service *notes.Service, attachm
 	}
 	routes = append(routes, inboxRoutes(service, attachments, devices)...)
 	routes = append(routes, protectedRoutes(devices)...)
-	return append(routes, widgetSettings(service, devices))
+	return append(append(routes, widgetSettings(service, devices)), pushSettings()...)
 }
 
 func noteWidget(note notes.Note) *widgets.Snapshot {

@@ -7,11 +7,28 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 
 | Feature | Go request | Android adapter | iOS adapter |
 | --- | --- | --- | --- |
+| In-app browser | `ServiceRequest.Browser` | Unavailable | SFSafariViewController (`browser/v1`) |
 | Receive shares | `ServiceRequest.IncomingShare` | SEND intents and a private inbox | Share extension and App Group inbox |
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
+| Foreground location | `ServiceRequest.Location` | Not implemented | CoreLocation, when-in-use authorization, bounded updates |
+| Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
+| Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
 
-The same Go-only demo runs on both platforms:
+[Location](location.md) is an additional iOS-only opt-in service. Build the
+demo with `--location --location-usage "Show nearby places in the foreground."`
+to enable its Location section. It reports permission, current position and
+up to five samples over five seconds; it never requests background access.
+The other three features remain shared across Android and iOS.
+
+The browser is a separate, user-initiated service in `device/browser`. It accepts
+only bounded absolute HTTP/HTTPS URLs without credentials. Reader mode and
+Done/Close/Cancel labels are optional; dismissal reports completed, not page-load
+success. Android and WebView do not fall back to opening an external browser.
+Try **About → Open docs** in the native Starter example. See the
+[UIKit service notes](../render/ios/docs/services.md#in-app-browser).
+
+The same Go-only share-in, storage and widgets demo runs on both platforms:
 
 ```powershell
 go run ./cmd/gofastr-native build --platform android-emu --renderer native --pkg ./examples/devicefeatures/featuresnative --receive-shares --secure-storage --biometric-usage 'Authenticate to use the demo secret.' --widgets --url-scheme gofastr-features --out dist/mobile/device-features
@@ -64,3 +81,18 @@ linking, actual Android 14 x86-64 behavior, and the existing WebView tests.
 macOS tests compile and execute Foundation wire fixtures and compile/sign both
 iOS extensions against the simulator SDK. These tests skip on Windows, so the
 iOS implementation still requires a Mac build and runtime acceptance.
+
+For location, `GOFASTR_IOS_UI=1 GOWORK=off go test -v -count=1 -timeout=20m ./internal/iosuitest`
+builds the demo, boots a fresh simulator, grants location permission, sets a
+simulated position and drives all four actions through the UI. iOS 26.5
+simulator acceptance passed with visible current and tracking coordinates.
+First-use prompts, denial UI and physical-device location checks are NOT RUN;
+see [location acceptance limits](location.md#checks-and-acceptance).
+
+## Contact picker
+
+The iOS [contact picker](contacts-services.md) supports explicit single or multiple
+selection with requested fields only, through `contacts/v1`. The native and
+WebView hosts reuse the service runner. No Contacts authorization or
+`NSContactsUsageDescription` is needed for the system picker. Android does
+not advertise this capability. Native picker GUI acceptance: NOT RUN.
