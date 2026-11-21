@@ -1,0 +1,1 @@
+{"name":"gofastr.barcode/v1","capabilities":["scanner/v1"],"android":{"factory":"GofastrBarcode","sources":["GofastrBarcode.java"],"bind":["barcodebind"]}}

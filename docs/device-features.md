@@ -17,7 +17,7 @@ OS prompts, storage, intents, and extension processes. All three are opt-in.
 | Secrets and authentication | `ServiceRequest.SecureStorage` | Keystore AES-GCM and BiometricPrompt | Keychain and LocalAuthentication |
 | Home-screen summary | `ServiceRequest.Widget` | AppWidgetProvider and RemoteViews | WidgetKit extension and App Group snapshot |
 | Foreground location | `ServiceRequest.Location` | LocationManager, coarse/fine runtime permission, bounded updates | CoreLocation, when-in-use authorization, bounded updates |
-| Barcode scanner | `ServiceRequest.Scan` | Not implemented | One-shot AVFoundation sheet; see [scanner](scanner.md) |
+| Barcode scanner | `ServiceRequest.Scan` | Camera photo or selected image, decoded offline; opt-in `extension/barcode` | One-shot AVFoundation sheet; see [scanner](scanner.md) |
 | Network status | `ServiceRequest.Network` | One-shot ConnectivityManager snapshot (`network/v1`); see [network status](network-status.md) | Not implemented |
 | Calendar events | `ServiceRequest.Calendar` | `edit`: system editor intent, save not confirmed | `status`/`add`/`read`: EventKit (`--calendar`); see [calendar events](calendar-events.md) |
 | Remote push | `ServiceRequest.Push` | Firebase Cloud Messaging and a private inbox (`--push-config`, `--push-libraries`) | APNs registration and tap routing (`--push`); no inbox |

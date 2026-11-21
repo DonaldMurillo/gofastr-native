@@ -28,6 +28,8 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/securestore"
 	"github.com/DonaldMurillo/gofastr-native/device/sharein"
 	"github.com/DonaldMurillo/gofastr-native/device/widgets"
+	"github.com/DonaldMurillo/gofastr-native/extension"
+	barcodeext "github.com/DonaldMurillo/gofastr-native/extension/barcode"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
@@ -365,7 +367,7 @@ func newApp() (*nativeui.App, error) {
 			}},
 		},
 	}
-	return nativeui.New(Root(), append(routes, newLocationRoutes()...)...)
+	return nativeui.NewWithExtensions(Root(), []extension.Definition{barcodeext.Definition()}, append(routes, newLocationRoutes()...)...)
 }
 
 func demoToken() string {

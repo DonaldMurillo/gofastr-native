@@ -67,6 +67,12 @@ This repository holds two Go modules, tagged separately:
   links for listed hosts open the matching Go screen. iOS does not
   implement `open-url/v1`. `scripts/android_links_smoke.py` drives them on
   an emulator; live Digital Asset Links verification is NOT RUN.
+- Android `scanner/v1` through the opt-in `extension/barcode` adapter. The
+  `ServiceRequest.Scan` that opens the iOS camera sheet asks Android for a
+  camera photo or a selected image, which Go decodes offline with gozxing
+  (MIT, a port of Apache-2.0 ZXing). Android reads QR, Data Matrix, EAN-13,
+  EAN-8, UPC-E, Code 128, Code 93, Code 39 and ITF-14; PDF417 and Aztec
+  report unsupported. Emulator and hardware acceptance are NOT RUN.
 
 ### Internal
 

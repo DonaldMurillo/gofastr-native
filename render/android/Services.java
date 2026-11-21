@@ -199,6 +199,11 @@ public final class Services {
             }
             else if(request.has("iap")) finish(outcome("unsupported","In-app purchases require the native iOS renderer."));
             else if(request.has("contacts")) contacts(request.getJSONObject("contacts"));
+            else if(request.has("scan")) {
+                Extensions.ServiceFactory scanner=Extensions.service(host,"scanner/v1");
+                if(scanner==null){finish(outcome("unsupported","Barcode scanning is not compiled into this app."));return;}
+                scanner.perform(host,request.getJSONObject("scan"),this::finish);
+            }
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
     }

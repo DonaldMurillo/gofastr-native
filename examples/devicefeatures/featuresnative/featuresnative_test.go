@@ -8,6 +8,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/device/calendar"
 	"github.com/DonaldMurillo/gofastr-native/device/deviceinfo"
+	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
 
 func TestEveryDemoActionUsesValidSharedServiceContracts(t *testing.T) {
@@ -83,4 +84,21 @@ func TestBackgroundRefreshRecordsTheLastRun(t *testing.T) {
 		t.Fatal("refresh did not record its run")
 	}
 	CancelBackgroundRefresh()
+}
+
+// Android serves the root screen's Scan code action through the compiled
+// barcode adapter; iOS serves the same scanner/v1 request natively.
+func TestScannerAdapterIsRegisteredForAndroid(t *testing.T) {
+	app, err := newApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, definition := range app.Extensions() {
+		for _, capability := range definition.Manifest.Capabilities {
+			if capability == string(nativeui.CapabilityScanner) && definition.Manifest.Android != nil {
+				return
+			}
+		}
+	}
+	t.Fatal("no Android scanner/v1 adapter is registered")
 }
