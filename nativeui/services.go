@@ -232,10 +232,15 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 			}
 		}
 		if request.Calendar != nil {
-			if outcome.Calendar == nil {
+			result := outcome.Calendar
+			if result == nil && request.Calendar.Operation == calendar.Edit {
+				// The editor reports only that it closed.
+				result = &calendar.Result{}
+			}
+			if result == nil {
 				return errors.New("nativeui: calendar result required")
 			}
-			if err := request.Calendar.Accept(*outcome.Calendar); err != nil {
+			if err := request.Calendar.Accept(*result); err != nil {
 				return err
 			}
 		}

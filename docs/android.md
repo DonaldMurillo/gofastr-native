@@ -52,6 +52,10 @@ under the selected output directory. Run installs only the selected app package.
   private, randomly named content URIs with temporary grants. Transfer storage is
   capped and old transfers expire after 24 hours. Closing the share sheet does not
   prove recipient delivery.
+- Calendar `edit` requests open the installed calendar editor without calendar
+  permission. Closing it does not confirm saving. Missing apps report
+  unsupported; `status`, `add` and `read` report unsupported.
+  See [calendar events](calendar-events.md) for bounds and acceptance limits.
 - Recording requires `--microphone-usage`, then Android permission at the user's
   explicit action. AAC/M4A recording is foreground-only, bounded by the request
   and the framework's 60 second / 1 MiB ceiling. Notes requests 512 KiB. Cancelled
@@ -62,6 +66,11 @@ under the selected output directory. Run installs only the selected app package.
   device restart or app update; notification taps open a Go route through the
   navigation guard. Android can delay inexact alarms. Force-stop prevents OS
   delivery until the app runs again. No exact-alarm permission is requested.
+- Foreground location uses the shared `device/location` contract and
+  `location/v1` (see [location](location.md)). Enable it with `--location` on
+  the native Android renderer; `--location-usage` is optional and unused on
+  Android. The manifest gains `ACCESS_COARSE_LOCATION` and
+  `ACCESS_FINE_LOCATION`, never background location or Play Services.
 - Live reads run separately from commands. They watch only the authorized query
   while the collection is visible. Retired reads can reopen once without replaying
   a write. Editors are never replaced by live-read replies.

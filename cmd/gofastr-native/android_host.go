@@ -113,7 +113,9 @@ func (a app) androidBindPackages() []string {
 // AndroidExtensionPermissions lists extension permissions the manifest
 // template does not already declare, in a stable order.
 func (a app) AndroidExtensionPermissions() []string {
-	seen := map[string]bool{"android.permission.INTERNET": true, "android.permission.POST_NOTIFICATIONS": true,
+	seen := map[string]bool{"android.permission.ACCESS_COARSE_LOCATION": a.Location,
+		"android.permission.ACCESS_FINE_LOCATION": a.Location,
+		"android.permission.INTERNET":             true, "android.permission.POST_NOTIFICATIONS": true,
 		"android.permission.RECEIVE_BOOT_COMPLETED": true, "android.permission.RECORD_AUDIO": a.MicrophoneUsage != "",
 		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != "", "android.permission.ACCESS_NETWORK_STATE": a.NetworkStatus}
 	var permissions []string

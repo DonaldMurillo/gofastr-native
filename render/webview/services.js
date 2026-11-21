@@ -32,6 +32,7 @@
     'contacts/v1': 'unavailable',
     'notifications/v1': 'unavailable',
     'browser/v1': 'unavailable',
+    'calendar/v1': 'unavailable',
     'sharing/v1': typeof navigator.share === 'function' || typeof Blob === 'function' && typeof atob === 'function' && typeof URL.createObjectURL === 'function' ? 'fallback' : 'unavailable',
     'clipboard/v1': window.isSecureContext && typeof navigator.clipboard?.writeText === 'function' ? 'fallback' : 'unavailable',
     'audio/v1': audioType() ? 'fallback' : 'unavailable',
@@ -45,14 +46,14 @@
     let timer;
     try { facts = await Promise.race([host.capabilities(), new Promise(resolve => { timer = setTimeout(resolve, 2000); })]); } catch (_) {}
     finally { clearTimeout(timer); }
-    const result = { 'live/v1': 'available', 'browser/v1': 'unavailable', 'iap/v1': 'unavailable' };
+    const result = { 'live/v1': 'available', 'browser/v1': 'unavailable', 'iap/v1': 'unavailable', 'calendar/v1': 'unavailable' };
     for (const capability of ['notifications/v1', 'sharing/v1', 'clipboard/v1', 'audio/v1', 'contacts/v1']) {
       result[capability] = ['available', 'fallback', 'unavailable'].includes(facts?.[capability]) ? facts[capability] : 'unavailable';
     }
     return result;
   })();
   const kindOf = request => {
-    const kinds = ['browser', 'notification', 'share', 'clipboard', 'audio', 'contacts', 'iap'].filter(key => request?.[key] != null);
+    const kinds = ['browser', 'notification', 'share', 'clipboard', 'audio', 'contacts', 'iap', 'calendar'].filter(key => request?.[key] != null);
     return kinds.length === 1 ? kinds[0] : '';
   };
   const bytesOf = file => {
@@ -328,7 +329,10 @@
     view.actions = element('div', '', { class: 'gfw-service-actions' });
     dialog.append(heading, view.feedback, view.actions);
     try {
-      if (kind === 'iap') {
+      if (kind === 'calendar') {
+        feedback(view, 'Calendar events are unavailable in this renderer. No event was added or opened.');
+        button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message: 'Calendar events require a supported native renderer. No event was added or opened.' }));
+      } else if (kind === 'iap') {
         const message = 'In-app purchases require the native iOS renderer.';
         feedback(view, message);
         button(view, 'Continue', 'data-gfw-service-perform', () => void settle(view, { status: 'unsupported', message }));
