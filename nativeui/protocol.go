@@ -83,6 +83,10 @@ type Contract struct {
 	Capabilities map[Capability]Support `json:"capabilities"`
 }
 
+// maxHelloCapabilities bounds a renderer's hello. It leaves room for every
+// built-in capability plus those that compiled extensions add.
+const maxHelloCapabilities = 128
+
 // Negotiate rejects incompatible compiled peers instead of silently changing renderers.
 func Negotiate(hello Hello) (Contract, error) {
 	return negotiate(hello, knownCapability)
@@ -95,7 +99,7 @@ func negotiate(hello Hello, allowed func(Capability) bool) (Contract, error) {
 	if hello.Renderer != "uikit" && hello.Renderer != "android" && hello.Renderer != "webview" {
 		return Contract{}, errors.New("nativeui: unknown renderer")
 	}
-	if len(hello.Capabilities) > 32 {
+	if len(hello.Capabilities) > maxHelloCapabilities {
 		return Contract{}, errors.New("nativeui: too many capabilities")
 	}
 	contract := Contract{Version: ProtocolVersion, Renderer: hello.Renderer, Capabilities: make(map[Capability]Support)}
