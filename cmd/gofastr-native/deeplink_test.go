@@ -137,3 +137,18 @@ func TestURLSchemeCLIValidation(t *testing.T) {
 		t.Fatalf("unsupported host silently accepted deep links: %d %s", code, &stderr)
 	}
 }
+
+func TestInspectRecognizesOpenURLCapability(t *testing.T) {
+	if !slices.Contains(inspectCapabilities, "open-url/v1") {
+		t.Fatal("inspect drops open-url capability")
+	}
+	for _, profile := range inspectProfiles() {
+		want := ""
+		if profile.Name == "android" {
+			want = "available"
+		}
+		if got := profile.Caps["open-url/v1"]; got != want {
+			t.Fatalf("%s profile open-url/v1 = %q, want %q", profile.Name, got, want)
+		}
+	}
+}
