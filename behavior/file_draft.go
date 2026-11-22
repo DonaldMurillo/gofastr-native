@@ -85,6 +85,17 @@ func (store *FileDraftStore) Load(ctx context.Context, key string) (Snapshot, bo
 }
 
 func (store *FileDraftStore) Put(ctx context.Context, key string, snapshot Snapshot) error {
+	return store.put(ctx, key, snapshot, nil, false)
+}
+
+// PutIfRevision writes a draft only when the stored revision matches
+// expected. Nil expects an unused key. The comparison and write share the
+// same lock as Put and ClearIfRevision within this process.
+func (store *FileDraftStore) PutIfRevision(ctx context.Context, key string, snapshot Snapshot, expected *DraftRevision) error {
+	return store.put(ctx, key, snapshot, expected, true)
+}
+
+func (store *FileDraftStore) put(ctx context.Context, key string, snapshot Snapshot, expected *DraftRevision, conditional bool) error {
 	path, err := store.path(key)
 	if err != nil {
 		return err
@@ -100,6 +111,14 @@ func (store *FileDraftStore) Put(ctx context.Context, key string, snapshot Snaps
 	existing, exists, err := readDraftFile(path)
 	if err != nil {
 		return err
+	}
+	if conditional {
+		switch {
+		case expected == nil && exists:
+			return ErrDraftConflict
+		case expected != nil && (!exists || !expected.Matches(existing)):
+			return ErrDraftConflict
+		}
 	}
 	if exists && existing.InstanceID == snapshot.InstanceID &&
 		(existing.Revision > snapshot.Revision || snapshotSaveToken(existing) > snapshotSaveToken(snapshot)) {
