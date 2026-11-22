@@ -21,6 +21,72 @@ Real APNs delivery on hardware: **NOT RUN**.
 What the project covers today, what has been checked and on what, and what
 is left. Updated with the work; the dates are in the [implementation log](agent-notes.md).
 
+## Windows desktop renderer prototype
+
+[Log Explorer](../../examples/logexplorer/) runs a Go-authored workspace
+through the GoFastr host. The default Windows renderer draws the workspace
+through DirectX. Stacks, split panes, text, buttons, select boxes, tables, and
+detail panes can be nested in a Go view tree. Keys retain table scroll,
+keyboard focus, and splitter positions across updates and reordering. A paint
+node provides clipped custom drawing. The host offers Win32 controls for the
+original workspace fields.
+
+The DirectX renderer keeps layout in device-independent pixels and rasterizes
+glyphs at the monitor's display scale. At 150% Windows scaling, the graphics
+check matched the render buffer to the 1680 × 1050 client area. Windows
+Graphics Capture showed sharper labels and editor text in Desktop Notes.
+
+The deterministic model test and the Windows control test passed 500
+updates with 50,000 appended rows. The Windows test checked the top row
+and selected row at every update. The host test opened and closed a
+window through the GoFastr lifecycle. The DirectX check drew a real
+window with cgo disabled, verified the selected-row indicator by reading
+the back buffer, and preserved the paused viewport as 50,000 rows arrived.
+It also moved the table to the opposite pane mid-replay and verified a
+custom paint node in the back buffer.
+
+The Windows [Notes editor](../../examples/notes/) composes single-line and
+multiline text fields and a checkbox. A switch is available to desktop views
+through the same toggle API. Text fields support grapheme-aware movement,
+selection, and clipboard actions. A Windows window check entered two lines,
+toggled the pin, displayed missing-title validation, and saved through the
+shared Notes service. The model test verified that edits made during a save
+were preserved and recovered from the draft store. The Write and Details tabs,
+Note actions menu, and discard confirmation use the shared desktop components.
+The desktop command prevents two processes from opening the same data
+directory. The draft store checks the expected revision before writing or
+discarding a draft within the process.
+
+The Windows amd64 DirectX window exposes its controls through UI Automation. A
+separate client queried the Notes Title and Save controls, set the title using
+the Value pattern, and saved the note using the Invoke pattern. A separate
+cross-process check selected the Details tab and read the selection from its
+tab group. It toggled Pin, expanded the Note actions menu, invoked its discard
+item, and confirmed the draft discard. The dialog's cancel button received
+focus and Save was absent from the modal accessibility tree. Screen-reader
+speech acceptance is NOT RUN. Cross-monitor DPI transitions are NOT RUN.
+
+The GPU renderer has a repeatable hidden-window benchmark
+([logbench](../../examples/logexplorer/cmd/logbench/), cgo disabled): it
+runs the real DirectX device without showing a window, so automated runs
+do not disturb other GUI work. On one Windows 10 workstation, the 10 s
+hidden replay drew 500 event-driven frames and measured Update+Draw p99 of
+1.30 ms and fixture event to drawn frame p95 of 1.25 ms. It drew one frame
+and used 0.31% process CPU over a five-second idle check. A visible replay
+passed at 1,050,000 rows with an Update+Draw p99 of 3.00 ms and a fixture
+event to drawn frame p95 of 2.00 ms. Readback hashes confirmed changes in the
+rendered table in both runs. A separate six-second Windows Graphics Capture
+sample recorded 302 distinct consecutive images with a 26.7 ms p95 interval
+between image changes. Interactive mode times the focused window's input
+poll through the end of Draw. A synthetic key message check produced five
+input frames. Physical input-to-display latency is NOT RUN.
+
+The opt-in `GOFASTR_DESKTOP_IME_TEST=1` check exercised synthetic Windows
+messages through the real DirectX window, including commit, cancellation,
+caret movement, and surrogate-pair input. Microsoft Japanese IME and Pinyin
+were registered but disabled in the test account. Candidate selection with
+an enabled Windows IME is NOT RUN.
+
 ## External presentation prototype
 
 The iOS-only [maps component](../maps.md) adds retained MapKit maps, keyed pins,

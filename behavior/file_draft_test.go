@@ -111,6 +111,54 @@ func TestFileDraftConditionalClearProtectsReopenedScreensAtSameSemanticKey(t *te
 	}
 }
 
+func TestFileDraftConditionalWriteAcceptsOneEditorOfTheSameRevision(t *testing.T) {
+	ctx := t.Context()
+	store, root := newFileStore(t)
+	other, err := behavior.NewFileDraftStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := newEditor(t, nil).Checkpoint(behavior.Values{"title": "original"})
+	if err := store.PutIfRevision(ctx, "key", old, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := other.PutIfRevision(ctx, "key", old, nil); !errors.Is(err, behavior.ErrDraftConflict) {
+		t.Fatalf("write to an occupied key with no expected revision: %v", err)
+	}
+	expected := old.DraftRevision()
+	type write struct {
+		snapshot behavior.Snapshot
+		err      error
+	}
+	results := make(chan write, 2)
+	names := [2]string{"first", "second"}
+	for i, writer := range []*behavior.FileDraftStore{store, other} {
+		name := names[i]
+		editor, err := behavior.NewEditor(name, old.Route, old.Current)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot := editor.Checkpoint(behavior.Values{"title": name})
+		go func() { results <- write{snapshot, writer.PutIfRevision(ctx, "key", snapshot, &expected)} }()
+	}
+	var winner behavior.DraftRevision
+	successes := 0
+	for range 2 {
+		result := <-results
+		switch {
+		case result.err == nil:
+			winner = result.snapshot.DraftRevision()
+			successes++
+		case !errors.Is(result.err, behavior.ErrDraftConflict):
+			t.Fatal(result.err)
+		}
+	}
+	recovered, exists, err := store.Load(ctx, "key")
+	if err != nil || !exists || successes != 1 || !winner.Matches(recovered) {
+		t.Fatalf("conditional write winners = %d, final revision = %+v, exists = %t, err = %v", successes, recovered.DraftRevision(), exists, err)
+	}
+}
+
 func TestFileDraftConcurrentOldClearCannotDeleteNewCheckpoint(t *testing.T) {
 	ctx := context.Background()
 	store, root := newFileStore(t)

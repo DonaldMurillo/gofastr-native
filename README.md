@@ -1,10 +1,10 @@
 # gofastr-native
 
 Write an app in Go and run it natively: as a phone app on iOS and Android,
-or as a terminal app on macOS, Linux and Windows. The project is
-experimental and not ready for production use.
+a desktop app on Windows, or a terminal app on macOS, Linux and Windows.
+The project is experimental and not ready for production use.
 
-It has two parts, each its own Go module:
+It ships two Go modules:
 
 - **Phone apps** (`github.com/DonaldMurillo/gofastr-native`). Screens and
   actions are Go `nativeui` definitions. A bundled renderer draws them with
@@ -15,6 +15,8 @@ It has two parts, each its own Go module:
   builds and runs the app with the platforms' command-line tools: no Xcode
   project, no Gradle. It can also run an existing GoFastr web app inside the
   phone app's process, served over an in-memory listener with no socket.
+  The same module includes an experimental GPU desktop renderer with Go-authored
+  views. Try [Log Explorer](examples/logexplorer) on Windows.
 - **Terminal apps** (`github.com/DonaldMurillo/gofastr-native/tui`). A
   terminal UI library written from scratch on the standard library and
   `golang.org/x/sys`: raw mode and input decoding, a diffing cell renderer,
@@ -61,12 +63,13 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | Path | What it shows |
 |---|---|
 | [`examples/starter`](examples/starter) | What `init` generates, kept in the repository. |
-| [`examples/notes`](examples/notes) | The main phone example: one Notes app with native and WebView renderers, files, photos, reminders, sharing, widgets, and terminal and web presentations of the same service. |
+| [`examples/notes`](examples/notes) | One Notes service with phone, web, terminal, and Windows desktop presentations. The desktop editor exercises text fields, validation, and draft recovery. |
 | [`examples/gallery`](examples/gallery) | Every screen contract `nativeui` supports, one at a time. |
 | [`examples/devicefeatures`](examples/devicefeatures) | Incoming shares, secure storage and widgets through their opt-in APIs, plus Android device and battery snapshots. |
 | [`examples/chordharp`](examples/chordharp) | A chord harp with sound, as a terminal app and as an Android and iOS app that share one Go synthesizer. |
 | [`examples/capture`](examples/capture) | Android video capture with GPS, camera direction, recordings and live WHIP streaming, on the native renderer (keeps running in the background) and the WebView renderer. |
 | [`examples/dashcam`](examples/dashcam) | A dash cam on Android: loop recording in short files, locks on impact or by hand, and a list of locked clips. |
+| [`examples/logexplorer`](examples/logexplorer) | A Windows log viewer that tests a paused viewport and selected record during live replay. |
 
 ## Layout
 
@@ -78,6 +81,7 @@ go run ./cmd/netmon       # the machine's network connections, refreshed live
 | `extension/` | The API for libraries that add a screen component or a device adapter, with the built-in `media` and `photos` extensions. |
 | `render/ios/`, `render/android/` | The native renderers: UIKit (Swift) and Android (Java), compiled into the app without Xcode or Gradle. |
 | `render/webview/` | The WebView renderer for the same definitions, with its component styles in `render/webview/mobileui`. |
+| `render/desktop/` | A GoFastr desktop host with composable Go views, custom GPU drawing, and optional Windows controls. |
 | `mobilehost/` | Runs a GoFastr app inside the phone app's process, with the native bridge (`bridge.js`). |
 | `cmd/gofastr-native/` | The CLI: `doctor`, `init`, `dev`, `build`, `run`, `inspect`, `extension`. |
 | `tui/` | The terminal UI library, a separate module. |
@@ -155,3 +159,6 @@ the Unicode Character Database and are used under the
 The Android barcode scanner adapter uses gozxing and its original ZXing implementation
 under [MIT and Apache-2.0 terms](extension/barcode/LICENSE-gozxing), and
 xerrors under a [BSD license](extension/barcode/LICENSE-xerrors).
+The desktop renderer uses Ebitengine under Apache-2.0 and embeds Go Regular,
+Go Bold, and Go Mono from `golang.org/x/image/font/gofont` under the
+[Go fonts BSD license](render/desktop/LICENSE-go-fonts).
