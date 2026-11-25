@@ -3,6 +3,7 @@ package dev.gofastr.nativeui;
 import android.Manifest;
 import android.app.*;
 import android.content.*;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.MediaRecorder;
@@ -101,10 +102,19 @@ public final class Services {
     public void capture(Consumer<Uri> callback) {
         try {
             if(!host.canUseCamera()){finish(JSON.object("status","unsupported"));return;}
+            if(host.checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED && declaresCameraPermission()){
+                permissionGranted=()->capture(callback);
+                host.requestPermissions(new String[]{Manifest.permission.CAMERA},CAMERA);
+                return;
+            }
             cameraFile=TransferProvider.create(host,"capture.jpg");Uri uri=TransferProvider.uri(host,cameraFile);
             Intent intent=new Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             intent.setClipData(ClipData.newRawUri("Photo",uri));picked=callback;activityCode=CAMERA;host.startActivityForResult(intent,CAMERA);
         }catch(Exception e){failed(e);}
+    }
+    private boolean declaresCameraPermission() throws PackageManager.NameNotFoundException {
+        PackageInfo info=host.getPackageManager().getPackageInfo(host.getPackageName(),PackageManager.GET_PERMISSIONS);
+        return info.requestedPermissions!=null && Arrays.asList(info.requestedPermissions).contains(Manifest.permission.CAMERA);
     }
     private static boolean calendarText(String text,int maximum) {
         if(text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>maximum)return false;
@@ -360,7 +370,7 @@ public final class Services {
     }
     void permissionsResult(int code,int[] grants) {
         if(code==DeviceLocation.PERMISSION_REQUEST){if(result!=null)location.permissionsResult(grants);return;}
-        if((code!=MICROPHONE && code!=NOTIFICATION) || result==null)return;
+        if((code!=CAMERA && code!=MICROPHONE && code!=NOTIFICATION) || result==null)return;
         Runnable granted=permissionGranted;permissionGranted=null;
         if(grants.length>0 && grants[0]==PackageManager.PERMISSION_GRANTED && granted!=null)granted.run();
         else finish(outcome("denied","Permission was denied."));
