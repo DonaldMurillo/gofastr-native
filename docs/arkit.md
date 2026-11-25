@@ -40,7 +40,8 @@ Put the block in `Screen.Components` and handle `err`.
   objects require plane detection. `Reset` under the scene restarts tracking
   and clears placements. Placements belong to the view: opening an object's
   route and going back re-creates the screen, which starts a new session with
-  nothing placed.
+  nothing placed. In the simulator fixture, placements also cleared after the
+  app returned from the background.
 - `Destination` makes an object open a registered local route when tapped.
   Only the component's exact `object.<id>` destination allowlist authorizes
   navigation; Swift never routes using payload destinations.
