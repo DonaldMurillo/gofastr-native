@@ -38,7 +38,9 @@ Put the block in `Screen.Components` and handle `err`.
 - An object without `Position` is placed by the person: objects are offered in
   order, and each tap on a detected surface places the next one on it. These
   objects require plane detection. `Reset` under the scene restarts tracking
-  and clears placements.
+  and clears placements. Placements belong to the view: opening an object's
+  route and going back re-creates the screen, which starts a new session with
+  nothing placed.
 - `Destination` makes an object open a registered local route when tapped.
   Only the component's exact `object.<id>` destination allowlist authorizes
   navigation; Swift never routes using payload destinations.
