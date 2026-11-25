@@ -118,6 +118,8 @@ capture, location and camera direction, with live WHIP streaming.
 
 - Remote push is opt-in Firebase Cloud Messaging with a private message inbox;
   see [push notifications](push.md) for licensing, flags and validation.
+- Local plane detection and anchor placement are opt-in via
+  [Google ARCore](android-ar.md). Default APKs do not bundle the ARCore SDK.
 
 ## Speech
 

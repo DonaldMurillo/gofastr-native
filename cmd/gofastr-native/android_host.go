@@ -11,6 +11,7 @@ import (
 
 	"github.com/DonaldMurillo/gofastr-native/extension"
 	renderandroid "github.com/DonaldMurillo/gofastr-native/render/android"
+	renderarcore "github.com/DonaldMurillo/gofastr-native/render/android/arcore"
 	renderfcm "github.com/DonaldMurillo/gofastr-native/render/android/fcm"
 )
 
@@ -48,6 +49,26 @@ func prepareAndroidHost(r *runner, a app, dir string) ([]string, error) {
 		sources = append(sources, dst)
 	}
 	var factories []string
+	if a.ARCoreAAR != "" {
+		entries, err := renderarcore.Sources.ReadDir(".")
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			dst := filepath.Join(dir, "renderer", "arcore", entry.Name())
+			if err := r.do("copy Android ARCore provider "+entry.Name(), func() error {
+				content, err := renderarcore.Sources.ReadFile(entry.Name())
+				if err != nil {
+					return err
+				}
+				return writeSource(dst, content)
+			}); err != nil {
+				return nil, err
+			}
+			sources = append(sources, dst)
+		}
+		factories = append(factories, "        dev.gofastr.nativeui.arcore.ARCore.install();\n")
+	}
 	if a.PushConfig != "" {
 		entries, err := renderfcm.Sources.ReadDir(".")
 		if err != nil {
@@ -124,7 +145,8 @@ func (a app) AndroidExtensionPermissions() []string {
 		"android.permission.ACCESS_FINE_LOCATION": a.Location,
 		"android.permission.INTERNET":             true, "android.permission.POST_NOTIFICATIONS": true,
 		"android.permission.RECEIVE_BOOT_COMPLETED": true, "android.permission.RECORD_AUDIO": a.MicrophoneUsage != "",
-		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != "", "android.permission.ACCESS_NETWORK_STATE": a.NetworkStatus}
+		"android.permission.USE_BIOMETRIC": a.SecureStorage && a.BiometricUsage != "", "android.permission.ACCESS_NETWORK_STATE": a.NetworkStatus,
+		"android.permission.CAMERA": a.ARCoreAAR != ""}
 	var permissions []string
 	for _, definition := range a.Extensions {
 		if definition.manifest.Android == nil {

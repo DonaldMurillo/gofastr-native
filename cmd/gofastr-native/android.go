@@ -171,6 +171,7 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 		}
 	}
 	work := filepath.Join(out, "work")
+	androidWork := filepath.Join(work, "android")
 	bin := filepath.Join(work, "bin")
 	if err := bootstrapGomobile(r, bin); err != nil {
 		return "", err
@@ -211,6 +212,13 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 	}); err != nil {
 		return "", err
 	}
+	var arcoreJars []string
+	if a.ARCoreAAR != "" {
+		arcoreJars, err = prepareARCore(r, &a, androidWork, filepath.Join(unpacked, "jni"))
+		if err != nil {
+			return "", err
+		}
+	}
 	if err := r.do("verify 16 KiB Android native-library alignment", func() error {
 		libraries, err := listFiles(filepath.Join(unpacked, "jni"), ".so")
 		if err != nil {
@@ -235,34 +243,53 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 	}
 	classesJar := filepath.Join(unpacked, "classes.jar")
 
-	sources, err := prepareAndroidHost(r, a, filepath.Join(work, "android"))
+	sources, err := prepareAndroidHost(r, a, androidWork)
 	if err != nil {
 		return "", err
 	}
 	var push pushBuild
 	if a.PushConfig != "" {
-		if push, err = preparePushLibraries(r, &a, filepath.Join(work, "android")); err != nil {
+		if push, err = preparePushLibraries(r, &a, androidWork); err != nil {
 			return "", err
 		}
 	}
-	manifest := filepath.Join(work, "android", "AndroidManifest.xml")
+	manifest := filepath.Join(androidWork, "AndroidManifest.xml")
 	if err := r.do("generate AndroidManifest.xml", func() error {
 		return writeRendered("templates/android/AndroidManifest.xml.tmpl", manifest, a)
 	}); err != nil {
 		return "", err
 	}
-	resourceArgs, err := prepareAndroidFeatureResources(r, sdk, a, filepath.Join(work, "android"))
+	resourceArgs, err := prepareAndroidFeatureResources(r, sdk, a, androidWork)
 	if err != nil {
 		return "", err
 	}
-	if a.PushConfig != "" {
-		if err := preparePushResources(r, sdk, a, filepath.Join(work, "android"), manifest, &push, resourceArgs); err != nil {
+	if a.ARCoreAAR != "" || a.PushConfig != "" {
+		resourceArgs = append(resourceArgs, "--auto-add-overlay")
+		packages := push.packages
+		if a.ARCoreAAR != "" {
+			arResources, err := compileARCoreResources(r, sdk, androidWork)
+			if err != nil {
+				return "", err
+			}
+			resourceArgs = append(resourceArgs, arResources...)
+			packages = append(packages, "com.google.ar.core")
+		}
+		if a.PushConfig != "" {
+			pushResources, err := compilePushResources(r, sdk, a, androidWork)
+			if err != nil {
+				return "", err
+			}
+			resourceArgs = append(resourceArgs, pushResources...)
+		}
+		rSources, stableIDs, err := linkAndroidLibraryResources(r, sdk, a, androidWork, manifest, resourceArgs, packages)
+		if err != nil {
 			return "", err
 		}
-		resourceArgs = append(resourceArgs, push.resourceArgs...)
-		sources = append(sources, push.rSources...)
+		resourceArgs = append(resourceArgs, "--stable-ids", stableIDs)
+		sources = append(sources, rSources...)
 	}
-	classpath := append([]string{sdk.androidJar, classesJar}, push.jars...)
+	libraryJars := append(push.jars, arcoreJars...)
+	classpath := append([]string{sdk.androidJar, classesJar}, libraryJars...)
 	classes := filepath.Join(work, "android", "classes")
 	if err := r.do("clear old classes", func() error { return os.RemoveAll(classes) }); err != nil {
 		return "", err
@@ -287,7 +314,7 @@ func buildAndroidProfile(r *runner, a app, out string, o releaseOptions) (_ stri
 		return "", err
 	}
 	d8Args := append([]string{"--release", "--min-api", strconv.Itoa(a.MinSDK), "--lib", sdk.androidJar, "--output", dex}, classFiles...)
-	if err := r.run("convert the Java classes to dex", sdk.tool("d8"), append(append(d8Args, classesJar), push.jars...)...); err != nil {
+	if err := r.run("convert the Java classes to dex", sdk.tool("d8"), append(append(d8Args, classesJar), libraryJars...)...); err != nil {
 		return "", err
 	}
 	base := filepath.Join(work, "android", "base.apk")

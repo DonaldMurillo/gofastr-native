@@ -30,6 +30,10 @@ func (runtime *Runtime) presentService(ctx context.Context, session *runtimeSess
 		reply.Error = commandFailure("unsupported", "Speech services require the native Android renderer.")
 		return
 	}
+	if definition.AR != nil && session.contract.Renderer != "android" {
+		reply.Error = commandFailure("unsupported", "AR services require the native Android renderer.")
+		return
+	}
 	if record.serviceID != "" {
 		if session.service != nil && session.service.id == record.serviceID && !session.service.resolved {
 			reply.ServiceID, reply.Response.Service = record.serviceID, cloneService(&session.service.definition)

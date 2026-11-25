@@ -24,6 +24,7 @@ type buildFlags struct {
 	cameraUsage, microphoneUsage, urlScheme, biometricUsage         *string
 	appGroup, device, shot, existingApp, require                    *string
 	pushConfig, pushLibraries                                       *string
+	arcoreAAR                                                       *string
 	appLinkHosts                                                    *string
 	receiveShares, secureStorage, widgets, dry, devices, debugTrace *bool
 	signInWithApple, backgroundRefresh, push                        *bool
@@ -60,6 +61,7 @@ func registerBuildFlags(fs *flag.FlagSet) *buildFlags {
 		appGroup:          fs.String("app-group", "", "iOS app-group identifier"),
 		pushConfig:        fs.String("push-config", "", "Firebase google-services.json enabling Android push notifications"),
 		pushLibraries:     fs.String("push-libraries", "", "directory filled by gofastr-native push-libraries"),
+		arcoreAAR:         fs.String("arcore-aar", "", "local pinned ARCore AAR (enables AR on native Android)"),
 		dry:               fs.Bool("dry-run", false, "print the steps only"),
 		debugTrace:        fs.Bool("debug-trace", false, "enable redacted tracing in instrumented debug native apps"),
 		device:            fs.String("device", "", "simulator / device / AVD"),
@@ -92,6 +94,10 @@ func (f *buildFlags) validate(sub string, stderr io.Writer) int {
 		return 2
 	}
 	if sub == "doctor" {
+		if f.given("arcore-aar") {
+			fmt.Fprintln(stderr, "--arcore-aar applies only to build, run, and dev")
+			return 2
+		}
 		if f.given("app-link-hosts") {
 			fmt.Fprintln(stderr, "--app-link-hosts applies only to build, run, and dev")
 			return 2
@@ -209,7 +215,7 @@ func (f *buildFlags) resolveApp(r *runner, stderr io.Writer) (app, int) {
 	a.BackgroundRefresh = *f.backgroundRefresh
 	a.Push = *f.push
 	a.BiometricUsage, a.AppGroup = strings.TrimSpace(*f.biometricUsage), *f.appGroup
-	for _, value := range []struct{ flag, dst *string }{{f.pushConfig, &a.PushConfig}, {f.pushLibraries, &a.PushLibraries}} {
+	for _, value := range []struct{ flag, dst *string }{{f.pushConfig, &a.PushConfig}, {f.pushLibraries, &a.PushLibraries}, {f.arcoreAAR, &a.ARCoreAAR}} {
 		if *value.flag != "" {
 			absolute, err := filepath.Abs(*value.flag)
 			if err != nil {

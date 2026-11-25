@@ -67,6 +67,7 @@ func TestNegotiateAcceptsEveryBuiltInCapability(t *testing.T) {
 		CapabilityPrivacy,
 		CapabilityPush,
 		CapabilityScanner,
+		CapabilityAR,
 		CapabilitySecureStorage,
 		CapabilityShare,
 		CapabilitySharing,

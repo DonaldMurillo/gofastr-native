@@ -8,6 +8,9 @@ import (
 )
 
 func validateDeviceFeatures(a app, platform string) error {
+	if a.ARCoreAAR != "" && (a.Renderer != "native" || !strings.HasPrefix(platform, "android")) {
+		return errors.New("--arcore-aar requires Android and --renderer native")
+	}
 	if a.NetworkStatus && (a.Renderer != "native" || platform != "android-emu") {
 		return errors.New("--network-status requires Android and --renderer native")
 	}

@@ -181,9 +181,9 @@ func (v firebaseValues) resource() []byte {
 // pushBuild is what a push-enabled build adds to the Java, dex and
 // resource steps.
 type pushBuild struct {
-	jars, rSources, resourceArgs []string
-	libraryManifests             [][]byte
-	packages                     []string
+	jars             []string
+	libraryManifests [][]byte
+	packages         []string
 }
 
 // preparePushLibraries verifies and unpacks the pinned libraries and merges
@@ -434,10 +434,7 @@ func mergeLibraryManifests(manifests [][]byte, appID string, skip map[string]boo
 	return p.String(), c.String(), nil
 }
 
-// preparePushResources compiles the Firebase values and every library's
-// resources, then links them once to generate the R classes the library
-// bytecode reads. The emitted ids keep the final link identical.
-func preparePushResources(r *runner, sdk androidSDK, a app, dir, manifest string, build *pushBuild, featureArgs []string) error {
+func compilePushResources(r *runner, sdk androidSDK, a app, dir string) ([]string, error) {
 	root := filepath.Join(dir, "push")
 	values := filepath.Join(root, "values", "res", "values", "gofastr_push.xml")
 	if err := r.do("generate Firebase configuration resources", func() error {
@@ -447,13 +444,13 @@ func preparePushResources(r *runner, sdk androidSDK, a app, dir, manifest string
 		}
 		return writeSource(values, config.resource())
 	}); err != nil {
-		return err
+		return nil, err
 	}
 	compiled := filepath.Join(root, "values.zip")
 	if err := r.run("compile Firebase configuration resources", sdk.tool("aapt2"), "compile", "-o", compiled, values); err != nil {
-		return err
+		return nil, err
 	}
-	args := []string{"--auto-add-overlay"}
+	var args []string
 	for _, library := range pushLibraries {
 		res := filepath.Join(root, library.group+"_"+library.name, "res")
 		if library.ext != "aar" || (!r.dryRun && !isDir(res)) {
@@ -461,32 +458,9 @@ func preparePushResources(r *runner, sdk androidSDK, a app, dir, manifest string
 		}
 		zip := filepath.Join(root, library.group+"_"+library.name+".zip")
 		if err := r.run("compile "+library.name+" resources", sdk.tool("aapt2"), "compile", "--dir", res, "-o", zip); err != nil {
-			return err
+			return nil, err
 		}
 		args = append(args, "-R", zip)
 	}
-	args = append(args, "-R", compiled)
-	ids := filepath.Join(root, "ids.txt")
-	gen := filepath.Join(root, "gen")
-	link := append(aapt2LinkArgs(sdk, a, manifest, filepath.Join(root, "r.apk"), append(append([]string(nil), featureArgs...), args...), false),
-		"--java", gen, "--emit-ids", ids)
-	if len(build.packages) > 0 {
-		link = append(link, "--extra-packages", strings.Join(build.packages, ":"))
-	}
-	if err := r.do("clear old generated R classes", func() error { return os.RemoveAll(gen) }); err != nil {
-		return err
-	}
-	if err := r.run("generate R classes for the Firebase libraries", sdk.tool("aapt2"), link...); err != nil {
-		return err
-	}
-	build.rSources = []string{filepath.Join(gen, "<R.java>")}
-	if !r.dryRun {
-		sources, err := listFiles(gen, ".java")
-		if err != nil {
-			return err
-		}
-		build.rSources = sources
-	}
-	build.resourceArgs = append(args, "--stable-ids", ids)
-	return nil
+	return append(args, "-R", compiled), nil
 }
