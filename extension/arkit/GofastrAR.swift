@@ -421,14 +421,11 @@ final class GofastrARView: NSObject, MobileComponentExtensionView, ARSCNViewDele
         guard let arView, running else { return nil }
         let planes = Set(content.planes ?? [])
         let alignment: ARRaycastQuery.TargetAlignment = planes.count == 2 ? .any : planes.contains("vertical") ? .vertical : .horizontal
-        for target in [ARRaycastQuery.Target.existingPlaneGeometry, .estimatedPlane] {
-            guard let query = arView.raycastQuery(from: point, allowing: target, alignment: alignment),
-                  let result = arView.session.raycast(query).first else { continue }
-            let transform = result.worldTransform
-            return Placement(point: SCNVector3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z),
-                             normal: SCNVector3(transform.columns.1.x, transform.columns.1.y, transform.columns.1.z))
-        }
-        return nil
+        guard let query = arView.raycastQuery(from: point, allowing: .existingPlaneGeometry, alignment: alignment),
+              let result = arView.session.raycast(query).first else { return nil }
+        let transform = result.worldTransform
+        return Placement(point: SCNVector3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z),
+                         normal: SCNVector3(transform.columns.1.x, transform.columns.1.y, transform.columns.1.z))
     }
 
     @objc private func resetTapped() {
