@@ -111,6 +111,7 @@ public abstract class GofastrActivity extends Activity {
                 caps.put("push/v1", Push.available() ? "available" : "unavailable");
                 caps.put("contacts/v1", Contacts.available(this) ? "available" : "unavailable");
                 caps.put("scanner/v1", "unavailable");
+                caps.put("ar/v1", "unavailable");
                 caps.put("background-refresh/v1", backgroundRefreshEnabled() ? "available" : "unavailable");
                 caps.putAll(Extensions.capabilities(this));
                 JSONObject reply = command(JSON.object("kind","hello", "hello", JSON.object("minimum",1,"maximum",1,"renderer","android","capabilities",new JSONObject(caps))));

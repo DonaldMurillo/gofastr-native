@@ -38,6 +38,7 @@ const (
 	CapabilityWidgets         Capability = "widgets/v1"
 	CapabilityContacts        Capability = "contacts/v1"
 	CapabilityScanner         Capability = "scanner/v1"
+	CapabilityAR              Capability = "ar/v1"
 	CapabilityIAP             Capability = "iap/v1"
 	CapabilityPrivacy         Capability = "privacy/v1"
 	CapabilitySignInWithApple Capability = "sign-in-with-apple/v1"
@@ -130,7 +131,7 @@ func knownCapability(capability Capability) bool {
 	switch capability {
 	case CapabilityTextToSpeech, CapabilitySpeechRecognition:
 		return true
-	case CapabilityNetwork, CapabilityDeviceInfo, CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityOpenURL, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
+	case CapabilityNetwork, CapabilityDeviceInfo, CapabilityBrowser, CapabilityPush, CapabilityCalendar, CapabilityNavigation, CapabilityEditor, CapabilityDrafts, CapabilityShare, CapabilityHaptics, CapabilitySheets, CapabilityAnnouncement, CapabilityPresentation, CapabilityFiles, CapabilityPhotos, CapabilityCamera, CapabilityNotifications, CapabilitySharing, CapabilityClipboard, CapabilityOpenURL, CapabilityAudio, CapabilityLive, CapabilityIncomingShares, CapabilitySecureStorage, CapabilityLocation, CapabilityWidgets, CapabilityIAP, CapabilityContacts, CapabilityScanner, CapabilityAR, CapabilityBackgroundRefresh, CapabilityPrivacy, CapabilitySignInWithApple, CapabilityOAuthWebLogin:
 		return true
 	default:
 		return false

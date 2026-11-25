@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/DonaldMurillo/gofastr-native/behavior"
+	"github.com/DonaldMurillo/gofastr-native/device/ar"
 	"github.com/DonaldMurillo/gofastr-native/device/audio"
 	"github.com/DonaldMurillo/gofastr-native/device/authentication"
 	"github.com/DonaldMurillo/gofastr-native/device/browser"
@@ -49,6 +50,7 @@ type ServiceRequest struct {
 	Location       *location.Request       `json:"location,omitempty"`
 	Widget         *widgets.Request        `json:"widget,omitempty"`
 	Scan           *scanner.Request        `json:"scan,omitempty"`
+	AR             *ar.Request             `json:"ar,omitempty"`
 	Authentication *authentication.Request `json:"authentication,omitempty"`
 	Refresh        *refresh.Request        `json:"refresh,omitempty"`
 	IAP            *iap.Request            `json:"iap,omitempty"`
@@ -74,6 +76,7 @@ type ServiceResult struct {
 	Location       *location.Result       `json:"location,omitempty"`
 	Widget         *widgets.State         `json:"widget,omitempty"`
 	Scan           *scanner.Result        `json:"scan,omitempty"`
+	AR             *ar.Result             `json:"ar,omitempty"`
 	Authentication *authentication.Result `json:"authentication,omitempty"`
 	Refresh        *refresh.State         `json:"refresh,omitempty"`
 	IAP            *iap.Result            `json:"iap,omitempty"`
@@ -87,7 +90,7 @@ type ServiceRespond func(context.Context, Request, ServiceResult) (Result, error
 // Validate checks the operation without invoking application or platform code.
 func (request ServiceRequest) Validate() error {
 	operations := 0
-	for _, present := range []bool{request.Network != nil, request.DeviceInfo != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.Speech != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
+	for _, present := range []bool{request.Network != nil, request.DeviceInfo != nil, request.Push != nil, request.Browser != nil, request.Contacts != nil, request.Notification != nil, request.Share != nil, request.Clipboard != nil, request.OpenURL != nil, request.Audio != nil, request.Speech != nil, request.IncomingShare != nil, request.SecureStorage != nil, request.Widget != nil, request.Location != nil, request.Scan != nil, request.AR != nil, request.Authentication != nil, request.Calendar != nil, request.Refresh != nil, request.IAP != nil} {
 		if present {
 			operations++
 		}
@@ -106,6 +109,8 @@ func (request ServiceRequest) Validate() error {
 		return request.Contacts.Validate()
 	case request.Scan != nil:
 		return request.Scan.Validate()
+	case request.AR != nil:
+		return request.AR.Validate()
 	case request.Push != nil:
 		return request.Push.Validate()
 	case request.Notification != nil:
@@ -151,6 +156,8 @@ func (request ServiceRequest) capability() Capability {
 		return CapabilityContacts
 	case request.Scan != nil:
 		return CapabilityScanner
+	case request.AR != nil:
+		return CapabilityAR
 	case request.Push != nil:
 		return CapabilityPush
 	case request.Notification != nil:
@@ -212,6 +219,9 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 	if outcome.Scan != nil && (request.Scan == nil || outcome.Status != EffectCompleted) {
 		return errors.New("nativeui: unexpected scanner content")
 	}
+	if outcome.AR != nil && (request.AR == nil || outcome.Status != EffectCompleted) {
+		return errors.New("nativeui: unexpected AR content")
+	}
 	if outcome.Push != nil && request.Push == nil {
 		return errors.New("nativeui: service result contains unrelated device content")
 	}
@@ -268,6 +278,14 @@ func (request ServiceRequest) accept(outcome ServiceResult) error {
 				return errors.New("nativeui: scanner result is required")
 			}
 			if err := request.Scan.Accept(*outcome.Scan); err != nil {
+				return err
+			}
+		}
+		if request.AR != nil {
+			if outcome.AR == nil {
+				return errors.New("nativeui: AR result is required")
+			}
+			if err := request.AR.Accept(*outcome.AR); err != nil {
 				return err
 			}
 		}

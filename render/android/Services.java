@@ -3,6 +3,7 @@ package dev.gofastr.nativeui;
 import android.Manifest;
 import android.app.*;
 import android.content.*;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.MediaRecorder;
@@ -28,6 +29,7 @@ public final class Services {
     private final Speech speech;
     private Consumer<JSONObject> result;
     private Consumer<Uri> picked;
+    private Consumer<Intent> extensionActivity;
     private Runnable permissionGranted;
     private Runnable speechAfterPermission;
     private int activityCode;
@@ -40,13 +42,14 @@ public final class Services {
     private boolean recordingFinishing,disposed,foreground;
     private boolean fileTask;
     private static final int PICK=401, EXPORT=402, CAMERA=403, SHARE=404, MICROPHONE=405, NOTIFICATION=406, CALENDAR=407;
+    private static final int EXTENSION_ACTIVITY=408;
     Services(GofastrActivity host){this.host=host;this.location=new DeviceLocation(host);this.secureStorage=new SecureStorage(host,host.workers);this.speech=new Speech(host);TransferProvider.clean(host);}
     public boolean busy(){return result!=null;}
     private boolean begin(Consumer<JSONObject> callback) {if(result!=null){callback.accept(JSON.object("status","failed"));return false;}result=callback;fileTask=false;return true;}
     private void finish(JSONObject outcome) {
         if(disposed)return;
         if(fileTask){JSONObject file=outcome.optJSONObject("file");outcome=JSON.object("status",outcome.optString("status","failed"));if(file!=null)GofastrActivity.put(outcome,"file",file);}
-        Consumer<JSONObject> callback=result;result=null;picked=null;permissionGranted=null;activityCode=0;
+        Consumer<JSONObject> callback=result;result=null;picked=null;extensionActivity=null;permissionGranted=null;activityCode=0;
         fileTask=false;
         if(callback!=null)callback.accept(outcome);
     }
@@ -91,13 +94,27 @@ public final class Services {
         picked=callback;activityCode=PICK;
         try{host.startActivityForResult(intent,PICK);}catch(Exception e){failed(e);}
     }
+    public void launchExtensionActivity(Intent intent,Consumer<Intent> callback) {
+        if(result==null || activityCode!=0)throw new IllegalStateException("No extension activity slot");
+        extensionActivity=callback;activityCode=EXTENSION_ACTIVITY;
+        host.startActivityForResult(intent,EXTENSION_ACTIVITY);
+    }
     public void capture(Consumer<Uri> callback) {
         try {
             if(!host.canUseCamera()){finish(JSON.object("status","unsupported"));return;}
+            if(host.checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED && declaresCameraPermission()){
+                permissionGranted=()->capture(callback);
+                host.requestPermissions(new String[]{Manifest.permission.CAMERA},CAMERA);
+                return;
+            }
             cameraFile=TransferProvider.create(host,"capture.jpg");Uri uri=TransferProvider.uri(host,cameraFile);
             Intent intent=new Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             intent.setClipData(ClipData.newRawUri("Photo",uri));picked=callback;activityCode=CAMERA;host.startActivityForResult(intent,CAMERA);
         }catch(Exception e){failed(e);}
+    }
+    private boolean declaresCameraPermission() throws PackageManager.NameNotFoundException {
+        PackageInfo info=host.getPackageManager().getPackageInfo(host.getPackageName(),PackageManager.GET_PERMISSIONS);
+        return info.requestedPermissions!=null && Arrays.asList(info.requestedPermissions).contains(Manifest.permission.CAMERA);
     }
     private static boolean calendarText(String text,int maximum) {
         if(text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>maximum)return false;
@@ -208,6 +225,11 @@ public final class Services {
                 Extensions.ServiceFactory scanner=Extensions.service(host,"scanner/v1");
                 if(scanner==null){finish(outcome("unsupported","Barcode scanning is not compiled into this app."));return;}
                 scanner.perform(host,request.getJSONObject("scan"),this::finish);
+            }
+            else if(request.has("ar")) {
+                Extensions.ServiceFactory ar=Extensions.service(host,"ar/v1");
+                if(ar==null){finish(outcome("unsupported","Native AR is not compiled into this app."));return;}
+                ar.perform(host,request.getJSONObject("ar"),this::finish);
             }
             else finish(outcome("unsupported","This service is unavailable."));
         }catch(Exception e){failed(e);}
@@ -330,11 +352,16 @@ public final class Services {
     boolean back(){if(recordingDialog!=null){stopRecording(false);return true;}return busy();}
     void resume(){foreground=true;Runnable speechStart=speechAfterPermission;speechAfterPermission=null;if(speechStart!=null)speechStart.run();}
     void pause(){foreground=false;if(recorder!=null)stopRecording(false);speech.cancel();secureStorage.cancel();location.pause();}
-    void dispose(){disposed=true;speechAfterPermission=null;speech.cancel();secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;permissionGranted=null;}
+    void dispose(){disposed=true;speechAfterPermission=null;speech.cancel();secureStorage.cancel();location.cancel();releaseRecorder();if(recordingDialog!=null)recordingDialog.dismiss();if(recordingLimit!=null)host.main.removeCallbacks(recordingLimit);releaseCapture();result=null;picked=null;extensionActivity=null;permissionGranted=null;}
     void activityResult(int code,int status,Intent data) {
         if(code!=activityCode || result==null)return;
         if(code==CALENDAR){finish(outcome("completed","Calendar editor closed. Android does not confirm the event was saved."));return;}
         if(code==SHARE){finish(outcome(status==Activity.RESULT_OK?"completed":"cancelled","Share sheet closed. Android does not confirm delivery."));return;}
+        if(code==EXTENSION_ACTIVITY){
+            Consumer<Intent> callback=extensionActivity;extensionActivity=null;activityCode=0;
+            try{callback.accept(status==Activity.RESULT_OK?data:null);}catch(Exception e){failed(e);}
+            return;
+        }
         Consumer<Uri> callback=picked;picked=null;activityCode=0;
         if(status!=Activity.RESULT_OK){releaseCapture();finish(JSON.object("status","cancelled"));return;}
         Uri uri=code==CAMERA && cameraFile!=null?Uri.fromFile(cameraFile):data==null?null:data.getData();
@@ -343,7 +370,7 @@ public final class Services {
     }
     void permissionsResult(int code,int[] grants) {
         if(code==DeviceLocation.PERMISSION_REQUEST){if(result!=null)location.permissionsResult(grants);return;}
-        if((code!=MICROPHONE && code!=NOTIFICATION) || result==null)return;
+        if((code!=CAMERA && code!=MICROPHONE && code!=NOTIFICATION) || result==null)return;
         Runnable granted=permissionGranted;permissionGranted=null;
         if(grants.length>0 && grants[0]==PackageManager.PERMISSION_GRANTED && granted!=null)granted.run();
         else finish(outcome("denied","Permission was denied."));

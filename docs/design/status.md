@@ -21,6 +21,15 @@ Real APNs delivery on hardware: **NOT RUN**.
 What the project covers today, what has been checked and on what, and what
 is left. Updated with the work; the dates are in the [implementation log](agent-notes.md).
 
+## Android augmented reality
+
+Native Android builds can opt into [ARCore](../android-ar.md) for a
+camera-free availability check and local plane detection with one anchor.
+The app can still run on an Android device without ARCore support. iOS and
+WebView do not advertise this capability. Emulator tracking and placement
+are **NOT RUN** (ARCore could not open the emulator camera). Physical-device
+acceptance is **NOT RUN**.
+
 ## Windows desktop renderer prototype
 
 [Log Explorer](../../examples/logexplorer/) runs a Go-authored workspace
