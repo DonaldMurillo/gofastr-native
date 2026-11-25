@@ -164,10 +164,9 @@ public final class ARSessionActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
-        if (session != null) {
-            session.close();
-            session = null;
-        }
+        Session closing = session;
+        session = null;
+        if (closing != null) new Thread(closing::close, "gofastr-ar-close").start();
         super.onDestroy();
     }
 

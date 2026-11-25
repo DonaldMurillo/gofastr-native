@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	renderarcore "github.com/DonaldMurillo/gofastr-native/render/android/arcore"
 )
 
 func TestARCoreIsOptIn(t *testing.T) {
@@ -40,6 +42,55 @@ func TestARCoreIsOptIn(t *testing.T) {
 	if validateDeviceFeatures(a, "android-emu") == nil {
 		t.Fatal("ARCore works only in the native renderer")
 	}
+}
+
+func TestARCoreClosesSessionAfterPauseOffMainThread(t *testing.T) {
+	source, err := renderarcore.Sources.ReadFile("ARSessionActivity.java")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifecycle := androidJavaSection(t, string(source), "    @Override protected void onPause()", "    private void place(")
+	runAndroidJavaFixture(t, "ARSessionLifecycle", `import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+class ARSessionLifecycle extends Activity {
+    final Surface surface = new Surface();
+    Session session = new Session();
+    boolean running = true;
+
+    class Surface {
+        boolean paused;
+        void onPause() { paused = true; }
+    }
+
+    class Session {
+        final Thread main = Thread.currentThread();
+        final CountDownLatch closed = new CountDownLatch(1);
+        boolean paused;
+        void pause() {
+            if (Thread.currentThread() != main || !surface.paused) throw new AssertionError("pause before renderer stops");
+            paused = true;
+        }
+        void close() {
+            if (Thread.currentThread() == main || !paused || session != null) throw new AssertionError("unsafe session close");
+            closed.countDown();
+        }
+    }
+
+`+lifecycle+`
+    public static void main(String[] args) throws Exception {
+        ARSessionLifecycle activity = new ARSessionLifecycle();
+        Session session = activity.session;
+        activity.onPause();
+        activity.onDestroy();
+        if (activity.session != null || !session.closed.await(2, TimeUnit.SECONDS)) throw new AssertionError("session not closed");
+    }
+}
+
+class Activity {
+    protected void onPause() {}
+    protected void onDestroy() {}
+}`)
 }
 
 func TestARCoreCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
