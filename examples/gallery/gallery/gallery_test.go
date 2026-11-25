@@ -40,6 +40,7 @@ func (r *recorder) actions() []string {
 func everything() map[nativeui.Capability]nativeui.Support {
 	capabilities := map[nativeui.Capability]nativeui.Support{}
 	capabilities["gofastr.maps/v1"] = nativeui.SupportAvailable
+	capabilities["gofastr.arkit/v1"] = nativeui.SupportAvailable
 	capabilities[nativeui.CapabilityContacts] = nativeui.SupportAvailable
 	for _, capability := range KnownCapabilities {
 		capabilities[capability] = nativeui.SupportAvailable

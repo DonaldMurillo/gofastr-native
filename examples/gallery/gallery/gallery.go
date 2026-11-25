@@ -24,6 +24,7 @@ import (
 	"github.com/DonaldMurillo/gofastr-native/device/files"
 	"github.com/DonaldMurillo/gofastr-native/device/sharing"
 	"github.com/DonaldMurillo/gofastr-native/extension"
+	"github.com/DonaldMurillo/gofastr-native/extension/arkit"
 	"github.com/DonaldMurillo/gofastr-native/extension/maps"
 	"github.com/DonaldMurillo/gofastr-native/nativeui"
 )
@@ -66,6 +67,7 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		tabRoot(Root, "controls", "Controls", "Each row opens one demo. A demo that needs a capability says so and refuses to open where the renderer lacks it.", []nativeui.Row{
 			{ID: "fields", Title: "Form fields", Subtitle: "Six field kinds, required, disabled, validation", Destination: "/gallery/fields"},
 			{ID: "map", Title: "Map", Subtitle: "MapKit pins and optional location (iOS)", Destination: "/gallery/map"},
+			{ID: "ar", Title: "AR scene", Subtitle: "ARKit planes and placed objects (iOS)", Destination: "/gallery/ar"},
 			{ID: "document", Title: "Document form", Subtitle: "Document style with a details section", Icon: nativeui.IconFile, Destination: "/gallery/document"},
 			{ID: "draft", Title: "Drafts", Subtitle: "Local recovery and the leave prompt", Destination: "/gallery/draft"},
 			{ID: "unknown", Title: "Simulated unknown save", Subtitle: "What happens when a save's outcome is lost", Destination: "/gallery/unknown"},
@@ -163,8 +165,16 @@ func newApp(onCall func(string)) (*nativeui.App, error) {
 		return nativeui.Screen{Title: "Map", Text: "Select a pin, then its detail button to open the place.", Components: []extension.Component{block}}, err
 	}}, nativeui.Route{Path: "/gallery/places/{id}", Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
 		return nativeui.Screen{Title: "Place", Text: "Selected place: " + request.Params["id"]}, nil
+	}}, nativeui.Route{Path: "/gallery/ar", Screen: func(context.Context, nativeui.Request) (nativeui.Screen, error) {
+		block, err := arkit.Block("scene", arkit.Content{Planes: []arkit.Plane{arkit.Horizontal}, ShowsPlanes: true, Coaching: true, LightEstimation: true, Objects: []arkit.Object{
+			{ID: "cube", Title: "Blue cube", Shape: arkit.Box, Size: 0.25, Color: "#2F6FDE", Position: &arkit.Vector{Y: -0.45, Z: -1.2}, Destination: "/gallery/ar/objects/cube"},
+			{ID: "ball", Title: "Orange ball", Shape: arkit.Sphere, Size: 0.15, Color: "#F28C28", Destination: "/gallery/ar/objects/ball"},
+		}})
+		return nativeui.Screen{Title: "AR scene", Text: "Tap a surface to place the ball, then tap an object to open it.", Components: []extension.Component{block}}, err
+	}}, nativeui.Route{Path: "/gallery/ar/objects/{id}", Screen: func(_ context.Context, request nativeui.Request) (nativeui.Screen, error) {
+		return nativeui.Screen{Title: "Object", Text: "Selected object: " + request.Params["id"]}, nil
 	}})
-	return nativeui.NewWithExtensions(Root, []extension.Definition{maps.Definition()}, routes...)
+	return nativeui.NewWithExtensions(Root, []extension.Definition{maps.Definition(), arkit.Definition()}, routes...)
 }
 
 func contactsRoute(demo *state) nativeui.Route {

@@ -1,0 +1,1 @@
+{"name":"gofastr.arkit/v1","kind":"component","capabilities":["gofastr.arkit/v1"],"ios":{"factory":"GofastrARComponent","sources":["GofastrAR.swift"]}}
