@@ -22,6 +22,11 @@ This repository holds two Go modules, tagged separately:
 - iOS-only `extension/maps` MapKit component with keyed pins, callout navigation,
   optional user location, a gallery screen and `--location --location-usage`
   opt-in purpose text.
+- iOS-only `extension/arkit` ARKit component: world tracking, horizontal and
+  vertical plane detection, coaching, built-in primitives fixed in space or
+  placed by tapping a surface, keyed object navigation, reset, and a gallery
+  AR scene. A `GOFASTR_AR_FIXTURE` simulator scene drives XCUITest; device
+  tracking and camera permission UX are NOT RUN.
 - The native Android renderer serves `contacts/v1` through the system phone
   or email row picker, without `READ_CONTACTS`: single selection of one
   `phone` or `email` field, with the display name in `GivenName`. Other

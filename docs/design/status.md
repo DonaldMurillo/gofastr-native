@@ -98,6 +98,15 @@ callout-to-detail navigation and a preauthorized simulated user-location annotat
 plus first-time when-in-use authorization across renderer suspension
 (four tests, zero failures). Physical-device gates remain.
 
+The iOS-only [AR component](../arkit.md) adds ARKit world tracking, plane
+detection, coaching, built-in primitives fixed in space or placed on tapped
+surfaces, and route-only object navigation. Go validation, Foundation decoding
+and simulator compilation are automated. Simulator XCUITest acceptance passed on
+iPhone 17/iOS 26.5 (three tests, zero failures): the unsupported-device status,
+and with the `GOFASTR_AR_FIXTURE` surface, fixed-object navigation, tap-to-place,
+placed-object navigation and reset. Device world tracking, plane detection,
+camera permission UX and VoiceOver remain NOT RUN.
+
 The typed `browser/v1` service opens SFSafariViewController in native iOS,
 with optional Reader mode and dismiss label. Starter includes About → Open docs
 and a returned-status screen. Android and WebView advertise unavailable.
