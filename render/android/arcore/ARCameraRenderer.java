@@ -41,7 +41,6 @@ final class ARCameraRenderer implements GLSurfaceView.Renderer {
     private int width, height, previousWidth, previousHeight, previousRotation = -1;
     private Anchor anchor;
     private float[] tap;
-    private String instruction;
     private boolean failed;
 
     ARCameraRenderer(ARSessionActivity host) {
@@ -102,7 +101,7 @@ final class ARCameraRenderer implements GLSurfaceView.Renderer {
             Camera camera = frame.getCamera();
             if (camera.getTrackingState() != TrackingState.TRACKING) {
                 tap = null;
-                report("Move the camera slowly to start tracking.", null);
+                host.updatePlacement("Move the camera slowly to start tracking.", null);
                 return;
             }
             if (tap != null) {
@@ -115,7 +114,6 @@ final class ARCameraRenderer implements GLSurfaceView.Renderer {
                             Anchor placed = hit.createAnchor();
                             if (anchor != null) anchor.detach();
                             anchor = placed;
-                            instruction = null;
                             break;
                         }
                     }
@@ -124,7 +122,7 @@ final class ARCameraRenderer implements GLSurfaceView.Renderer {
             if (anchor != null && anchor.getTrackingState() == TrackingState.TRACKING) {
                 float[] position = anchor.getPose().getTranslation();
                 drawAnchor(camera, position);
-                report("Anchor placed. Tap another surface to move it, or choose Done.", position);
+                host.updatePlacement("Anchor placed. Tap another surface to move it, or choose Done.", position);
             } else {
                 boolean found = false;
                 for (Plane plane : session.getAllTrackables(Plane.class)) {
@@ -133,17 +131,10 @@ final class ARCameraRenderer implements GLSurfaceView.Renderer {
                         break;
                     }
                 }
-                report(found ? "Surface detected. Tap it to place an anchor." : "Look around for a flat surface.", null);
+                host.updatePlacement(found ? "Surface detected. Tap it to place an anchor." : "Look around for a flat surface.", null);
             }
         } catch (Exception e) {
             fail(e);
-        }
-    }
-
-    private void report(String text, float[] position) {
-        if (!text.equals(instruction)) {
-            instruction = text;
-            host.updatePlacement(text, position);
         }
     }
 

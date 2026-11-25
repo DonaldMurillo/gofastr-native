@@ -34,7 +34,8 @@ public final class ARSessionActivity extends Activity {
     private volatile boolean running;
     private boolean requestedInstall;
     private boolean requestedPermission;
-    private float[] position;
+    private volatile float[] position;
+    private String reportedInstruction;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -178,9 +179,11 @@ public final class ARSessionActivity extends Activity {
     int rotation() { return rotation; }
 
     void updatePlacement(String text, float[] anchorPosition) {
+        position = anchorPosition;
+        if (text.equals(reportedInstruction)) return;
+        reportedInstruction = text;
         runOnUiThread(() -> {
-            if (!running || isFinishing() || isDestroyed()) return;
-            position = anchorPosition;
+            if (isFinishing() || isDestroyed()) return;
             instruction.setText(text);
             done.setEnabled(position != null);
         });
@@ -193,9 +196,12 @@ public final class ARSessionActivity extends Activity {
 
     private void settle(String status, String message) {
         if (isFinishing() || isDestroyed()) return;
+        boolean completed = "completed".equals(status);
+        float[] anchorPosition = position;
+        if (completed && anchorPosition == null) return;
         Intent data = new Intent().putExtra("status", status);
         if (message != null) data.putExtra("message", message);
-        if ("completed".equals(status)) data.putExtra("position", position);
+        if (completed) data.putExtra("position", anchorPosition);
         setResult(RESULT_OK, data);
         finish();
     }

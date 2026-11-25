@@ -93,6 +93,57 @@ class Activity {
 }`)
 }
 
+func TestARCoreReturnsLatestPoseWithUnchangedInstruction(t *testing.T) {
+	source, err := renderarcore.Sources.ReadFile("ARSessionActivity.java")
+	if err != nil {
+		t.Fatal(err)
+	}
+	update := androidJavaSection(t, string(source), "    void updatePlacement(", "    void fail(")
+	settle := androidJavaSection(t, string(source), "    private void settle(", "\n}")
+	runAndroidJavaFixture(t, "ARPlacement", `import java.util.ArrayDeque;
+
+class ARPlacement {
+    static final int RESULT_OK = -1;
+    static class Intent {
+        float[] position;
+        Intent putExtra(String key,String value) { return this; }
+        Intent putExtra(String key,float[] value) { position=value; return this; }
+    }
+    static class TextView { void setText(String text) {} }
+    static class Button { boolean enabled; void setEnabled(boolean value) { enabled=value; } }
+    final ArrayDeque<Runnable> posted=new ArrayDeque<>();
+    final TextView instruction=new TextView();
+    final Button done=new Button();
+    boolean finished;
+    volatile float[] position;
+    String reportedInstruction;
+    Intent result;
+    boolean isFinishing() { return finished; }
+    boolean isDestroyed() { return false; }
+    void runOnUiThread(Runnable callback) { posted.add(callback); }
+    void setResult(int code,Intent data) { result=data; }
+    void finish() { finished=true; }
+`+update+settle+`
+    public static void main(String[] args) {
+        ARPlacement activity=new ARPlacement();
+        activity.updatePlacement("Anchor placed",new float[]{1,2,3});
+        activity.posted.remove().run();
+        if (!activity.done.enabled) throw new AssertionError("Done not enabled");
+        float[] latest={4,5,6};
+        activity.updatePlacement("Anchor placed",latest);
+        activity.settle("completed",null);
+        if (activity.result==null || activity.result.position!=latest || !activity.posted.isEmpty()) throw new AssertionError("stale pose or extra UI work");
+        ARPlacement lost=new ARPlacement();
+        lost.updatePlacement("Anchor placed",latest);
+        lost.posted.remove().run();
+        lost.updatePlacement("Look around for a flat surface",null);
+        lost.settle("completed",null);
+        lost.posted.remove().run();
+        if (lost.finished || lost.done.enabled) throw new AssertionError("completed without tracking");
+    }
+}`)
+}
+
 func TestARCoreCompilesAgainstSDKAndGeneratedBindings(t *testing.T) {
 	aar := os.Getenv("GOFASTR_ARCORE_AAR")
 	if aar == "" {
